@@ -1,0 +1,25 @@
+# electron-builder 設定。
+# 署名は当面行わない（docs/design/decisions.md F-3）。証明書を入れる段になったら
+# mac.identity / win.certificateFile 等を追加する。ネイティブモジュールを
+# 使わない方針（F-2b）のため、asarUnpack や node-gyp 関連の設定は不要。
+appId: com.shovel.app
+productName: shovel
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**/*
+  - package.json
+asarUnpack: []
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    --primary: 222 89% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 92%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 222 89% 55%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 10% 8%;
+    --foreground: 0 0% 96%;
+    --card: 240 8% 11%;
+    --card-foreground: 0 0% 96%;
+    --popover: 240 8% 11%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 222 89% 65%;
+    --primary-foreground: 240 10% 8%;
+    --secondary: 240 6% 16%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 240 6% 16%;
+    --muted-foreground: 240 4% 64%;
+    --accent: 240 6% 20%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 63% 40%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 240 6% 20%;
+    --input: 240 6% 20%;
+    --ring: 222 89% 65%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      'Hiragino Kaku Gothic ProN',
+      'Yu Gothic',
+      sans-serif;
+  }
+}
+
+/**
+ * トランスクリプト / Markdown プレビュー共通のスタイル。
+ * decisions.md N-1: transcript.css を出発点に、shadcn のテーマ変数
+ * （--background 等）へ接続する。ここでは最小限の要素だけを整える。
+ */
+.markdown :where(p, ul, ol, blockquote, pre, table) {
+  margin: 0.5em 0;
+}
+.markdown :where(ul, ol) {
+  padding-left: 1.5em;
+}
+.markdown ul {
+  list-style: disc;
+}
+.markdown ol {
+  list-style: decimal;
+}
+.markdown code {
+  @apply rounded bg-muted px-1 py-0.5 text-[0.85em];
+}
+.markdown pre {
+  @apply overflow-x-auto rounded-md bg-muted p-3;
+}
+.markdown pre code {
+  @apply bg-transparent p-0;
+}
+.markdown blockquote {
+  @apply border-l-2 border-border pl-3 text-muted-foreground;
+}
+.markdown a {
+  @apply text-primary underline;
+}
+.markdown :where(h1, h2, h3, h4) {
+  font-weight: 600;
+  margin: 0.75em 0 0.25em;
+}
+.markdown table {
+  border-collapse: collapse;
+}
+.markdown :where(th, td) {
+  @apply border border-border px-2 py-1;
+}
+
+/** ui.md §9: shiki の出力に行番号を付ける（拡張パッケージ無しで CSS カウンタで実現）。 */
+.shiki-lines pre.shiki {
+  @apply overflow-x-auto rounded-md p-3;
+  counter-reset: line;
+}
+.shiki-lines pre.shiki code {
+  display: grid;
+}
+.shiki-lines .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 2.5em;
+  margin-right: 1em;
+  text-align: right;
+  opacity: 0.4;
+  user-select: none;
+}

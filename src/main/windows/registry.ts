@@ -1,0 +1,41 @@
+import { BrowserWindow } from 'electron'
+
+/**
+ * decisions.md G-1-6: プロジェクトは常に新しいウィンドウで開き、すでに
+ * 開いていればそのウィンドウを前面に出す。「現在のウィンドウで開く」は無い。
+ */
+const windowsByProjectId = new Map<string, BrowserWindow>()
+let projectManagerWindow: BrowserWindow | null = null
+
+export function getProjectWindow(projectId: string): BrowserWindow | null {
+  const win = windowsByProjectId.get(projectId)
+  if (win && !win.isDestroyed()) return win
+  windowsByProjectId.delete(projectId)
+  return null
+}
+
+export function registerProjectWindow(projectId: string, win: BrowserWindow): void {
+  windowsByProjectId.set(projectId, win)
+  win.once('closed', () => {
+    windowsByProjectId.delete(projectId)
+  })
+}
+
+export function getProjectManagerWindow(): BrowserWindow | null {
+  if (projectManagerWindow && !projectManagerWindow.isDestroyed()) return projectManagerWindow
+  return null
+}
+
+export function setProjectManagerWindow(win: BrowserWindow): void {
+  projectManagerWindow = win
+  win.once('closed', () => {
+    projectManagerWindow = null
+  })
+}
+
+export function anyProjectWindowOpen(): boolean {
+  for (const win of windowsByProjectId.values()) {
+    if (!win.isDestroyed()) return true
+  }
+  return false
+}

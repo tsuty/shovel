@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+dist-electron/
+release/
+out/
+
+# mise local override (personal, not shared)
+.mise.local.toml
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+
+# OS
+.DS_Store
+
+# editor
+.idea/
+.vscode/

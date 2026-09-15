@@ -1,0 +1,112 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "create": "Create",
+    "creating": "Creating…",
+    "rename": "Rename",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "dismiss": "Dismiss"
+  },
+  "header": {
+    "allProjects": "All projects…"
+  },
+  "projectManager": {
+    "title": "Projects",
+    "newProject": "New project",
+    "empty": "No projects yet.",
+    "confirmRemove": "Also move the local directory to the trash?",
+    "status": {
+      "running": "Running",
+      "stopped": "Stopped",
+      "missing": "Sandbox missing",
+      "workspace_missing": "Directory missing"
+    }
+  },
+  "createFlow": {
+    "title": "New project",
+    "tabNew": "New directory",
+    "tabExisting": "Existing directory",
+    "tabSandbox": "Existing sandbox",
+    "agent": "Agent",
+    "projectName": "Project name",
+    "baseDirectory": "Base directory",
+    "selectDirectory": "Select a directory",
+    "browse": "Browse…",
+    "projectPath": "Directory name",
+    "details": "Details",
+    "sandboxName": "Sandbox name",
+    "gitInit": "Track changes with git (recommended)",
+    "existingWarning": "All files in this directory, including hidden files, will be visible to the AI.",
+    "acknowledge": "I understand",
+    "noImportable": "No sandboxes to import."
+  },
+  "sidebar": {
+    "tabs": "Tabs",
+    "filer": "Files",
+    "changes": "Changes",
+    "commands": "Run command",
+    "comingSoon": "Coming soon"
+  },
+  "filer": {
+    "copyPath": "Copy path",
+    "fileDeleted": "This file has been deleted."
+  },
+  "editor": {
+    "mode": {
+      "split": "Split",
+      "source": "Source",
+      "preview": "Preview"
+    },
+    "conflict": "The agent changed this file, so your edits were saved to {{path}}."
+  },
+  "changes": {
+    "empty": "No changes.",
+    "restore": "Restore",
+    "restoreAll": "Restore all",
+    "confirmRestoreAll": "Restore all of the following files?",
+    "noDiff": "No diff to show."
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "systemDefault": "System default",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "transcriptFontSize": "Transcript font size",
+    "autoAttachActiveFile": "Automatically attach the active file"
+  },
+  "history": {
+    "title": "History",
+    "untitled": "Untitled session",
+    "readOnlyNotice": "Read-only history. The agent no longer remembers this conversation.",
+    "startNew": "Start new session",
+    "empty": "Nothing was recorded for this session."
+  },
+  "commands": {
+    "hint": "Prompts like [Y/n] can be answered, but full-screen apps such as vim will not work.",
+    "placeholder": "Run a command…",
+    "run": "Run",
+    "cancel": "Cancel",
+    "stdinPlaceholder": "Send input…",
+    "sendInput": "Send"
+  },
+  "transcript": {
+    "you": "You",
+    "agent": "Agent",
+    "plan": "Plan",
+    "thinking": "Thinking",
+    "working": "Working…",
+    "worked": "Worked"
+  },
+  "composer": {
+    "placeholder": "Message the agent…",
+    "send": "Send",
+    "stop": "Stop"
+  },
+  "mainWindow": {
+    "noProject": "No project was specified.",
+    "connecting": "Connecting…"
+  }
+}
