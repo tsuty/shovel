@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ProjectWithStatus } from '@shared/types/project'
 import type { SessionMeta, SessionSnapshot } from '@shared/types/session'
@@ -16,6 +17,7 @@ import { AuthDialog } from './components/AuthDialog'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 import { useTabSwitchShortcuts } from './useTabShortcuts'
 import { addAttachmentToSession } from './attachmentRegistry'
+import { friendlyErrorMessage } from '../shared/friendlyError'
 
 const MAX_SESSION_TABS = 10
 
@@ -31,6 +33,7 @@ function getProjectIdFromQuery(): string | null {
 export function App(): React.JSX.Element {
   const { t } = useTranslation()
   const [projectId] = useState(getProjectIdFromQuery)
+  const [allProjects, setAllProjects] = useState<ProjectWithStatus[]>([])
   const [project, setProject] = useState<ProjectWithStatus | null>(null)
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -45,6 +48,7 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     if (!projectId) return
     void window.shovel.projects.list().then((projects) => {
+      setAllProjects(projects)
       setProject(projects.find((p) => p.id === projectId) ?? null)
     })
   }, [projectId])
@@ -55,15 +59,16 @@ export function App(): React.JSX.Element {
     if (!projectId || sessionTabCount >= MAX_SESSION_TABS) return
     setError(null)
 
-    // flows.md §1-2: 接続前に高速な事前チェックを行い、未ログインなら接続を
-    // 試みずに認証画面を出す。
-    const status = await window.shovel.auth.status(projectId)
-    if (!status.checkFailed && !status.loggedIn) {
-      setAuthOpen(true)
-      return
-    }
-
     try {
+      // flows.md §1-2: 接続前に高速な事前チェックを行い、未ログインなら接続を
+      // 試みずに認証画面を出す。`sbx` 自体が無い等でこのチェック自体が失敗
+      // した場合も、下の catch でエラー表示に落とす（画面が固まらないように）。
+      const status = await window.shovel.auth.status(projectId)
+      if (!status.checkFailed && !status.loggedIn) {
+        setAuthOpen(true)
+        return
+      }
+
       const { sessionId, meta } = await window.shovel.session.openTab(projectId)
       // ui.md §7: アクティブファイルの自動添付は設定項目（既定 off）。
       // ここでは「タブを開いた時点で最後に開いていたファイル」を初期チップとして
@@ -82,7 +87,7 @@ export function App(): React.JSX.Element {
         setAuthOpen(true)
         return
       }
-      setError(message)
+      setError(friendlyErrorMessage(message, t))
     }
   }
 
@@ -162,6 +167,8 @@ export function App(): React.JSX.Element {
       <Header
         displayName={project?.displayName ?? '…'}
         status={project?.status ?? null}
+        currentProjectId={projectId}
+        recentProjects={allProjects}
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <div className="flex flex-1 overflow-hidden">
@@ -189,7 +196,15 @@ export function App(): React.JSX.Element {
             onNew={() => void openNewTab()}
             canAddTab={sessionTabCount < MAX_SESSION_TABS}
           />
-          {error && <p className="px-3 py-1 text-xs text-destructive">{error}</p>}
+          {error && (
+            <div className="flex items-start gap-2 border-b border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span className="flex-1">{error}</span>
+              <button className="shrink-0 font-medium hover:underline" onClick={() => void openNewTab()}>
+                {t('common.retry')}
+              </button>
+            </div>
+          )}
           <div className="flex flex-1 flex-col overflow-hidden">
             {tabs.map((tab) => (
               <div

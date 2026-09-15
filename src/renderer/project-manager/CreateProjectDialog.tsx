@@ -13,6 +13,7 @@ import { Button } from '../shared/components/ui/button'
 import { Input } from '../shared/components/ui/input'
 import { Checkbox } from '../shared/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../shared/components/ui/tabs'
+import { friendlyErrorMessage } from '../shared/friendlyError'
 
 type Flow = 'new' | 'existing' | 'sandbox'
 
@@ -142,7 +143,7 @@ function NewDirForm(props: {
       })
       onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyErrorMessage(err instanceof Error ? err.message : String(err), t))
     } finally {
       setBusy(false)
     }
@@ -237,7 +238,7 @@ function ExistingDirForm(props: {
       await window.shovel.projects.createExistingDir({ agentId, hostPath, displayName, gitInit })
       onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyErrorMessage(err instanceof Error ? err.message : String(err), t))
     } finally {
       setBusy(false)
     }
@@ -317,7 +318,7 @@ function ExistingSandboxForm(props: {
       await window.shovel.projects.createFromExisting({ sandboxName: selected, displayName })
       onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyErrorMessage(err instanceof Error ? err.message : String(err), t))
     } finally {
       setBusy(false)
     }

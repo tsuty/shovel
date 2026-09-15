@@ -1,6 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { SbxExecResult, SbxLsEntry } from './types'
 import { SbxCommandError } from './types'
+import { SBX_NOT_FOUND_MARKER } from '@shared/sbxErrors'
+
+/** `spawn` の 'error' を、renderer で案内文言に差し替えられるマーカー付きの Error へ変換する。 */
+function toFriendlyError(err: NodeJS.ErrnoException): Error {
+  if (err.code === 'ENOENT') return new Error(SBX_NOT_FOUND_MARKER)
+  return err
+}
 
 /**
  * `sbx` CLI との唯一の接点。architecture.md §3 / §7 の規則を守る:
@@ -19,7 +26,7 @@ function run(args: string[], opts: { input?: string; cwd?: string } = {}): Promi
     let stderr = ''
     child.stdout.on('data', (d: Buffer) => (stdout += d.toString('utf8')))
     child.stderr.on('data', (d: Buffer) => (stderr += d.toString('utf8')))
-    child.on('error', (err) => reject(err))
+    child.on('error', (err) => reject(toFriendlyError(err)))
     child.on('close', (code) => resolve({ code, stdout, stderr }))
     if (opts.input !== undefined) {
       child.stdin.end(opts.input)
@@ -73,7 +80,7 @@ export function sbxCreate(opts: SbxCreateOptions): Promise<void> {
     }
     child.stdout.on('data', forwardLines('stdout'))
     child.stderr.on('data', forwardLines('stderr'))
-    child.on('error', reject)
+    child.on('error', (err) => reject(toFriendlyError(err)))
     child.on('close', (code) => {
       if (code === 0) resolve()
       else reject(new SbxCommandError(`sbx create failed with code ${code}`, { code, stdout: '', stderr }))
@@ -129,7 +136,15 @@ export function sbxSpawnInteractive(
   const args = ['exec', '-i']
   if (opts.cwd) args.push('-w', opts.cwd)
   args.push(sandboxName, ...command)
-  return spawn(SBX_BIN, args, { shell: false })
+  const child = spawn(SBX_BIN, args, { shell: false })
+  // Node の EventEmitter は 'error' にリスナーが無いと例外を投げ、main
+  // プロセスごと落ちる。呼び出し側（ACP 接続・コマンド実行）は 'close' や
+  // ストリームの終了で子プロセスの消失に気づく設計なので、ここでは
+  // クラッシュを防ぐための最低限のリスナーだけを付けておく。
+  child.on('error', (err) => {
+    console.error(`[sbx] failed to spawn "sbx ${args.join(' ')}":`, err)
+  })
+  return child
 }
 
 export async function sbxSecretSet(service: string, value: string): Promise<void> {

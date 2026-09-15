@@ -7,7 +7,8 @@
     "delete": "Delete",
     "cancel": "Cancel",
     "dismiss": "Dismiss",
-    "save": "Save"
+    "save": "Save",
+    "retry": "Retry"
   },
   "detail": {
     "title": "Details",
@@ -30,7 +31,9 @@
     "recheck": "Check again"
   },
   "header": {
-    "allProjects": "All projects…"
+    "allProjects": "All projects…",
+    "recentProjects": "Recent projects",
+    "newProject": "New project…"
   },
   "projectManager": {
     "title": "Projects",
@@ -128,6 +131,9 @@
     "send": "Send",
     "stop": "Stop",
     "removeAttachment": "Remove attachment"
+  },
+  "errors": {
+    "sbxNotFound": "The \"sbx\" (Docker Sandboxes) command line tool was not found. Install it and try again: https://docs.docker.com/ai/sandboxes/"
   },
   "mainWindow": {
     "noProject": "No project was specified.",

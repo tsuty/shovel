@@ -7,7 +7,8 @@
     "delete": "削除",
     "cancel": "キャンセル",
     "dismiss": "閉じる",
-    "save": "保存"
+    "save": "保存",
+    "retry": "再試行"
   },
   "detail": {
     "title": "詳細",
@@ -30,7 +31,9 @@
     "recheck": "確認"
   },
   "header": {
-    "allProjects": "すべてのプロジェクト…"
+    "allProjects": "すべてのプロジェクト…",
+    "recentProjects": "最近のプロジェクト",
+    "newProject": "新しいプロジェクト…"
   },
   "projectManager": {
     "title": "プロジェクト",
@@ -128,6 +131,9 @@
     "send": "送信",
     "stop": "停止",
     "removeAttachment": "添付を外す"
+  },
+  "errors": {
+    "sbxNotFound": "Docker Sandboxes の「sbx」コマンドが見つかりません。インストールしてからもう一度お試しください: https://docs.docker.com/ai/sandboxes/"
   },
   "mainWindow": {
     "noProject": "プロジェクトが指定されていません。",
