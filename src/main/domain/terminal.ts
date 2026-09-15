@@ -1,12 +1,13 @@
 import { spawn } from 'node:child_process'
 
 /**
- * OS のターミナルアプリを開き、`sbx exec -it <sandbox> /bin/bash -l` を
- * 渡す（decisions.md N-4）。フル機能のターミナルが必要な場合の唯一の逃げ道。
+ * OS のターミナルアプリを開き、サンドボックス内でコマンドを実行させる
+ * （decisions.md N-4, N-2-7b）。フル機能のターミナルが必要な場合や、
+ * ブラウザを伴う認証フローを走らせる場合の唯一の逃げ道。
  * `node-pty` は使わない方針（F-2b）のため、ここだけは OS ごとの分岐が要る。
  */
-export function openSandboxTerminal(sandboxName: string): void {
-  const command = `sbx exec -it ${shellQuote(sandboxName)} /bin/bash -l`
+export function openSandboxCommand(sandboxName: string, argv: string[]): void {
+  const command = ['sbx', 'exec', '-it', sandboxName, ...argv].map(shellQuote).join(' ')
 
   if (process.platform === 'darwin') {
     const script = `tell application "Terminal" to do script "${command.replace(/"/g, '\\"')}"`
@@ -28,6 +29,10 @@ export function openSandboxTerminal(sandboxName: string): void {
     detached: true,
     stdio: 'ignore'
   }).unref()
+}
+
+export function openSandboxTerminal(sandboxName: string): void {
+  openSandboxCommand(sandboxName, ['/bin/bash', '-l'])
 }
 
 function shellQuote(value: string): string {

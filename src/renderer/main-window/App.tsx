@@ -12,6 +12,8 @@ import { Commands } from './components/Commands'
 import { HistoryView } from './components/HistoryView'
 import { useSettings } from '../shared/useSettings'
 import { SettingsDialog } from '../shared/components/SettingsDialog'
+import { AuthDialog } from './components/AuthDialog'
+import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 
 const MAX_SESSION_TABS = 10
 
@@ -34,6 +36,7 @@ export function App(): React.JSX.Element {
   const [openPanels, setOpenPanels] = useState<Set<SidebarPanel>>(new Set(['tabs']))
   const [commandsOpen, setCommandsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
   const { settings, update: updateSettings } = useSettings()
 
   useEffect(() => {
@@ -47,6 +50,16 @@ export function App(): React.JSX.Element {
 
   async function openNewTab(): Promise<void> {
     if (!projectId || sessionTabCount >= MAX_SESSION_TABS) return
+    setError(null)
+
+    // flows.md §1-2: 接続前に高速な事前チェックを行い、未ログインなら接続を
+    // 試みずに認証画面を出す。
+    const status = await window.shovel.auth.status(projectId)
+    if (!status.checkFailed && !status.loggedIn) {
+      setAuthOpen(true)
+      return
+    }
+
     try {
       const { sessionId, meta } = await window.shovel.session.openTab(projectId)
       setTabs((prev) => [
@@ -55,7 +68,14 @@ export function App(): React.JSX.Element {
       ])
       setActiveSessionId(sessionId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      // 事前チェックを素通りしても、トークン期限切れ等で接続時に認証エラーに
+      // なることがある。同じ認証画面へ導く（flows.md §1-2「両方持つ」）。
+      if (message === AUTH_REQUIRED_MARKER) {
+        setAuthOpen(true)
+        return
+      }
+      setError(message)
     }
   }
 
@@ -187,6 +207,12 @@ export function App(): React.JSX.Element {
           onUpdate={(patch) => void updateSettings(patch)}
         />
       )}
+      <AuthDialog
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        projectId={projectId}
+        onConfirmed={() => void openNewTab()}
+      />
     </div>
   )
 }

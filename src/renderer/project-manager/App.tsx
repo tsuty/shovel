@@ -5,6 +5,7 @@ import type { ProjectWithStatus, SandboxStatus } from '@shared/types/project'
 import { Button } from '../shared/components/ui/button'
 import { Badge } from '../shared/components/ui/badge'
 import { CreateProjectDialog } from './CreateProjectDialog'
+import { ProjectDetailDialog } from './ProjectDetailDialog'
 import { useSettings } from '../shared/useSettings'
 import { SettingsDialog } from '../shared/components/SettingsDialog'
 
@@ -13,6 +14,7 @@ export function App(): React.JSX.Element {
   const [projects, setProjects] = useState<ProjectWithStatus[] | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const { settings, update: updateSettings } = useSettings()
@@ -117,6 +119,16 @@ export function App(): React.JSX.Element {
                 <Button size="sm" variant="ghost" onClick={() => void remove(project.id)}>
                   {t('common.delete')}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDetailId(project.id)
+                  }}
+                >
+                  {t('detail.title')}
+                </Button>
               </div>
             </li>
           ))}
@@ -139,6 +151,11 @@ export function App(): React.JSX.Element {
           onUpdate={(patch) => void updateSettings(patch)}
         />
       )}
+      <ProjectDetailDialog
+        projectId={detailId}
+        open={detailId !== null}
+        onOpenChange={(open) => !open && setDetailId(null)}
+      />
     </div>
   )
 }

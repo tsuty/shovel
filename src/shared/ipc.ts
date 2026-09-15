@@ -18,6 +18,7 @@ import type { FileReadResult, FsEntry } from './types/filer'
 import type { ChangesSummary } from './types/changes'
 import type { CommandExit, CommandOutputChunk } from './types/command'
 import type { AppSettings } from './types/settings'
+import type { SbxLsEntry } from './types/sbx'
 
 export const IpcChannel = {
   // renderer -> main (invoke/handle)
@@ -31,10 +32,15 @@ export const IpcChannel = {
   ProjectsOpen: 'projects:open',
   ProjectsPickBaseDirectory: 'projects:pickBaseDirectory',
   ProjectsDiagnose: 'projects:diagnose',
+  ProjectsDiagnostics: 'projects:diagnostics',
+  ProjectsStop: 'projects:stop',
   ProjectsOpenTerminal: 'projects:openTerminal',
   AppOpenProjectManager: 'app:openProjectManager',
   SettingsGet: 'settings:get',
   SettingsUpdate: 'settings:update',
+  AuthStatus: 'auth:status',
+  AuthSetApiKey: 'auth:setApiKey',
+  AuthOpenLoginTerminal: 'auth:openLoginTerminal',
   AgentsList: 'agents:list',
 
   SessionOpenTab: 'session:openTab',
@@ -114,6 +120,13 @@ export interface SessionEnvelope {
   event: TranscriptEvent
 }
 
+/** ui.md §2「プロジェクトの詳細」の診断情報。まとめてクリップボードにコピーできる。 */
+export interface ProjectDiagnostics {
+  project: Project
+  diagnoseOutput: string
+  sbxLsEntry: SbxLsEntry | null
+}
+
 export interface RendererApi {
   app: {
     openProjectManager(): Promise<void>
@@ -121,6 +134,11 @@ export interface RendererApi {
   settings: {
     get(): Promise<AppSettings>
     update(patch: Partial<AppSettings>): Promise<AppSettings>
+  }
+  auth: {
+    status(projectId: string): Promise<{ loggedIn: boolean; checkFailed: boolean }>
+    setApiKey(projectId: string, apiKey: string): Promise<void>
+    openLoginTerminal(projectId: string): Promise<void>
   }
   projects: {
     list(): Promise<ProjectWithStatus[]>
@@ -133,6 +151,8 @@ export interface RendererApi {
     open(id: string): Promise<void>
     pickBaseDirectory(): Promise<string | null>
     diagnose(): Promise<string>
+    diagnostics(id: string): Promise<ProjectDiagnostics>
+    stop(id: string): Promise<void>
     openTerminal(id: string): Promise<void>
     onProgress(cb: (p: ProjectProgress) => void): () => void
   }

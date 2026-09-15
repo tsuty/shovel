@@ -17,9 +17,14 @@ import { buildAcpStream } from './stream'
 import { loadAcpSdk } from './sdk'
 import { permissionRequestToEvent, SessionTranslator } from './translate'
 import { saveSnapshot } from '../persistence/snapshot'
+import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 
 /** `initialize` のアイドルタイムアウト（既定 180 秒）。architecture.md §3。 */
 const INITIALIZE_IDLE_TIMEOUT_MS = 180_000
+
+function isAuthRequiredError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && (err as { code: unknown }).code === -32000
+}
 /** `session/prompt` を除く、その他のリクエストの締切。architecture.md §3。 */
 const REQUEST_DEADLINE_MS = 120_000
 
@@ -194,6 +199,10 @@ export async function openAcpSession(
   } catch (err) {
     child.kill()
     logger.close()
+    // flows.md §1-2: 「接続やターンが認証エラーで失敗したら、同じ認証画面を
+    // 出す」。事前チェック（authService.checkAuthStatus）だけに頼ると、
+    // トークン期限切れのケースを取りこぼすため、ここでも検知する。
+    if (isAuthRequiredError(err)) throw new Error(AUTH_REQUIRED_MARKER)
     throw err
   }
   const session = resolvedSession

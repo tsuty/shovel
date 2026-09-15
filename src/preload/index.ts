@@ -14,6 +14,11 @@ const api: RendererApi = {
     get: () => ipcRenderer.invoke(IpcChannel.SettingsGet),
     update: (patch) => ipcRenderer.invoke(IpcChannel.SettingsUpdate, patch)
   },
+  auth: {
+    status: (projectId) => ipcRenderer.invoke(IpcChannel.AuthStatus, projectId),
+    setApiKey: (projectId, apiKey) => ipcRenderer.invoke(IpcChannel.AuthSetApiKey, projectId, apiKey),
+    openLoginTerminal: (projectId) => ipcRenderer.invoke(IpcChannel.AuthOpenLoginTerminal, projectId)
+  },
   projects: {
     list: () => ipcRenderer.invoke(IpcChannel.ProjectsList),
     createNewDir: (req) => ipcRenderer.invoke(IpcChannel.ProjectsCreateNewDir, req),
@@ -25,6 +30,8 @@ const api: RendererApi = {
     open: (id) => ipcRenderer.invoke(IpcChannel.ProjectsOpen, id),
     pickBaseDirectory: () => ipcRenderer.invoke(IpcChannel.ProjectsPickBaseDirectory),
     diagnose: () => ipcRenderer.invoke(IpcChannel.ProjectsDiagnose),
+    diagnostics: (id) => ipcRenderer.invoke(IpcChannel.ProjectsDiagnostics, id),
+    stop: (id) => ipcRenderer.invoke(IpcChannel.ProjectsStop, id),
     openTerminal: (id) => ipcRenderer.invoke(IpcChannel.ProjectsOpenTerminal, id),
     onProgress: (cb) => {
       const listener = (_event: unknown, payload: ProjectProgress): void => cb(payload)

@@ -9,9 +9,18 @@ import type {
   CreateFromExistingRequest,
   CreateNewDirRequest,
   ImportableSandbox,
+  ProjectDiagnostics,
   ProjectProgress
 } from '@shared/ipc'
-import { sbxCreate, sbxDiagnose, sbxExecCapture, sbxLs, sbxMeasureSandboxPath, sbxRm } from '../sbx/cli'
+import {
+  sbxCreate,
+  sbxDiagnose,
+  sbxExecCapture,
+  sbxLs,
+  sbxMeasureSandboxPath,
+  sbxRm,
+  sbxStop
+} from '../sbx/cli'
 import { hostPathsEqual } from './pathTranslate'
 import { deleteSnapshot, listSnapshotsForProject } from '../persistence/snapshot'
 import { projectsStore } from '../persistence/store'
@@ -209,6 +218,21 @@ export async function pickDirectory(): Promise<string | null> {
 
 export async function diagnose(): Promise<string> {
   return sbxDiagnose()
+}
+
+/** ui.md §2「プロジェクトの詳細」の診断情報。N-2-6: まとめてコピーできる形にする。 */
+export async function getProjectDiagnostics(id: string): Promise<ProjectDiagnostics> {
+  const project = projectsStore.list().find((p) => p.id === id)
+  if (!project) throw new Error(`project not found: ${id}`)
+  const [diagnoseOutput, sandboxes] = await Promise.all([sbxDiagnose(), sbxLs().catch(() => [])])
+  const sbxLsEntry = sandboxes.find((s) => s.id === project.sandboxId) ?? null
+  return { project, diagnoseOutput, sbxLsEntry }
+}
+
+export async function stopProject(id: string): Promise<void> {
+  const project = projectsStore.list().find((p) => p.id === id)
+  if (!project) throw new Error(`project not found: ${id}`)
+  await sbxStop(project.sandboxName)
 }
 
 export function findProjectByHostPath(hostPath: string): Project | undefined {

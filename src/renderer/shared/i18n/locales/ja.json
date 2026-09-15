@@ -6,7 +6,28 @@
     "rename": "名前を変更",
     "delete": "削除",
     "cancel": "キャンセル",
-    "dismiss": "閉じる"
+    "dismiss": "閉じる",
+    "save": "保存"
+  },
+  "detail": {
+    "title": "詳細",
+    "hostPath": "ホストのパス",
+    "sandboxName": "サンドボックス名",
+    "agent": "エージェント",
+    "openTerminal": "OS のターミナルを開く",
+    "stop": "停止",
+    "diagnostics": "診断情報",
+    "copyAll": "丸ごとコピー",
+    "copied": "コピーしました"
+  },
+  "auth": {
+    "title": "ログインが必要です",
+    "description": "エージェントに接続するにはログインが必要です。shovel はブラウザでの認証自体は扱わず、サンドボックス内のターミナルでの操作に任せます。",
+    "openTerminal": "ターミナルを開いてログイン",
+    "useApiKey": "API キーを使う",
+    "apiKeyPlaceholder": "API キー",
+    "stillNotLoggedIn": "まだログインできていません。ターミナルでログインを完了してから、もう一度確認してください。",
+    "recheck": "確認"
   },
   "header": {
     "allProjects": "すべてのプロジェクト…"

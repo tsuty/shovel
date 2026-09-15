@@ -6,7 +6,28 @@
     "rename": "Rename",
     "delete": "Delete",
     "cancel": "Cancel",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "save": "Save"
+  },
+  "detail": {
+    "title": "Details",
+    "hostPath": "Host path",
+    "sandboxName": "Sandbox name",
+    "agent": "Agent",
+    "openTerminal": "Open OS terminal",
+    "stop": "Stop",
+    "diagnostics": "Diagnostics",
+    "copyAll": "Copy all",
+    "copied": "Copied"
+  },
+  "auth": {
+    "title": "Sign in required",
+    "description": "The agent needs you to sign in before it can connect. shovel does not handle the browser sign-in itself — it hands off to the sandbox's own terminal flow.",
+    "openTerminal": "Open a terminal to sign in",
+    "useApiKey": "Use an API key instead",
+    "apiKeyPlaceholder": "API key",
+    "stillNotLoggedIn": "Still not signed in. Finish signing in in the terminal, then check again.",
+    "recheck": "Check again"
   },
   "header": {
     "allProjects": "All projects…"

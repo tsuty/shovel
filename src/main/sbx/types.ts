@@ -1,11 +1,4 @@
-export interface SbxLsEntry {
-  name: string
-  id: string
-  agent: string
-  status: 'running' | 'stopped'
-  workspaces: string[]
-  workspace_missing?: boolean
-}
+export type { SbxLsEntry } from '@shared/types/sbx'
 
 export interface SbxExecResult {
   code: number | null

@@ -8,13 +8,16 @@ import {
   createFromExistingSandbox,
   createFromNewDirectory,
   diagnose,
+  getProjectDiagnostics,
   listImportableSandboxes,
   listProjectsWithStatus,
   pickDirectory,
   removeProject,
-  renameProject
+  renameProject,
+  stopProject
 } from '../domain/projectService'
 import { openSandboxTerminal } from '../domain/terminal'
+import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authService'
 import { openProjectWindow } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
 import { projectsStore, settingsStore } from '../persistence/store'
@@ -46,6 +49,12 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AppOpenProjectManager, () => openProjectManagerWindow())
   ipcMain.handle(IpcChannel.SettingsGet, () => settingsStore.get())
   ipcMain.handle(IpcChannel.SettingsUpdate, (_event, patch: Partial<AppSettings>) => settingsStore.set(patch))
+
+  ipcMain.handle(IpcChannel.AuthStatus, (_event, projectId: string) => checkAuthStatus(projectId))
+  ipcMain.handle(IpcChannel.AuthSetApiKey, (_event, projectId: string, apiKey: string) =>
+    setApiKey(projectId, apiKey)
+  )
+  ipcMain.handle(IpcChannel.AuthOpenLoginTerminal, (_event, projectId: string) => openLoginTerminal(projectId))
   ipcMain.handle(IpcChannel.ProjectsList, () => listProjectsWithStatus())
 
   ipcMain.handle(IpcChannel.ProjectsCreateNewDir, async (event, req: CreateNewDirRequest) => {
@@ -75,6 +84,8 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IpcChannel.ProjectsPickBaseDirectory, () => pickDirectory())
   ipcMain.handle(IpcChannel.ProjectsDiagnose, () => diagnose())
+  ipcMain.handle(IpcChannel.ProjectsDiagnostics, (_event, id: string) => getProjectDiagnostics(id))
+  ipcMain.handle(IpcChannel.ProjectsStop, (_event, id: string) => stopProject(id))
   ipcMain.handle(IpcChannel.ProjectsOpenTerminal, (_event, id: string) => {
     const project = projectsStore.list().find((p) => p.id === id)
     if (!project) throw new Error(`project not found: ${id}`)
