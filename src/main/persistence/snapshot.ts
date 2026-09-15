@@ -47,6 +47,19 @@ export async function deleteSnapshot(sessionId: string): Promise<void> {
   await rm(snapshotPath(sessionId), { force: true })
 }
 
+/**
+ * flows.md §6「名前変更: ACP に session/rename が無いため、shovel 側に
+ * タイトルの上書きを保存し…」。永続化済みのスナップショットがあれば、その
+ * `title` も書き換えておく（履歴一覧が次のターンを待たずに新しい名前を
+ * 表示できるように）。スナップショットがまだ無いセッションは何もしない
+ * （呼び出し側の `sessionTitleStore` への保存だけで、次回保存時に反映される）。
+ */
+export async function renameSnapshotTitle(sessionId: string, title: string): Promise<void> {
+  const existing = await loadSnapshot(sessionId)
+  if (!existing) return
+  await saveSnapshot({ ...existing, title })
+}
+
 export async function listSnapshotsForProject(projectId: string): Promise<SessionSnapshot[]> {
   const dir = snapshotDir()
   let entries: string[]

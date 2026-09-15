@@ -103,7 +103,8 @@
     "untitled": "Untitled session",
     "readOnlyNotice": "Read-only history. The agent no longer remembers this conversation.",
     "startNew": "Start new session",
-    "empty": "Nothing was recorded for this session."
+    "empty": "Nothing was recorded for this session.",
+    "confirmDelete": "Delete this session's local history? This cannot be undone."
   },
   "commands": {
     "hint": "Prompts like [Y/n] can be answered, but full-screen apps such as vim will not work.",
@@ -128,6 +129,7 @@
   },
   "mainWindow": {
     "noProject": "No project was specified.",
-    "connecting": "Connecting…"
+    "connecting": "Connecting…",
+    "refreshTab": "Start a new session on this tab (reuses the current connection)"
   }
 }

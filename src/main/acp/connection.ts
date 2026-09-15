@@ -17,6 +17,7 @@ import { buildAcpStream } from './stream'
 import { loadAcpSdk } from './sdk'
 import { permissionRequestToEvent, SessionTranslator } from './translate'
 import { saveSnapshot } from '../persistence/snapshot'
+import { sessionTitleStore } from '../persistence/store'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 
 /** `initialize` のアイドルタイムアウト（既定 180 秒）。architecture.md §3。 */
@@ -43,6 +44,13 @@ export interface OpenedSession {
   setMode(modeId: string): Promise<void>
   setConfigOption(configId: string, value: string | boolean): Promise<void>
   resolvePermission(permissionId: string, optionId: string): void
+  /**
+   * ui.md §3「タブ内コンテンツ上部の ↻ は、今の接続を再利用して session/new
+   * を送る」。接続の確立（プロセス起動 + npx によるアダプタ取得）は高価
+   * なので、`sbx exec` プロセスと `initialize` 済みの `ClientContext` は
+   * そのまま使い回し、ACP セッションだけを新しく張り直す。
+   */
+  refresh(): Promise<void>
   close(): void
 }
 
@@ -108,7 +116,9 @@ export async function openAcpSession(
       schemaVersion: 1,
       sessionId,
       projectId: project.id,
-      title: snapshotAcc.title(),
+      // flows.md §6: 名前変更の上書きがあれば、エージェント発の内容から
+      // 推定したタイトルより優先する。
+      title: sessionTitleStore.get(sessionId) ?? snapshotAcc.title(),
       savedAt: Date.now(),
       entries: snapshotAcc.snapshotEntries()
     }).catch(() => {
@@ -205,7 +215,7 @@ export async function openAcpSession(
     if (isAuthRequiredError(err)) throw new Error(AUTH_REQUIRED_MARKER)
     throw err
   }
-  const session = resolvedSession
+  let currentSession = resolvedSession
   const resolvedMetaState = metaState as MutableMetaState | null
   if (!resolvedMetaState) throw new Error('unreachable: metaState must be set once readyPromise resolves')
   const meta: SessionMeta = {
@@ -225,17 +235,17 @@ export async function openAcpSession(
       const events = translator.userPrompt(text)
       snapshotAcc.track(events)
       for (const event of events) callbacks.onEvent(event)
-      await session.prompt(text)
+      await currentSession.prompt(text)
     },
     async cancel() {
       if (!ready) return
-      await ready.ctx.notify(acp.AGENT_METHODS.session_cancel, { sessionId: session.sessionId })
+      await ready.ctx.notify(acp.AGENT_METHODS.session_cancel, { sessionId: currentSession.sessionId })
     },
     async setMode(modeId: string) {
       if (!ready) return
       await withDeadline(
         ready.ctx.request(acp.AGENT_METHODS.session_set_mode, {
-          sessionId: session.sessionId,
+          sessionId: currentSession.sessionId,
           modeId
         }),
         REQUEST_DEADLINE_MS
@@ -245,8 +255,8 @@ export async function openAcpSession(
       if (!ready) return
       const params =
         typeof value === 'boolean'
-          ? { sessionId: session.sessionId, configId, type: 'boolean' as const, value }
-          : { sessionId: session.sessionId, configId, value }
+          ? { sessionId: currentSession.sessionId, configId, type: 'boolean' as const, value }
+          : { sessionId: currentSession.sessionId, configId, value }
       await withDeadline(
         ready.ctx.request(acp.AGENT_METHODS.session_set_config_option, params),
         REQUEST_DEADLINE_MS
@@ -258,6 +268,24 @@ export async function openAcpSession(
         pendingPermissions.delete(permissionId)
         resolve(optionId)
       }
+    },
+    async refresh() {
+      if (!ready) return
+      await persistSnapshot()
+      currentSession.dispose()
+      snapshotAcc.reset()
+      translator.reset()
+
+      const newSession = await ready.ctx.buildSession(project.sandboxPath).start()
+      currentSession = newSession
+      const newMetaState = initialMetaState(newSession)
+      resolvedMetaState.modes = newMetaState.modes
+      resolvedMetaState.currentModeId = newMetaState.currentModeId
+      resolvedMetaState.configOptions = newMetaState.configOptions
+
+      callbacks.onEvent({ type: 'reset', sessionId })
+      callbacks.onEvent({ ...resolvedMetaState, type: 'sessionMeta' })
+      void runUpdateLoop(newSession, translator, callbacks, resolvedMetaState, snapshotAcc, () => void persistSnapshot())
     },
     close() {
       void persistSnapshot()
@@ -295,6 +323,10 @@ class SnapshotAccumulator {
 
   isEmpty(): boolean {
     return this.entries.size === 0
+  }
+
+  reset(): void {
+    this.entries.clear()
   }
 
   snapshotEntries(): SnapshotEntry[] {

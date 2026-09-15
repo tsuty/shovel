@@ -5,7 +5,8 @@ import type { SessionMeta } from '@shared/types/session'
 import type { TranscriptAction, TranscriptEvent } from '@shared/types/transcript'
 import { IpcChannel, type SessionEnvelope } from '@shared/ipc'
 import { openAcpSession, type OpenedSession } from '../acp/connection'
-import { projectsStore } from '../persistence/store'
+import { projectsStore, sessionTitleStore } from '../persistence/store'
+import { deleteSnapshot, renameSnapshotTitle } from '../persistence/snapshot'
 
 /**
  * 1タブ = 1 ACP セッションのランタイム状態をプロジェクト横断で保持する。
@@ -60,15 +61,19 @@ export function closeTab(sessionId: string): void {
 }
 
 export async function refreshTab(sessionId: string): Promise<void> {
-  const tab = requireTab(sessionId)
-  sendEnvelope(sessionId, { type: 'reset', sessionId })
-  const meta = tab.opened.meta
-  sendEnvelope(sessionId, {
-    type: 'sessionMeta',
-    modes: meta.modes,
-    currentModeId: meta.currentModeId,
-    configOptions: meta.configOptions
-  })
+  await requireTab(sessionId).opened.refresh()
+}
+
+/** flows.md §6「名前変更」: ACP に session/rename が無いため、ローカルに上書きを保存する。 */
+export async function renameSession(sessionId: string, title: string): Promise<void> {
+  sessionTitleStore.set(sessionId, title)
+  await renameSnapshotTitle(sessionId, title)
+}
+
+/** flows.md §6「削除」: 常にローカルのスナップショットとメタデータを破棄する。 */
+export async function deleteHistorySession(sessionId: string): Promise<void> {
+  await deleteSnapshot(sessionId)
+  sessionTitleStore.remove(sessionId)
 }
 
 export async function promptSession(sessionId: string, text: string): Promise<void> {

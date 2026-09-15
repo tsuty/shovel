@@ -28,7 +28,9 @@ export function Sidebar({
   activeSessionId,
   onSelectTab,
   onOpenFile,
-  onOpenHistory
+  onOpenHistory,
+  onRenameTab,
+  onCloseTab
 }: {
   projectId: string
   openPanels: Set<SidebarPanel>
@@ -40,6 +42,8 @@ export function Sidebar({
   onSelectTab: (sessionId: string) => void
   onOpenFile: (relPath: string, isMarkdown: boolean) => void
   onOpenHistory: (snapshot: SessionSnapshot) => void
+  onRenameTab: (sessionId: string, title: string) => void
+  onCloseTab: (sessionId: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -81,6 +85,8 @@ export function Sidebar({
               activeSessionId={activeSessionId}
               onSelectTab={onSelectTab}
               onOpenHistory={onOpenHistory}
+              onRenameTab={onRenameTab}
+              onCloseTab={onCloseTab}
             />
           )}
           {panel === 'filer' && <Filer projectId={projectId} onOpenFile={onOpenFile} />}

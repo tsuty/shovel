@@ -24,10 +24,12 @@ import { projectsStore, settingsStore } from '../persistence/store'
 import {
   cancelSession,
   closeTab,
+  deleteHistorySession,
   dispatchTranscriptAction,
   openTab,
   promptSession,
   refreshTab,
+  renameSession,
   setSessionConfigOption,
   setSessionMode
 } from '../domain/sessionManager'
@@ -114,6 +116,12 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IpcChannel.SessionListHistory, (_event, projectId: string) =>
     listSnapshotsForProject(projectId)
+  )
+  ipcMain.handle(IpcChannel.SessionRename, (_event, sessionId: string, title: string) =>
+    renameSession(sessionId, title)
+  )
+  ipcMain.handle(IpcChannel.SessionDeleteHistory, (_event, sessionId: string) =>
+    deleteHistorySession(sessionId)
   )
 
   ipcMain.handle(IpcChannel.FsList, (_event, projectId: string, relPath: string, showGit?: boolean) =>

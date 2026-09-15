@@ -58,7 +58,9 @@ const api: RendererApi = {
       ipcRenderer.on(IpcChannel.TranscriptEvent, listener)
       return () => ipcRenderer.removeListener(IpcChannel.TranscriptEvent, listener)
     },
-    listHistory: (projectId) => ipcRenderer.invoke(IpcChannel.SessionListHistory, projectId)
+    listHistory: (projectId) => ipcRenderer.invoke(IpcChannel.SessionListHistory, projectId),
+    rename: (sessionId, title) => ipcRenderer.invoke(IpcChannel.SessionRename, sessionId, title),
+    deleteHistory: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionDeleteHistory, sessionId)
   },
   fs: {
     list: (projectId, relPath, showGit) => ipcRenderer.invoke(IpcChannel.FsList, projectId, relPath, showGit),

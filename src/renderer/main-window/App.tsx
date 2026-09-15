@@ -122,6 +122,10 @@ export function App(): React.JSX.Element {
     })
   }
 
+  function renameTab(sessionId: string, title: string): void {
+    setTabs((prev) => prev.map((tab) => (tab.sessionId === sessionId ? { ...tab, title } : tab)))
+  }
+
   function togglePanel(panel: SidebarPanel): void {
     setOpenPanels((prev) => {
       const next = new Set(prev)
@@ -160,6 +164,8 @@ export function App(): React.JSX.Element {
           onSelectTab={setActiveSessionId}
           onOpenFile={openFile}
           onOpenHistory={openHistory}
+          onRenameTab={renameTab}
+          onCloseTab={(id) => void closeTab(id)}
         />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TabBar

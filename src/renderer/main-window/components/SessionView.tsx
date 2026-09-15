@@ -1,4 +1,6 @@
 import { useEffect, useReducer, useState } from 'react'
+import { RotateCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { SessionMeta } from '@shared/types/session'
 import type { SessionEnvelope } from '@shared/ipc'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
@@ -13,9 +15,11 @@ export function SessionView({
   sessionId: string
   initialMeta: SessionMeta
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const [state, dispatch] = useReducer(transcriptReducer, initialTranscriptState)
   const [meta, setMeta] = useState(initialMeta)
   const [sending, setSending] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     return window.shovel.session.onEvent((envelope: SessionEnvelope) => {
@@ -46,8 +50,27 @@ export function SessionView({
     await window.shovel.session.cancel(sessionId)
   }
 
+  async function refresh(): Promise<void> {
+    setRefreshing(true)
+    try {
+      await window.shovel.session.refresh(sessionId)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
+      <div className="flex h-7 shrink-0 items-center border-b border-border px-1">
+        <button
+          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+          title={t('mainWindow.refreshTab')}
+          disabled={sending || refreshing}
+          onClick={() => void refresh()}
+        >
+          <RotateCw size={13} className={refreshing ? 'animate-spin' : undefined} />
+        </button>
+      </div>
       <Transcript
         state={state}
         onPermission={(permissionId, optionId) =>

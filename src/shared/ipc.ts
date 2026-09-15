@@ -52,6 +52,8 @@ export const IpcChannel = {
   SessionSetConfigOption: 'session:setConfigOption',
   SessionAction: 'session:action', // TranscriptAction (openFile / copyText / permission 等)
   SessionListHistory: 'session:listHistory',
+  SessionRename: 'session:rename',
+  SessionDeleteHistory: 'session:deleteHistory',
 
   FsList: 'fs:list',
   FsReadFile: 'fs:readFile',
@@ -173,6 +175,8 @@ export interface RendererApi {
     dispatch(action: TranscriptAction): Promise<void>
     onEvent(cb: (envelope: SessionEnvelope) => void): () => void
     listHistory(projectId: string): Promise<SessionSnapshot[]>
+    rename(sessionId: string, title: string): Promise<void>
+    deleteHistory(sessionId: string): Promise<void>
   }
   fs: {
     list(projectId: string, relPath: string, showGit?: boolean): Promise<FsEntry[]>
