@@ -14,6 +14,7 @@ import { useSettings } from '../shared/useSettings'
 import { SettingsDialog } from '../shared/components/SettingsDialog'
 import { AuthDialog } from './components/AuthDialog'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
+import { useTabSwitchShortcuts } from './useTabShortcuts'
 
 const MAX_SESSION_TABS = 10
 
@@ -129,6 +130,9 @@ export function App(): React.JSX.Element {
       return next
     })
   }
+
+  const tabIds = tabs.map((tab) => tab.sessionId)
+  useTabSwitchShortcuts(tabIds, setActiveSessionId)
 
   if (!projectId) {
     return <div className="p-4 text-sm text-muted-foreground">{t('mainWindow.noProject')}</div>

@@ -128,6 +128,9 @@ export interface ProjectDiagnostics {
 }
 
 export interface RendererApi {
+  /** ui.md §3「切り替えショートカットを『修飾キー + 0〜9』に割り当てる」の
+   * 修飾キーを OS ごとに出し分けるために使う（macOS は Cmd、それ以外は Ctrl）。 */
+  platform: NodeJS.Platform
   app: {
     openProjectManager(): Promise<void>
   }

@@ -7,6 +7,7 @@ import type { CommandExit, CommandOutputChunk } from '@shared/types/command'
  * 直接渡さない（architecture.md §2 / §5）。
  */
 const api: RendererApi = {
+  platform: process.platform,
   app: {
     openProjectManager: () => ipcRenderer.invoke(IpcChannel.AppOpenProjectManager)
   },
