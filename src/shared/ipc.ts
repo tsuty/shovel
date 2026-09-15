@@ -38,6 +38,8 @@ export const IpcChannel = {
   AppOpenProjectManager: 'app:openProjectManager',
   SettingsGet: 'settings:get',
   SettingsUpdate: 'settings:update',
+  SidebarGetWidths: 'sidebar:getWidths',
+  SidebarSetWidth: 'sidebar:setWidth',
   AuthStatus: 'auth:status',
   AuthSetApiKey: 'auth:setApiKey',
   AuthOpenLoginTerminal: 'auth:openLoginTerminal',
@@ -140,6 +142,11 @@ export interface RendererApi {
     get(): Promise<AppSettings>
     update(patch: Partial<AppSettings>): Promise<AppSettings>
   }
+  sidebar: {
+    /** ui.md §3「サイズは記憶される」。パネル id(tabs/filer/changes) ごとの幅(px)。 */
+    getWidths(): Promise<Record<string, number>>
+    setWidth(panel: string, width: number): Promise<void>
+  }
   auth: {
     status(projectId: string): Promise<{ loggedIn: boolean; checkFailed: boolean }>
     setApiKey(projectId: string, apiKey: string): Promise<void>
@@ -168,7 +175,7 @@ export interface RendererApi {
     openTab(projectId: string): Promise<{ sessionId: string; meta: SessionMeta }>
     closeTab(sessionId: string): Promise<void>
     refresh(sessionId: string): Promise<void>
-    prompt(sessionId: string, text: string): Promise<void>
+    prompt(sessionId: string, text: string, attachmentRelPaths?: string[]): Promise<void>
     cancel(sessionId: string): Promise<void>
     setMode(sessionId: string, modeId: string): Promise<void>
     setConfigOption(sessionId: string, configId: string, value: string | boolean): Promise<void>

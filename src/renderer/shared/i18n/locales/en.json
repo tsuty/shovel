@@ -71,6 +71,7 @@
   },
   "filer": {
     "copyPath": "Copy path",
+    "addToContext": "Add to context",
     "fileDeleted": "This file has been deleted."
   },
   "editor": {
@@ -125,7 +126,8 @@
   "composer": {
     "placeholder": "Message the agent…",
     "send": "Send",
-    "stop": "Stop"
+    "stop": "Stop",
+    "removeAttachment": "Remove attachment"
   },
   "mainWindow": {
     "noProject": "No project was specified.",

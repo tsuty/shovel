@@ -38,10 +38,12 @@ function replaceChildren(nodes: FsNode[], relPath: string, children: FsNode[]): 
  */
 export function Filer({
   projectId,
-  onOpenFile
+  onOpenFile,
+  onAddToContext
 }: {
   projectId: string
   onOpenFile: (relPath: string, isMarkdown: boolean) => void
+  onAddToContext: (relPath: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [data, setData] = useState<FsNode[]>([])
@@ -163,6 +165,16 @@ export function Filer({
           onClick={(e) => e.stopPropagation()}
         >
           <MenuItem onClick={() => void copyPath(menu.node)}>{t('filer.copyPath')}</MenuItem>
+          {!menu.node.isDir && (
+            <MenuItem
+              onClick={() => {
+                onAddToContext(menu.node.relPath)
+                setMenu(null)
+              }}
+            >
+              {t('filer.addToContext')}
+            </MenuItem>
+          )}
           <MenuItem
             onClick={() => {
               setRenaming(menu.node)

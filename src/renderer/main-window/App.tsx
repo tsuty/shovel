@@ -15,11 +15,12 @@ import { SettingsDialog } from '../shared/components/SettingsDialog'
 import { AuthDialog } from './components/AuthDialog'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 import { useTabSwitchShortcuts } from './useTabShortcuts'
+import { addAttachmentToSession } from './attachmentRegistry'
 
 const MAX_SESSION_TABS = 10
 
 type Tab =
-  | { kind: 'session'; sessionId: string; title: string; meta: SessionMeta }
+  | { kind: 'session'; sessionId: string; title: string; meta: SessionMeta; initialAttachments: string[] }
   | { kind: 'file'; sessionId: string; title: string; relPath: string; isMarkdown: boolean }
   | { kind: 'history'; sessionId: string; title: string; snapshot: SessionSnapshot }
 
@@ -38,6 +39,7 @@ export function App(): React.JSX.Element {
   const [commandsOpen, setCommandsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
+  const [lastOpenedFilePath, setLastOpenedFilePath] = useState<string | null>(null)
   const { settings, update: updateSettings } = useSettings()
 
   useEffect(() => {
@@ -63,9 +65,13 @@ export function App(): React.JSX.Element {
 
     try {
       const { sessionId, meta } = await window.shovel.session.openTab(projectId)
+      // ui.md §7: アクティブファイルの自動添付は設定項目（既定 off）。
+      // ここでは「タブを開いた時点で最後に開いていたファイル」を初期チップとして
+      // 種付けする、という簡略化で実装している。
+      const initialAttachments = settings?.autoAttachActiveFile && lastOpenedFilePath ? [lastOpenedFilePath] : []
       setTabs((prev) => [
         ...prev,
-        { kind: 'session', sessionId, title: `Tab ${sessionTabCount + 1}`, meta }
+        { kind: 'session', sessionId, title: `Tab ${sessionTabCount + 1}`, meta, initialAttachments }
       ])
       setActiveSessionId(sessionId)
     } catch (err) {
@@ -86,6 +92,7 @@ export function App(): React.JSX.Element {
   }, [projectId])
 
   function openFile(relPath: string, isMarkdown: boolean): void {
+    setLastOpenedFilePath(relPath)
     const existing = tabs.find((tab) => tab.kind === 'file' && tab.relPath === relPath)
     if (existing) {
       setActiveSessionId(existing.sessionId)
@@ -97,6 +104,11 @@ export function App(): React.JSX.Element {
       { kind: 'file', sessionId: id, title: relPath.split('/').pop() ?? relPath, relPath, isMarkdown }
     ])
     setActiveSessionId(id)
+  }
+
+  /** ui.md §7: ファイラーの右クリック「コンテキストに追加」。アクティブなセッションタブへ渡す。 */
+  function addToContext(relPath: string): void {
+    if (activeSessionId) addAttachmentToSession(activeSessionId, relPath)
   }
 
   function openHistory(snapshot: SessionSnapshot): void {
@@ -166,6 +178,7 @@ export function App(): React.JSX.Element {
           onOpenHistory={openHistory}
           onRenameTab={renameTab}
           onCloseTab={(id) => void closeTab(id)}
+          onAddToContext={addToContext}
         />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TabBar
@@ -186,7 +199,11 @@ export function App(): React.JSX.Element {
                 }
               >
                 {tab.kind === 'session' ? (
-                  <SessionView sessionId={tab.sessionId} initialMeta={tab.meta} />
+                  <SessionView
+                    sessionId={tab.sessionId}
+                    initialMeta={tab.meta}
+                    initialAttachments={tab.initialAttachments}
+                  />
                 ) : tab.kind === 'history' ? (
                   <HistoryView snapshot={tab.snapshot} onStartNew={() => void openNewTab()} />
                 ) : tab.isMarkdown ? (

@@ -15,6 +15,10 @@ const api: RendererApi = {
     get: () => ipcRenderer.invoke(IpcChannel.SettingsGet),
     update: (patch) => ipcRenderer.invoke(IpcChannel.SettingsUpdate, patch)
   },
+  sidebar: {
+    getWidths: () => ipcRenderer.invoke(IpcChannel.SidebarGetWidths),
+    setWidth: (panel, width) => ipcRenderer.invoke(IpcChannel.SidebarSetWidth, panel, width)
+  },
   auth: {
     status: (projectId) => ipcRenderer.invoke(IpcChannel.AuthStatus, projectId),
     setApiKey: (projectId, apiKey) => ipcRenderer.invoke(IpcChannel.AuthSetApiKey, projectId, apiKey),
@@ -47,7 +51,8 @@ const api: RendererApi = {
     openTab: (projectId) => ipcRenderer.invoke(IpcChannel.SessionOpenTab, projectId),
     closeTab: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionCloseTab, sessionId),
     refresh: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionRefresh, sessionId),
-    prompt: (sessionId, text) => ipcRenderer.invoke(IpcChannel.SessionPrompt, sessionId, text),
+    prompt: (sessionId, text, attachmentRelPaths) =>
+      ipcRenderer.invoke(IpcChannel.SessionPrompt, sessionId, text, attachmentRelPaths),
     cancel: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionCancel, sessionId),
     setMode: (sessionId, modeId) => ipcRenderer.invoke(IpcChannel.SessionSetMode, sessionId, modeId),
     setConfigOption: (sessionId, configId, value) =>

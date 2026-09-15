@@ -76,6 +76,19 @@ function BlockView({ block }: { block: RenderBlock }): React.JSX.Element {
       )}
     >
       <div className="mb-1 text-xs font-medium text-muted-foreground">{label}</div>
+      {block.chips && block.chips.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {block.chips.map((chip) => (
+            <span
+              key={chip.key}
+              className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+              title={chip.path}
+            >
+              {chip.label}
+            </span>
+          ))}
+        </div>
+      )}
       {block.streaming ? (
         <div className="whitespace-pre-wrap text-sm">{block.markdown}</div>
       ) : (

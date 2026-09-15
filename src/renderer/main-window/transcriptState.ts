@@ -1,4 +1,5 @@
 import type {
+  AttachmentChip,
   BlockRole,
   PermissionOption,
   ToolCallPayload,
@@ -10,6 +11,7 @@ export interface RenderBlock {
   role: BlockRole
   markdown: string
   streaming: boolean
+  chips?: AttachmentChip[]
 }
 
 export interface RenderGroup {
@@ -122,9 +124,13 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
     }
     case 'toast':
       return { ...state, toast: event.text }
+    case 'attachments': {
+      const block = state.blocks[event.id]
+      if (!block) return state
+      return { ...state, blocks: { ...state.blocks, [event.id]: { ...block, chips: event.chips } } }
+    }
     case 'agent':
     case 'theme':
-    case 'attachments':
     case 'turnEnd':
     case 'sessionMeta':
       return state

@@ -71,6 +71,7 @@
   },
   "filer": {
     "copyPath": "パスをコピー",
+    "addToContext": "コンテキストに追加",
     "fileDeleted": "このファイルは削除されました。"
   },
   "editor": {
@@ -125,7 +126,8 @@
   "composer": {
     "placeholder": "エージェントへメッセージを送る…",
     "send": "送信",
-    "stop": "停止"
+    "stop": "停止",
+    "removeAttachment": "添付を外す"
   },
   "mainWindow": {
     "noProject": "プロジェクトが指定されていません。",

@@ -20,7 +20,7 @@ import { openSandboxTerminal } from '../domain/terminal'
 import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authService'
 import { openProjectWindow } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
-import { projectsStore, settingsStore } from '../persistence/store'
+import { projectsStore, settingsStore, sidebarStore } from '../persistence/store'
 import {
   cancelSession,
   closeTab,
@@ -51,6 +51,10 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AppOpenProjectManager, () => openProjectManagerWindow())
   ipcMain.handle(IpcChannel.SettingsGet, () => settingsStore.get())
   ipcMain.handle(IpcChannel.SettingsUpdate, (_event, patch: Partial<AppSettings>) => settingsStore.set(patch))
+  ipcMain.handle(IpcChannel.SidebarGetWidths, () => sidebarStore.getWidths())
+  ipcMain.handle(IpcChannel.SidebarSetWidth, (_event, panel: string, width: number) =>
+    sidebarStore.setWidth(panel, width)
+  )
 
   ipcMain.handle(IpcChannel.AuthStatus, (_event, projectId: string) => checkAuthStatus(projectId))
   ipcMain.handle(IpcChannel.AuthSetApiKey, (_event, projectId: string, apiKey: string) =>
@@ -99,8 +103,10 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.SessionOpenTab, (event, projectId: string) => openTab(projectId, event.sender))
   ipcMain.handle(IpcChannel.SessionCloseTab, (_event, sessionId: string) => closeTab(sessionId))
   ipcMain.handle(IpcChannel.SessionRefresh, (_event, sessionId: string) => refreshTab(sessionId))
-  ipcMain.handle(IpcChannel.SessionPrompt, (_event, sessionId: string, text: string) =>
-    promptSession(sessionId, text)
+  ipcMain.handle(
+    IpcChannel.SessionPrompt,
+    (_event, sessionId: string, text: string, attachmentRelPaths?: string[]) =>
+      promptSession(sessionId, text, attachmentRelPaths)
   )
   ipcMain.handle(IpcChannel.SessionCancel, (_event, sessionId: string) => cancelSession(sessionId))
   ipcMain.handle(IpcChannel.SessionSetMode, (_event, sessionId: string, modeId: string) =>

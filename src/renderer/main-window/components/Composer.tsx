@@ -1,12 +1,15 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SessionMeta } from '@shared/types/session'
+import type { AttachmentChip } from '@shared/types/transcript'
 import { Button } from '../../shared/components/ui/button'
 import { Textarea } from '../../shared/components/ui/input'
 
 export function Composer({
   meta,
   sending,
+  attachments,
+  onRemoveAttachment,
   onSend,
   onStop,
   onSetMode,
@@ -14,6 +17,8 @@ export function Composer({
 }: {
   meta: SessionMeta
   sending: boolean
+  attachments: AttachmentChip[]
+  onRemoveAttachment: (key: string) => void
   onSend: (text: string) => void
   onStop: () => void
   onSetMode: (modeId: string) => void
@@ -32,6 +37,26 @@ export function Composer({
 
   return (
     <div className="border-t border-border p-3">
+      {attachments.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {attachments.map((chip) => (
+            <span
+              key={chip.key}
+              className="flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+              title={chip.path}
+            >
+              {chip.label}
+              <button
+                className="hover:text-foreground"
+                onClick={() => onRemoveAttachment(chip.key)}
+                aria-label={t('composer.removeAttachment')}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <Textarea
         rows={3}
         value={text}

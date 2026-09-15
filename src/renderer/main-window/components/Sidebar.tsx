@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { FolderTree, GitBranch, MessageSquare, SquareTerminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionSnapshot } from '@shared/types/session'
@@ -6,10 +7,12 @@ import type { TabInfo } from './TabBar'
 import { Filer } from './Filer'
 import { Changes } from './Changes'
 import { ChatHistoryPanel } from './ChatHistoryPanel'
+import { ResizablePanel } from './ResizablePanel'
 
 export type SidebarPanel = 'tabs' | 'filer' | 'changes'
 
 const PANEL_ORDER: SidebarPanel[] = ['tabs', 'filer', 'changes']
+const DEFAULT_PANEL_WIDTH = 224
 
 /**
  * ui.md §3「サイドバー」: メニューバー(アイコンのみ) + サイドコンテンツ。
@@ -30,7 +33,8 @@ export function Sidebar({
   onOpenFile,
   onOpenHistory,
   onRenameTab,
-  onCloseTab
+  onCloseTab,
+  onAddToContext
 }: {
   projectId: string
   openPanels: Set<SidebarPanel>
@@ -44,8 +48,19 @@ export function Sidebar({
   onOpenHistory: (snapshot: SessionSnapshot) => void
   onRenameTab: (sessionId: string, title: string) => void
   onCloseTab: (sessionId: string) => void
+  onAddToContext: (relPath: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const [widths, setWidths] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    void window.shovel.sidebar.getWidths().then(setWidths)
+  }, [])
+
+  function setWidth(panel: SidebarPanel, width: number): void {
+    setWidths((prev) => ({ ...prev, [panel]: width }))
+    void window.shovel.sidebar.setWidth(panel, width)
+  }
 
   return (
     <div className="flex h-full shrink-0">
@@ -77,7 +92,11 @@ export function Sidebar({
         </IconButton>
       </div>
       {PANEL_ORDER.filter((p) => openPanels.has(p)).map((panel) => (
-        <div key={panel} className="w-56 shrink-0 border-r border-border">
+        <ResizablePanel
+          key={panel}
+          width={widths[panel] ?? DEFAULT_PANEL_WIDTH}
+          onResizeEnd={(width) => setWidth(panel, width)}
+        >
           {panel === 'tabs' && (
             <ChatHistoryPanel
               projectId={projectId}
@@ -89,9 +108,11 @@ export function Sidebar({
               onCloseTab={onCloseTab}
             />
           )}
-          {panel === 'filer' && <Filer projectId={projectId} onOpenFile={onOpenFile} />}
+          {panel === 'filer' && (
+            <Filer projectId={projectId} onOpenFile={onOpenFile} onAddToContext={onAddToContext} />
+          )}
           {panel === 'changes' && <Changes projectId={projectId} />}
-        </div>
+        </ResizablePanel>
       ))}
     </div>
   )

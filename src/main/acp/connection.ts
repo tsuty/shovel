@@ -1,8 +1,10 @@
 import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
+import path from 'node:path'
 import type {
   ActiveSession,
   ClientContext,
+  ContentBlock,
   RequestPermissionRequest,
   RequestPermissionResponse,
   SessionConfigOption,
@@ -39,7 +41,12 @@ export interface OpenedSession {
   readonly sessionId: string
   readonly meta: SessionMeta
   readonly logger: SessionLogger
-  prompt(text: string): Promise<void>
+  /**
+   * ui.md §7: 添付はプロジェクトルートからの相対パスの配列で渡す。
+   * `resource_link` の ContentBlock としてサンドボックス内の絶対パスへ変換して送る
+   * （中身は読まない。エージェント自身がサンドボックス内でファイルを読む）。
+   */
+  prompt(text: string, attachmentRelPaths?: string[]): Promise<void>
   cancel(): Promise<void>
   setMode(modeId: string): Promise<void>
   setConfigOption(configId: string, value: string | boolean): Promise<void>
@@ -231,11 +238,23 @@ export async function openAcpSession(
     sessionId,
     meta,
     logger,
-    async prompt(text: string) {
-      const events = translator.userPrompt(text)
+    async prompt(text: string, attachmentRelPaths: string[] = []) {
+      const chips = attachmentRelPaths.map((relPath) => ({
+        key: relPath,
+        label: relPath.split('/').pop() ?? relPath,
+        path: relPath
+      }))
+      const events = translator.userPrompt(text, chips)
       snapshotAcc.track(events)
       for (const event of events) callbacks.onEvent(event)
-      await currentSession.prompt(text)
+
+      const promptBlocks: ContentBlock[] = attachmentRelPaths.map((relPath) => ({
+        type: 'resource_link',
+        uri: `file://${path.posix.join(project.sandboxPath, relPath)}`,
+        name: relPath.split('/').pop() ?? relPath
+      }))
+      promptBlocks.push({ type: 'text', text })
+      await currentSession.prompt(promptBlocks)
     },
     async cancel() {
       if (!ready) return

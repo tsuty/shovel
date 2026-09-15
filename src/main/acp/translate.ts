@@ -12,6 +12,7 @@ import type {
   ToolKind
 } from '@agentclientprotocol/sdk'
 import type {
+  AttachmentChip,
   PermissionOption,
   ToolCallKind,
   ToolCallPayload,
@@ -39,16 +40,24 @@ export class SessionTranslator {
   private openGroupId: string | null = null
   private readonly toolCallGroups = new Map<string, string>()
 
-  /** ユーザーが送信したプロンプトを、エージェントの返信を待たずにその場で描画する。 */
-  userPrompt(text: string): TranscriptEvent[] {
+  /**
+   * ユーザーが送信したプロンプトを、エージェントの返信を待たずにその場で
+   * 描画する。ui.md §7: 添付は USER ブロックにチップとして可視化する
+   * （内容は運ばず、パスのみ）。
+   */
+  userPrompt(text: string, attachments: AttachmentChip[] = []): TranscriptEvent[] {
     const events = [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought()]
+    const id = randomUUID()
     events.push({
       type: 'block',
-      id: randomUUID(),
+      id,
       role: 'USER',
       markdown: text,
       streaming: false
     })
+    if (attachments.length > 0) {
+      events.push({ type: 'attachments', id, chips: attachments })
+    }
     return events
   }
 

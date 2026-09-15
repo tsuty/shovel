@@ -76,8 +76,8 @@ export async function deleteHistorySession(sessionId: string): Promise<void> {
   sessionTitleStore.remove(sessionId)
 }
 
-export async function promptSession(sessionId: string, text: string): Promise<void> {
-  await requireTab(sessionId).opened.prompt(text)
+export async function promptSession(sessionId: string, text: string, attachmentRelPaths?: string[]): Promise<void> {
+  await requireTab(sessionId).opened.prompt(text, attachmentRelPaths)
 }
 
 export async function cancelSession(sessionId: string): Promise<void> {
