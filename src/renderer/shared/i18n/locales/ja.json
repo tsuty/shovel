@@ -60,7 +60,6 @@
     "projectPath": "ディレクトリ名",
     "details": "詳細",
     "sandboxName": "サンドボックス名",
-    "gitInit": "git で変更を戻せるようにする",
     "existingWarning": "このディレクトリ内のファイルは、隠しファイルを含めすべて AI に参照されます。",
     "acknowledge": "確認しました",
     "noImportable": "取り込めるサンドボックスはありません。"
@@ -68,7 +67,6 @@
   "sidebar": {
     "tabs": "タブ",
     "filer": "ファイル",
-    "changes": "変更",
     "commands": "コマンド実行",
     "comingSoon": "近日対応"
   },
@@ -88,13 +86,6 @@
       "preview": "プレビュー"
     },
     "conflict": "AI がこのファイルを変更したため、あなたの編集を {{path}} に保存しました。"
-  },
-  "changes": {
-    "empty": "変更はありません。",
-    "restore": "戻す",
-    "restoreAll": "全部元に戻す",
-    "confirmRestoreAll": "以下のファイルをすべて元に戻しますか？",
-    "noDiff": "表示する差分がありません。"
   },
   "settings": {
     "title": "設定",
@@ -152,6 +143,7 @@
     "refreshTab": "このタブで新しいセッションを始める（今の接続を再利用）"
   },
   "diff": {
+    "empty": "表示する差分がありません。",
     "hiddenLines": "… {{count}} 行"
   }
 }

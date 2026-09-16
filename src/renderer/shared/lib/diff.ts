@@ -1,11 +1,9 @@
 /**
- * 行単位の差分計算と unified diff の解析。decisions.md N-3「IDE が無償提供して
- * いた Diff ビューアを自作する」の計算部分。表示は `DiffView` が受け持つ。
+ * 行単位の差分計算。decisions.md N-3-8「IDE が無償提供していた Diff ビューアを
+ * 自作する」の計算部分。表示は `DiffView` が受け持つ。
  *
- * 差分の入力が2種類あるため（decisions.md N-3-7）、どちらも同じ行の列へ
- * 畳んでから描く:
- *   - ツールコールの `diffs`  … 変更前後の全文（`diffRowsFromTexts`）
- *   - 「変更」サイドバー      … `git diff` の unified 形式（`diffRowsFromUnified`）
+ * ツールコールの `diffs`（変更前後の全文）を `DiffRow` の列へ畳んでから渡す
+ * （`diffRowsFromTexts`）。
  */
 
 export interface DiffRow {
@@ -116,45 +114,6 @@ function diffMiddle(oldLines: string[], newLines: string[], offset: number): Dif
   return rows
 }
 
-const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
-
-/** `git diff` の unified 形式を行の列へ解す。ファイルヘッダ（`diff --git` 等）は捨てる。 */
-export function diffRowsFromUnified(unified: string): DiffRow[] {
-  const rows: DiffRow[] = []
-  let oldNo = 0
-  let newNo = 0
-  let inHunk = false
-
-  const lines = unified.replace(/\r\n/g, '\n').split('\n')
-  // 末尾の改行が生む空要素は行ではない。落とさないと最後に空の文脈行が1つ増える。
-  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
-
-  for (const line of lines) {
-    const hunk = HUNK_HEADER.exec(line)
-    if (hunk) {
-      oldNo = Number(hunk[1])
-      newNo = Number(hunk[3])
-      inHunk = true
-      rows.push({ kind: 'gap', text: line })
-      continue
-    }
-    if (!inHunk) continue
-    // 「\ No newline at end of file」は行そのものではないので落とす。
-    if (line.startsWith('\\')) continue
-    if (line.startsWith('+')) {
-      rows.push({ kind: 'add', newNo: newNo++, text: line.slice(1) })
-    } else if (line.startsWith('-')) {
-      rows.push({ kind: 'remove', oldNo: oldNo++, text: line.slice(1) })
-    } else if (line.startsWith(' ')) {
-      rows.push({ kind: 'context', oldNo: oldNo++, newNo: newNo++, text: line.slice(1) })
-    } else if (line === '') {
-      // hunk の途中の空行は「空の文脈行」。末尾の余りは無視する。
-      if (rows.length > 0) rows.push({ kind: 'context', oldNo: oldNo++, newNo: newNo++, text: '' })
-    }
-  }
-  return rows
-}
-
 /** 変更から遠い文脈行を1つの `gap` にまとめる。 */
 export function collapseContext(rows: DiffRow[]): DiffRow[] {
   const keep = rows.map((row) => row.kind !== 'context')
@@ -182,14 +141,4 @@ export function collapseContext(rows: DiffRow[]): DiffRow[] {
   })
   flush()
   return out
-}
-
-export function countChanges(rows: DiffRow[]): { added: number; removed: number } {
-  let added = 0
-  let removed = 0
-  for (const row of rows) {
-    if (row.kind === 'add') added++
-    else if (row.kind === 'remove') removed++
-  }
-  return { added, removed }
 }

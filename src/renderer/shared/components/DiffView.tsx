@@ -1,12 +1,11 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { collapseContext, diffRowsFromTexts, diffRowsFromUnified, type DiffRow } from '../lib/diff'
+import { collapseContext, diffRowsFromTexts, type DiffRow } from '../lib/diff'
 import { cn } from '../lib/utils'
 
 /**
- * decisions.md N-3 の Diff ビューア。差分の入力は2系統あるが
- * （N-3-7: ツールコール単体の前後全文 / 「変更」サイドバーの累積 `git diff`）、
- * どちらも `DiffRow` の列に畳んでからここで描く。
+ * decisions.md N-3-8 の Diff ビューア。ツールコール単体の前後全文（`TextDiffView`）
+ * を `DiffRow` の列に畳んでから描く。
  *
  * 表示は unified（1列）。サイドバーに入る幅でも読めることを優先し、
  * 左右2列の split は採らない。
@@ -31,7 +30,7 @@ export function DiffView({ rows, className }: { rows: DiffRow[]; className?: str
   const { t } = useTranslation()
 
   if (rows.length === 0) {
-    return <p className={cn('p-2 text-xs text-muted-foreground', className)}>{t('changes.noDiff')}</p>
+    return <p className={cn('p-2 text-xs text-muted-foreground', className)}>{t('diff.empty')}</p>
   }
 
   return (
@@ -69,12 +68,5 @@ export function TextDiffView({
   className?: string
 }): React.JSX.Element {
   const rows = useMemo(() => collapseContext(diffRowsFromTexts(oldText, newText)), [oldText, newText])
-  return <DiffView rows={rows} className={className} />
-}
-
-/** 「変更」サイドバーの `git diff`（unified 形式）を描く。 */
-export function UnifiedDiffView({ diff, className }: { diff: string; className?: string }): React.JSX.Element {
-  // git は既に前後3行へ絞って出しているので、ここでの畳み込みは要らない。
-  const rows = useMemo(() => diffRowsFromUnified(diff), [diff])
   return <DiffView rows={rows} className={className} />
 }

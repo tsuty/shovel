@@ -46,7 +46,6 @@ import {
   renameEntry,
   writeTextFile
 } from '../domain/filerService'
-import { diffFile, listChanges, restoreAll, restoreOne } from '../domain/changesService'
 import { cancelRun, commandHistory, runCommand, sendInput } from '../domain/commandService'
 import { listSnapshotsForProject } from '../persistence/snapshot'
 
@@ -172,15 +171,6 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.FsCreateMarkdownFile, (_event, projectId: string, parentRelPath: string) =>
     createMarkdownFile(projectId, parentRelPath)
   )
-
-  ipcMain.handle(IpcChannel.ChangesList, (_event, projectId: string) => listChanges(projectId))
-  ipcMain.handle(IpcChannel.ChangesDiff, (_event, projectId: string, relPath: string) =>
-    diffFile(projectId, relPath)
-  )
-  ipcMain.handle(IpcChannel.ChangesRestoreOne, (_event, projectId: string, relPath: string) =>
-    restoreOne(projectId, relPath)
-  )
-  ipcMain.handle(IpcChannel.ChangesRestoreAll, (_event, projectId: string) => restoreAll(projectId))
 
   ipcMain.handle(IpcChannel.CommandRun, (event, projectId: string, command: string) => {
     const runId = runCommand(projectId, command, {

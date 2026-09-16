@@ -1,22 +1,21 @@
 import { useEffect, useState } from 'react'
-import { FolderTree, GitBranch, MessageSquare, SquareTerminal } from 'lucide-react'
+import { FolderTree, MessageSquare, SquareTerminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionSnapshot } from '@shared/types/session'
 import { cn } from '../../shared/lib/utils'
 import type { TabInfo } from './TabBar'
 import { Filer } from './Filer'
-import { Changes } from './Changes'
 import { ChatHistoryPanel } from './ChatHistoryPanel'
 import { ResizablePanel } from './ResizablePanel'
 
-export type SidebarPanel = 'tabs' | 'filer' | 'changes'
+export type SidebarPanel = 'tabs' | 'filer'
 
-const PANEL_ORDER: SidebarPanel[] = ['tabs', 'filer', 'changes']
+const PANEL_ORDER: SidebarPanel[] = ['tabs', 'filer']
 const DEFAULT_PANEL_WIDTH = 224
 
 /**
  * ui.md §3「サイドバー」: メニューバー(アイコンのみ) + サイドコンテンツ。
- * 排他ではなく、押した順ではなく固定順（チャット履歴→ファイラー→変更）で
+ * 排他ではなく、押した順ではなく固定順（チャット履歴→ファイラー）で
  * 左から並べる（クリックされたものすべてを表示する、という要件の簡易実装）。
  * 下付きの「コマンド実行」はサイドではなく画面下のドロワーなので、ここでは
  * トグルボタンだけを持つ。
@@ -79,13 +78,6 @@ export function Sidebar({
         >
           <FolderTree size={18} />
         </IconButton>
-        <IconButton
-          active={openPanels.has('changes')}
-          onClick={() => onTogglePanel('changes')}
-          title={t('sidebar.changes')}
-        >
-          <GitBranch size={18} />
-        </IconButton>
         <div className="flex-1" />
         <IconButton active={commandsOpen} onClick={onToggleCommands} title={t('sidebar.commands')}>
           <SquareTerminal size={18} />
@@ -111,7 +103,6 @@ export function Sidebar({
           {panel === 'filer' && (
             <Filer projectId={projectId} onOpenFile={onOpenFile} onAddToContext={onAddToContext} />
           )}
-          {panel === 'changes' && <Changes projectId={projectId} />}
         </ResizablePanel>
       ))}
     </div>

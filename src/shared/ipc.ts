@@ -15,7 +15,6 @@ import type { TranscriptAction, TranscriptEvent } from './types/transcript'
 import type { AgentEntry, Project, ProjectWithStatus } from './types/project'
 import type { SessionMeta, SessionSnapshot } from './types/session'
 import type { FileReadResult, FsEntry } from './types/filer'
-import type { ChangesSummary } from './types/changes'
 import type { CommandExit, CommandOutputChunk } from './types/command'
 import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
@@ -69,11 +68,6 @@ export const IpcChannel = {
   FsMkdir: 'fs:mkdir',
   FsCreateMarkdownFile: 'fs:createMarkdownFile',
 
-  ChangesList: 'changes:list',
-  ChangesDiff: 'changes:diff',
-  ChangesRestoreOne: 'changes:restoreOne',
-  ChangesRestoreAll: 'changes:restoreAll',
-
   CommandRun: 'command:run',
   CommandSendInput: 'command:sendInput',
   CommandCancel: 'command:cancel',
@@ -93,14 +87,12 @@ export interface CreateNewDirRequest {
   baseDir: string
   dirName: string
   sandboxName: string
-  gitInit: boolean
 }
 
 export interface CreateExistingDirRequest {
   agentId: string
   hostPath: string
   displayName: string
-  gitInit: boolean
 }
 
 export interface ImportableSandbox {
@@ -146,7 +138,7 @@ export interface RendererApi {
     update(patch: Partial<AppSettings>): Promise<AppSettings>
   }
   sidebar: {
-    /** ui.md §3「サイズは記憶される」。パネル id(tabs/filer/changes) ごとの幅(px)。 */
+    /** ui.md §3「サイズは記憶される」。パネル id(tabs/filer) ごとの幅(px)。 */
     getWidths(): Promise<Record<string, number>>
     setWidth(panel: string, width: number): Promise<void>
   }
@@ -201,12 +193,6 @@ export interface RendererApi {
     openInOS(projectId: string, relPath: string): Promise<void>
     mkdir(projectId: string, parentRelPath: string): Promise<string>
     createMarkdownFile(projectId: string, parentRelPath: string): Promise<string>
-  }
-  changes: {
-    list(projectId: string): Promise<ChangesSummary>
-    diff(projectId: string, relPath: string): Promise<string>
-    restoreOne(projectId: string, relPath: string): Promise<void>
-    restoreAll(projectId: string): Promise<void>
   }
   command: {
     run(projectId: string, command: string): Promise<{ runId: string }>

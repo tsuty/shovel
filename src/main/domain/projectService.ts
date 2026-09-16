@@ -12,15 +12,7 @@ import type {
   ProjectDiagnostics,
   ProjectProgress
 } from '@shared/ipc'
-import {
-  sbxCreate,
-  sbxDiagnose,
-  sbxExecCapture,
-  sbxLs,
-  sbxMeasureSandboxPath,
-  sbxRm,
-  sbxStop
-} from '../sbx/cli'
+import { sbxCreate, sbxDiagnose, sbxLs, sbxMeasureSandboxPath, sbxRm, sbxStop } from '../sbx/cli'
 import { hostPathsEqual } from './pathTranslate'
 import { deleteSnapshot, listSnapshotsForProject } from '../persistence/snapshot'
 import { projectsStore } from '../persistence/store'
@@ -87,7 +79,6 @@ export async function createFromNewDirectory(
     displayName: req.displayName,
     agentId: req.agentId,
     sandboxName: req.sandboxName,
-    gitInit: req.gitInit,
     onProgress
   })
 }
@@ -106,7 +97,6 @@ export async function createFromExistingDirectory(
     displayName: req.displayName,
     agentId: req.agentId,
     sandboxName,
-    gitInit: req.gitInit,
     onProgress
   })
 }
@@ -116,7 +106,6 @@ async function createSandboxAndPersist(args: {
   displayName: string
   agentId: string
   sandboxName: string
-  gitInit: boolean
   onProgress: (p: ProjectProgress) => void
 }): Promise<Project> {
   const agent = getAgentEntry(args.agentId)
@@ -139,15 +128,6 @@ async function createSandboxAndPersist(args: {
 
   args.onProgress({ step: 'measure', message: 'ワークスペースのパスを確認しています…' })
   const sandboxPath = await sbxMeasureSandboxPath(args.sandboxName)
-
-  // flows.md §2-4 は「git init」を sbx create の前に置くが、A-3-7「git は
-  // サンドボックス内で実行する（ホストに git があるとは限らない）」という
-  // より繰り返し強調されている原則を優先し、サンドボックス作成後に
-  // サンドボックス内で `git init` を実行する順序へ変更している。
-  if (args.gitInit) {
-    args.onProgress({ step: 'git', message: 'git リポジトリとして初期化しています…' })
-    await sbxExecCapture(args.sandboxName, ['git', 'init'], { cwd: sandboxPath })
-  }
 
   const project: Project = {
     id: randomUUID(),

@@ -86,12 +86,6 @@ const api: RendererApi = {
     createMarkdownFile: (projectId, parentRelPath) =>
       ipcRenderer.invoke(IpcChannel.FsCreateMarkdownFile, projectId, parentRelPath)
   },
-  changes: {
-    list: (projectId) => ipcRenderer.invoke(IpcChannel.ChangesList, projectId),
-    diff: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.ChangesDiff, projectId, relPath),
-    restoreOne: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.ChangesRestoreOne, projectId, relPath),
-    restoreAll: (projectId) => ipcRenderer.invoke(IpcChannel.ChangesRestoreAll, projectId)
-  },
   command: {
     run: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandRun, projectId, command),
     sendInput: (runId, text) => ipcRenderer.invoke(IpcChannel.CommandSendInput, runId, text),

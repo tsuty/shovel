@@ -60,7 +60,6 @@
     "projectPath": "Directory name",
     "details": "Details",
     "sandboxName": "Sandbox name",
-    "gitInit": "Track changes with git (recommended)",
     "existingWarning": "All files in this directory, including hidden files, will be visible to the AI.",
     "acknowledge": "I understand",
     "noImportable": "No sandboxes to import."
@@ -68,7 +67,6 @@
   "sidebar": {
     "tabs": "Tabs",
     "filer": "Files",
-    "changes": "Changes",
     "commands": "Run command",
     "comingSoon": "Coming soon"
   },
@@ -88,13 +86,6 @@
       "preview": "Preview"
     },
     "conflict": "The agent changed this file, so your edits were saved to {{path}}."
-  },
-  "changes": {
-    "empty": "No changes.",
-    "restore": "Restore",
-    "restoreAll": "Restore all",
-    "confirmRestoreAll": "Restore all of the following files?",
-    "noDiff": "No diff to show."
   },
   "settings": {
     "title": "Settings",
@@ -152,6 +143,7 @@
     "refreshTab": "Start a new session on this tab (reuses the current connection)"
   },
   "diff": {
+    "empty": "No diff to show.",
     "hiddenLines": "… {{count}} lines"
   }
 }

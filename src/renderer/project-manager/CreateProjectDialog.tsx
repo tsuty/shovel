@@ -112,7 +112,6 @@ function NewDirForm(props: {
   const [displayName, setDisplayName] = useState('')
   const [baseDir, setBaseDir] = useState('')
   const [dirName, setDirName] = useState('')
-  const [gitInit, setGitInit] = useState(true)
 
   useEffect(() => {
     if (agents.length > 0 && !agentId) setAgentId(agents[0]!.id)
@@ -138,8 +137,7 @@ function NewDirForm(props: {
         displayName,
         baseDir,
         dirName,
-        sandboxName,
-        gitInit
+        sandboxName
       })
       onCreated()
     } catch (err) {
@@ -187,10 +185,6 @@ function NewDirForm(props: {
           <Field label={t('createFlow.sandboxName')}>
             <Input value={sandboxName} readOnly />
           </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={gitInit} onChange={(e) => setGitInit(e.target.checked)} />
-            {t('createFlow.gitInit')}
-          </label>
         </div>
       </details>
       <DialogFooter>
@@ -214,7 +208,6 @@ function ExistingDirForm(props: {
   const [agentId, setAgentId] = useState('')
   const [hostPath, setHostPath] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [gitInit, setGitInit] = useState(true)
   const [ack, setAck] = useState(false)
 
   useEffect(() => {
@@ -235,7 +228,7 @@ function ExistingDirForm(props: {
     setBusy(true)
     setError(null)
     try {
-      await window.shovel.projects.createExistingDir({ agentId, hostPath, displayName, gitInit })
+      await window.shovel.projects.createExistingDir({ agentId, hostPath, displayName })
       onCreated()
     } catch (err) {
       setError(friendlyErrorMessage(err instanceof Error ? err.message : String(err), t))
@@ -272,10 +265,6 @@ function ExistingDirForm(props: {
       </Field>
       <div className="rounded-md border border-border bg-muted/50 p-3 text-sm">
         <p>{t('createFlow.existingWarning')}</p>
-        <label className="mt-2 flex items-center gap-2">
-          <Checkbox checked={gitInit} onChange={(e) => setGitInit(e.target.checked)} />
-          {t('createFlow.gitInit')}
-        </label>
         <label className="mt-2 flex items-center gap-2">
           <Checkbox checked={ack} onChange={(e) => setAck(e.target.checked)} />
           {t('createFlow.acknowledge')}
