@@ -12,12 +12,11 @@ import { Button } from '../shared/components/ui/button'
 
 /**
  * ui.md §2「プロジェクトの詳細」。基本情報・操作（停止/OSターミナル）・
- * 診断情報（`sbx diagnose` 出力、`sbx ls --json` の該当エントリ）をまとめ、
- * 丸ごとクリップボードにコピーできる（decisions.md N-2-6）。
- *
- * ACP トラフィックログ・エージェントの stderr はセッション単位のファイルで
- * 保存されており（`src/main/log.ts`）、プロジェクトへの逆引きは未実装のため
- * ここには含めていない（follow-up）。
+ * 診断情報（`sbx diagnose` 出力、ACP トラフィックログ、エージェントの stderr、
+ * `sbx ls --json` の該当エントリ）をまとめ、丸ごとクリップボードにコピー
+ * できる（decisions.md N-2-6）。ACP トラフィックログ・stderr は最後に開いた
+ * セッションのログファイル（`src/main/log.ts`）から読む — 一度もセッションを
+ * 開いていないプロジェクトでは `null` になり、その節はそもそも表示しない。
  */
 export function ProjectDetailDialog({
   projectId,
@@ -49,6 +48,8 @@ export function ProjectDetailDialog({
       '',
       '## sbx diagnose',
       diagnostics.diagnoseOutput,
+      ...(diagnostics.acpTrafficLog ? ['', '## ACP traffic log', diagnostics.acpTrafficLog] : []),
+      ...(diagnostics.stderrLog ? ['', '## agent stderr', diagnostics.stderrLog] : []),
       '',
       '## sbx ls --json (this project)',
       JSON.stringify(diagnostics.sbxLsEntry, null, 2)

@@ -43,6 +43,9 @@ export function App(): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [lastOpenedFilePath, setLastOpenedFilePath] = useState<string | null>(null)
+  const [tabStatuses, setTabStatuses] = useState<
+    Record<string, { sending: boolean; hasPendingPermission: boolean }>
+  >({})
   const { settings, update: updateSettings } = useSettings()
 
   useEffect(() => {
@@ -155,6 +158,26 @@ export function App(): React.JSX.Element {
       }
       return next
     })
+    setTabStatuses((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
+
+  /** ui.md §4「背景タブの通知」。変化がなければ同一参照を返し、無駄な再レンダリングを避ける。 */
+  function updateTabStatus(
+    sessionId: string,
+    status: { sending: boolean; hasPendingPermission: boolean }
+  ): void {
+    setTabStatuses((prev) => {
+      const current = prev[sessionId]
+      if (current && current.sending === status.sending && current.hasPendingPermission === status.hasPendingPermission) {
+        return prev
+      }
+      return { ...prev, [sessionId]: status }
+    })
   }
 
   function renameTab(sessionId: string, title: string): void {
@@ -177,7 +200,11 @@ export function App(): React.JSX.Element {
     return <div className="p-4 text-sm text-muted-foreground">{t('mainWindow.noProject')}</div>
   }
 
-  const tabInfos: TabInfo[] = tabs.map((tab) => ({ sessionId: tab.sessionId, title: tab.title }))
+  const tabInfos: TabInfo[] = tabs.map((tab) => ({
+    sessionId: tab.sessionId,
+    title: tab.title,
+    status: tab.kind === 'session' ? tabStatuses[tab.sessionId] : undefined
+  }))
   const activeTab = tabs.find((tab) => tab.sessionId === activeSessionId) ?? null
 
   return (
@@ -237,6 +264,7 @@ export function App(): React.JSX.Element {
                     initialMeta={tab.meta}
                     initialAttachments={tab.initialAttachments}
                     onOpenFile={(relPath) => openFile(relPath, relPath.toLowerCase().endsWith('.md'))}
+                    onStatusChange={(status) => updateTabStatus(tab.sessionId, status)}
                   />
                 ) : tab.kind === 'history' ? (
                   <HistoryView

@@ -149,3 +149,20 @@
   opacity: 0.4;
   user-select: none;
 }
+
+/**
+ * ui.md §4「背景タブの通知」: ターン実行中は不透明度が約1秒周期で
+ * 1.0 ↔ 0.35 に脈動する。Tailwind 標準の animate-pulse は周期・振れ幅が
+ * 異なるため、仕様どおりの値で自前定義する。
+ */
+@keyframes tab-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.animate-tab-pulse {
+  animation: tab-pulse 1s ease-in-out infinite;
+}

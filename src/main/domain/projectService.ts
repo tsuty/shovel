@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { dialog, shell } from 'electron'
 import { getAgentEntry } from '@shared/agentTable'
@@ -16,6 +16,7 @@ import { sbxCreate, sbxDiagnose, sbxLs, sbxMeasureSandboxPath, sbxRm, sbxStop } 
 import { hostPathsEqual } from './pathTranslate'
 import { deleteSnapshot, listSnapshotsForProject } from '../persistence/snapshot'
 import { projectsStore } from '../persistence/store'
+import { logsDir } from '../log'
 
 const SANDBOX_NAME_ALLOWED = /[^a-zA-Z0-9.+-]+/g
 
@@ -201,12 +202,49 @@ export async function diagnose(): Promise<string> {
 }
 
 /** ui.md §2「プロジェクトの詳細」の診断情報。N-2-6: まとめてコピーできる形にする。 */
+const RECENT_LOG_LINES = 500
+
+/** `src/main/log.ts` が書くファイル名 `{ms}_{projectId}_{sessionId}.log` から、このプロジェクトの最後のセッションのログを逆引きする。 */
+async function findLatestLogFile(projectId: string): Promise<string | null> {
+  const dir = logsDir()
+  const entries = await readdir(dir).catch(() => [])
+  const matches = entries.filter((f) => f.includes(`_${projectId}_`)).sort()
+  const latest = matches[matches.length - 1]
+  return latest ? path.join(dir, latest) : null
+}
+
+/**
+ * decisions.md N-2-6「診断情報画面」。SAC 方式のログ行 `{ms} {OUT|IN} {raw JSON}` /
+ * `{ms} STDERR {text}` を種別ごとに振り分け、末尾 `RECENT_LOG_LINES` 行に切り詰める。
+ */
+async function readSessionLogs(projectId: string): Promise<Pick<ProjectDiagnostics, 'acpTrafficLog' | 'stderrLog'>> {
+  const file = await findLatestLogFile(projectId)
+  if (!file) return { acpTrafficLog: null, stderrLog: null }
+  const raw = await readFile(file, 'utf8').catch(() => '')
+  const rpcLines: string[] = []
+  const stderrLines: string[] = []
+  for (const line of raw.split('\n')) {
+    if (!line) continue
+    const match = /^\d+ (OUT|IN|STDERR) /.exec(line)
+    if (!match) continue
+    ;(match[1] === 'STDERR' ? stderrLines : rpcLines).push(line)
+  }
+  return {
+    acpTrafficLog: rpcLines.length > 0 ? rpcLines.slice(-RECENT_LOG_LINES).join('\n') : null,
+    stderrLog: stderrLines.length > 0 ? stderrLines.slice(-RECENT_LOG_LINES).join('\n') : null
+  }
+}
+
 export async function getProjectDiagnostics(id: string): Promise<ProjectDiagnostics> {
   const project = projectsStore.list().find((p) => p.id === id)
   if (!project) throw new Error(`project not found: ${id}`)
-  const [diagnoseOutput, sandboxes] = await Promise.all([sbxDiagnose(), sbxLs().catch(() => [])])
+  const [diagnoseOutput, sandboxes, logs] = await Promise.all([
+    sbxDiagnose(),
+    sbxLs().catch(() => []),
+    readSessionLogs(id)
+  ])
   const sbxLsEntry = sandboxes.find((s) => s.id === project.sandboxId) ?? null
-  return { project, diagnoseOutput, sbxLsEntry }
+  return { project, diagnoseOutput, sbxLsEntry, ...logs }
 }
 
 export async function stopProject(id: string): Promise<void> {

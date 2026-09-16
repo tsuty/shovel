@@ -124,6 +124,14 @@ export interface ProjectDiagnostics {
   project: Project
   diagnoseOutput: string
   sbxLsEntry: SbxLsEntry | null
+  /**
+   * decisions.md N-2-6「診断情報画面」。このプロジェクトが最後に開いたセッション
+   * の `src/main/log.ts` ログファイルから、ACP トラフィック（`IN`/`OUT` 行）と
+   * エージェントの `stderr`（`STDERR` 行）をそれぞれ抜き出したもの。末尾側を
+   * `RECENT_LOG_LINES` 行に切り詰める。一度もセッションを開いていなければ `null`。
+   */
+  acpTrafficLog: string | null
+  stderrLog: string | null
 }
 
 export interface RendererApi {

@@ -7,7 +7,7 @@ import type { AttachmentChip } from '@shared/types/transcript'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
 import { flushAllEditors } from '../editorRegistry'
 import { registerAttachHandler } from '../attachmentRegistry'
-import { Transcript } from './Transcript'
+import { LiveThoughtArea, Transcript } from './Transcript'
 import { Composer } from './Composer'
 
 function chipFromRelPath(relPath: string): AttachmentChip {
@@ -18,12 +18,15 @@ export function SessionView({
   sessionId,
   initialMeta,
   initialAttachments = [],
-  onOpenFile
+  onOpenFile,
+  onStatusChange
 }: {
   sessionId: string
   initialMeta: SessionMeta
   initialAttachments?: string[]
   onOpenFile: (relPath: string) => void
+  /** ui.md §4「背景タブの通知」。TabBar が非アクティブなタブに反映する。 */
+  onStatusChange?: (status: { sending: boolean; hasPendingPermission: boolean }) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [state, dispatch] = useReducer(transcriptReducer, initialTranscriptState)
@@ -37,8 +40,8 @@ export function SessionView({
       if (envelope.sessionId !== sessionId) return
       const event = envelope.event
       if (event.type === 'sessionMeta') {
-        const { modes, currentModeId, configOptions, usage } = event
-        setMeta((prev) => ({ ...prev, modes, currentModeId, configOptions, usage }))
+        const { modes, currentModeId, configOptions, usage, commands } = event
+        setMeta((prev) => ({ ...prev, modes, currentModeId, configOptions, usage, commands }))
         return
       }
       dispatch(event)
@@ -52,6 +55,15 @@ export function SessionView({
       setAttachments((prev) => (prev.some((c) => c.path === relPath) ? prev : [...prev, chipFromRelPath(relPath)]))
     })
   }, [sessionId])
+
+  const hasPendingPermission = Object.values(state.permissions).some((p) => p.status === 'pending')
+  // ui.md §4「背景タブの通知」。親（TabBar）へ状態を伝える。onStatusChange を
+  // 依存に含めると呼び出し側で新しい関数が渡されるたびに発火してしまうため、
+  // sending / hasPendingPermission の実際の変化だけをトリガーにする。
+  useEffect(() => {
+    onStatusChange?.({ sending, hasPendingPermission })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sending, hasPendingPermission])
 
   async function send(text: string): Promise<void> {
     // flows.md §4: 送信時に未保存の Markdown 編集をディスクへフラッシュする
@@ -103,6 +115,7 @@ export function SessionView({
         onOpenFile={onOpenFile}
         onSubmitChoices={(markdown) => void send(markdown)}
       />
+      {state.liveThought && <LiveThoughtArea markdown={state.liveThought.markdown} />}
       <Composer
         meta={meta}
         sending={sending}

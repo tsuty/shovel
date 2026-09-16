@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { SessionMeta, SessionUsage } from '@shared/types/session'
+import type { SessionCommand, SessionMeta, SessionUsage } from '@shared/types/session'
 import type { AttachmentChip } from '@shared/types/transcript'
 import { Button } from '../../shared/components/ui/button'
 import { Textarea } from '../../shared/components/ui/input'
+import { cn } from '../../shared/lib/utils'
 
 const compactNumberFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 
@@ -41,6 +42,30 @@ export function Composer({
   const { t } = useTranslation()
   const [text, setText] = useState('')
   const composingRef = useRef(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // ui.md §8「行頭の / でスラッシュコマンド補完（available_commands_update
+  // の候補）」。テキスト全体が「/」+ 空白を含まない語のときだけ候補を出す
+  // （複数行入力の途中に出てくる「/」は対象外という単純化）。
+  const slashMatch = /^\/(\S*)$/.exec(text)
+  const [dismissed, setDismissed] = useState(false)
+  const [commandIndex, setCommandIndex] = useState(0)
+  const filteredCommands =
+    slashMatch && !dismissed
+      ? meta.commands.filter((c) => c.name.toLowerCase().startsWith(slashMatch[1]!.toLowerCase()))
+      : []
+  const showCommands = filteredCommands.length > 0
+
+  useEffect(() => {
+    setDismissed(false)
+    setCommandIndex(0)
+  }, [text])
+
+  function applyCommand(cmd: SessionCommand): void {
+    setText(`/${cmd.name} `)
+    setDismissed(false)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
 
   function submit(): void {
     const trimmed = text.trim()
@@ -71,21 +96,68 @@ export function Composer({
           ))}
         </div>
       )}
-      <Textarea
-        rows={3}
-        value={text}
-        placeholder={t('composer.placeholder')}
-        onChange={(e) => setText(e.target.value)}
-        onCompositionStart={() => (composingRef.current = true)}
-        onCompositionEnd={() => (composingRef.current = false)}
-        onKeyDown={(e) => {
-          // decisions.md G-1-5: IME 合成中の Enter で誤送信しない。
-          if (e.key === 'Enter' && !e.shiftKey && !composingRef.current && !e.nativeEvent.isComposing) {
-            e.preventDefault()
-            submit()
-          }
-        }}
-      />
+      <div className="relative">
+        {showCommands && (
+          <div className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+            {filteredCommands.map((cmd, i) => (
+              <button
+                key={cmd.name}
+                type="button"
+                className={cn(
+                  'flex w-full flex-col items-start px-2 py-1.5 text-left',
+                  i === commandIndex && 'bg-accent'
+                )}
+                onMouseEnter={() => setCommandIndex(i)}
+                onClick={() => applyCommand(cmd)}
+              >
+                <span className="text-xs font-medium">
+                  /{cmd.name}
+                  {cmd.inputHint && <span className="ml-1 font-normal text-muted-foreground">{cmd.inputHint}</span>}
+                </span>
+                {cmd.description && <span className="text-xs text-muted-foreground">{cmd.description}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+        <Textarea
+          ref={textareaRef}
+          rows={3}
+          value={text}
+          placeholder={t('composer.placeholder')}
+          onChange={(e) => setText(e.target.value)}
+          onCompositionStart={() => (composingRef.current = true)}
+          onCompositionEnd={() => (composingRef.current = false)}
+          onKeyDown={(e) => {
+            if (showCommands && !composingRef.current && !e.nativeEvent.isComposing) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setCommandIndex((i) => Math.min(i + 1, filteredCommands.length - 1))
+                return
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setCommandIndex((i) => Math.max(i - 1, 0))
+                return
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault()
+                applyCommand(filteredCommands[commandIndex]!)
+                return
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setDismissed(true)
+                return
+              }
+            }
+            // decisions.md G-1-5: IME 合成中の Enter で誤送信しない。
+            if (e.key === 'Enter' && !e.shiftKey && !composingRef.current && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              submit()
+            }
+          }}
+        />
+      </div>
       <div className="mt-2 flex items-center gap-2">
         {meta.modes.length > 0 && (
           <select

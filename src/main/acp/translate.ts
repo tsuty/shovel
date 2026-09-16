@@ -278,6 +278,13 @@ function toolCallPayload(payload: ToolCall | ToolCallUpdate, groupId: string): T
   const diffs = (payload.content ?? [])
     .filter((c): c is ToolCallContent & { type: 'diff' } & Diff => c.type === 'diff')
     .map((diff) => diffToPayload(diff))
+  // ui.md §5「その他 → 標準の折り畳みアンカー」「search → ヒット一覧は展開部に」
+  // 「fetch → 取得内容のみ末尾のキャレットで展開」。ACP はこれらを diff とは別の
+  // `type: "content"` ブロックとして運んでくるので、結合してそのまま展開領域に流す。
+  const textParts = (payload.content ?? [])
+    .filter((c): c is ToolCallContent & { type: 'content' } => c.type === 'content')
+    .map((c) => contentBlockToText(c.content))
+  const content = textParts.length > 0 ? textParts.join('\n') : undefined
   return {
     id: payload.toolCallId,
     groupId,
@@ -286,7 +293,8 @@ function toolCallPayload(payload: ToolCall | ToolCallUpdate, groupId: string): T
     status: (payload.status as ToolCallStatus | undefined) ?? 'pending',
     locations: (payload.locations ?? []).map((l) => ({ path: l.path, line: l.line ?? undefined })),
     diffs,
-    rawInput: payload.rawInput
+    rawInput: payload.rawInput,
+    content
   }
 }
 

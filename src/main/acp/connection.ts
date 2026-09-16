@@ -18,6 +18,7 @@ import type { AgentEntry, Project } from '@shared/types/project'
 import type {
   ConfigOption,
   SessionCapabilities,
+  SessionCommand,
   SessionMeta,
   SessionMode,
   SessionUsage,
@@ -113,7 +114,7 @@ export async function openAcpSession(
   }
 
   const acp = await loadAcpSdk()
-  const logger = new SessionLogger(sessionId)
+  const logger = new SessionLogger(sessionId, project.id)
   const child = sbxSpawnInteractive(project.sandboxName, ['npx', '-y', agent.acpPackage], {
     cwd: project.sandboxPath
   })
@@ -384,7 +385,8 @@ export async function openAcpSession(
     modes: resolvedMetaState.modes,
     currentModeId: resolvedMetaState.currentModeId,
     configOptions: resolvedMetaState.configOptions,
-    usage: resolvedMetaState.usage
+    usage: resolvedMetaState.usage,
+    commands: resolvedMetaState.commands
   }
   callbacks.onMetaChanged(meta)
 
@@ -456,9 +458,11 @@ export async function openAcpSession(
       resolvedMetaState.modes = newMetaState.modes
       resolvedMetaState.currentModeId = newMetaState.currentModeId
       resolvedMetaState.configOptions = newMetaState.configOptions
-      // 新しいセッションでは使用量はまだ届いていない。前のセッションの値を
-      // 引きずらないよう明示的にクリアする（undefined = 未受信、ui.md §8）。
+      // 新しいセッションでは使用量・利用可能コマンドはまだ届いていない。
+      // 前のセッションの値を引きずらないよう明示的にクリアする
+      // （usage は undefined = 未受信、ui.md §8。commands は空配列）。
       resolvedMetaState.usage = undefined
+      resolvedMetaState.commands = []
 
       callbacks.onEvent({ type: 'reset', sessionId })
       callbacks.onEvent({ ...resolvedMetaState, type: 'sessionMeta' })
@@ -600,6 +604,7 @@ interface MutableMetaState {
   currentModeId?: string
   configOptions: ConfigOption[]
   usage?: SessionUsage
+  commands: SessionCommand[]
 }
 
 /**
@@ -679,6 +684,15 @@ function handleSessionMessage(
       callbacks.onEvent({ ...metaState, type: 'sessionMeta' })
       return
     }
+    if (update.sessionUpdate === 'available_commands_update') {
+      metaState.commands = update.availableCommands.map((c) => ({
+        name: c.name,
+        description: c.description,
+        inputHint: c.input?.hint
+      }))
+      callbacks.onEvent({ ...metaState, type: 'sessionMeta' })
+      return
+    }
     const events = translator.handleSessionUpdate(update)
     snapshotAcc.track(events)
     for (const event of events) callbacks.onEvent(event)
@@ -746,7 +760,8 @@ function initialMetaState(
   return {
     modes,
     currentModeId: modeState?.currentModeId,
-    configOptions: (options ?? []).map(configOptionToPayload)
+    configOptions: (options ?? []).map(configOptionToPayload),
+    commands: []
   }
 }
 

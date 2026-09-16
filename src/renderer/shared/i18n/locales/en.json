@@ -125,7 +125,9 @@
     "worked": "Worked",
     "copy": "Copy",
     "viewDiff": "View diff",
-    "sendChoices": "Send"
+    "sendChoices": "Send",
+    "jumpToLatest": "Jump to latest",
+    "backToTurnStart": "↑ Back to turn start"
   },
   "composer": {
     "placeholder": "Message the agent…",

@@ -125,7 +125,9 @@
     "worked": "完了",
     "copy": "コピー",
     "viewDiff": "差分を表示",
-    "sendChoices": "送信"
+    "sendChoices": "送信",
+    "jumpToLatest": "最新へ",
+    "backToTurnStart": "↑ ターンの先頭へ戻る"
   },
   "composer": {
     "placeholder": "エージェントへメッセージを送る…",

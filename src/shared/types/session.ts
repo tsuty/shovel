@@ -48,6 +48,17 @@ export interface SessionUsage {
   costCurrency?: string
 }
 
+/**
+ * ui.md §8「行頭の `/` でスラッシュコマンド補完（`available_commands_update`
+ * の候補）」。`input.hint` はコマンド名の後に続ける引数のプレースホルダ
+ * （エージェントが省略すれば引数なしコマンドとして扱う）。
+ */
+export interface SessionCommand {
+  name: string
+  description: string
+  inputHint?: string
+}
+
 /** タブが保持するセッションの実行時メタデータ（真実はエージェント側）。 */
 export interface SessionMeta {
   sessionId: string
@@ -58,6 +69,7 @@ export interface SessionMeta {
   currentModeId?: string
   configOptions: ConfigOption[]
   usage?: SessionUsage
+  commands: SessionCommand[]
 }
 
 /** 個別 JSON ファイルとして永続化するスナップショット。data-model.md §3。 */

@@ -8,7 +8,7 @@ import path from 'node:path'
  * SAC 方式のフォーマット: `{ms} {OUT|IN} {raw JSON}`。
  */
 
-function logsDir(): string {
+export function logsDir(): string {
   const dir = path.join(app.getPath('userData'), 'logs')
   mkdirSync(dir, { recursive: true })
   return dir
@@ -20,8 +20,16 @@ export class SessionLogger {
   private readonly stream: WriteStream
   private readonly stderrRing: string[] = []
 
-  constructor(readonly sessionId: string) {
-    const file = path.join(logsDir(), `${Date.now()}_${sessionId}.log`)
+  /**
+   * ファイル名に `projectId` を刻んでおく。プロジェクト詳細ダイアログ
+   * （decisions.md N-2-6）がセッション単位のログファイルからプロジェクトを
+   * 逆引きするための唯一の手がかり。
+   */
+  constructor(
+    readonly sessionId: string,
+    readonly projectId: string
+  ) {
+    const file = path.join(logsDir(), `${Date.now()}_${projectId}_${sessionId}.log`)
     this.stream = createWriteStream(file, { flags: 'a' })
   }
 
