@@ -27,6 +27,7 @@ import {
   deleteHistorySession,
   dispatchTranscriptAction,
   openTab,
+  resumeTab,
   promptSession,
   refreshTab,
   renameSession,
@@ -35,6 +36,8 @@ import {
 } from '../domain/sessionManager'
 import {
   copyEntry,
+  createDirectory,
+  createMarkdownFile,
   deleteEntry,
   listDir,
   moveEntry,
@@ -101,6 +104,9 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AgentsList, () => AGENT_TABLE)
 
   ipcMain.handle(IpcChannel.SessionOpenTab, (event, projectId: string) => openTab(projectId, event.sender))
+  ipcMain.handle(IpcChannel.SessionResumeTab, (event, projectId: string, snapshotSessionId: string) =>
+    resumeTab(projectId, snapshotSessionId, event.sender)
+  )
   ipcMain.handle(IpcChannel.SessionCloseTab, (_event, sessionId: string) => closeTab(sessionId))
   ipcMain.handle(IpcChannel.SessionRefresh, (_event, sessionId: string) => refreshTab(sessionId))
   ipcMain.handle(
@@ -159,6 +165,12 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IpcChannel.FsOpenInOS, (_event, projectId: string, relPath: string) =>
     openInOS(projectId, relPath)
+  )
+  ipcMain.handle(IpcChannel.FsMkdir, (_event, projectId: string, parentRelPath: string) =>
+    createDirectory(projectId, parentRelPath)
+  )
+  ipcMain.handle(IpcChannel.FsCreateMarkdownFile, (_event, projectId: string, parentRelPath: string) =>
+    createMarkdownFile(projectId, parentRelPath)
   )
 
   ipcMain.handle(IpcChannel.ChangesList, (_event, projectId: string) => listChanges(projectId))

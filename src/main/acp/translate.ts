@@ -37,8 +37,21 @@ interface OpenBlock {
 export class SessionTranslator {
   private currentAgent: OpenBlock | null = null
   private currentThought: OpenBlock | null = null
+  private currentUser: OpenBlock | null = null
   private openGroupId: string | null = null
+  private replaying = false
   private readonly toolCallGroups = new Map<string, string>()
+
+  /**
+   * `session/load` は過去の会話を `session/update` として流し直す
+   * （decisions.md C-1/C-2）。replay 中だけ `user_message_chunk` を
+   * 描画対象にする: ライブのターンでは `userPrompt()` が既にユーザーの
+   * 発言を描いており、エージェントがそれをエコーし返した場合に二重に
+   * なってしまうため。
+   */
+  setReplayMode(on: boolean): void {
+    this.replaying = on
+  }
 
   /**
    * ユーザーが送信したプロンプトを、エージェントの返信を待たずにその場で
@@ -46,7 +59,7 @@ export class SessionTranslator {
    * （内容は運ばず、パスのみ）。
    */
   userPrompt(text: string, attachments: AttachmentChip[] = []): TranscriptEvent[] {
-    const events = [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought()]
+    const events = [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser()]
     const id = randomUUID()
     events.push({
       type: 'block',
@@ -64,10 +77,10 @@ export class SessionTranslator {
   handleSessionUpdate(update: SessionUpdate): TranscriptEvent[] {
     switch (update.sessionUpdate) {
       case 'user_message_chunk':
-        // ライブなターンでは userPrompt() が既に描画済み。session/load の
-        // replay 時のみここに来る可能性があるが、現時点では表示のみに留める
-        // （V-4 が解決してから replay 経路を本格実装する）。
-        return []
+        // ライブなターンでは userPrompt() が既に描画済みなので捨てる。
+        // replay 中（session/load）だけ USER ブロックとして描き直す。
+        if (!this.replaying) return []
+        return this.appendUserChunk(update.content, update.messageId ?? null)
       case 'agent_message_chunk':
         return this.appendAgentChunk(update.content, update.messageId ?? null)
       case 'agent_thought_chunk':
@@ -99,12 +112,13 @@ export class SessionTranslator {
   }
 
   handleStop(_stopReason: StopReason): TranscriptEvent[] {
-    return [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought()]
+    return [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser()]
   }
 
   reset(): TranscriptEvent[] {
     this.currentAgent = null
     this.currentThought = null
+    this.currentUser = null
     this.openGroupId = null
     this.toolCallGroups.clear()
     return []
@@ -119,7 +133,7 @@ export class SessionTranslator {
     if (!this.currentAgent) return []
     const { id, buffer } = this.currentAgent
     this.currentAgent = null
-    return [{ type: 'blockMarkdown', id, markdown: buffer }]
+    return [{ type: 'blockMarkdown', id, markdown: buffer, choices: extractChoices(id, buffer) }]
   }
 
   private finalizeThought(): TranscriptEvent[] {
@@ -129,11 +143,32 @@ export class SessionTranslator {
     return [{ type: 'blockMarkdown', id, markdown: buffer }]
   }
 
+  private finalizeUser(): TranscriptEvent[] {
+    if (!this.currentUser) return []
+    const { id, buffer } = this.currentUser
+    this.currentUser = null
+    return [{ type: 'blockMarkdown', id, markdown: buffer }]
+  }
+
+  private appendUserChunk(content: ContentBlock, messageId: string | null): TranscriptEvent[] {
+    const text = contentBlockToText(content)
+    const events: TranscriptEvent[] = []
+    if (!this.currentUser || messageId !== this.currentUser.messageId) {
+      events.push(...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser())
+      const id = randomUUID()
+      this.currentUser = { id, messageId, buffer: '' }
+      events.push({ type: 'block', id, role: 'USER', markdown: '', streaming: true })
+    }
+    this.currentUser.buffer += text
+    events.push({ type: 'stream', id: this.currentUser.id, text })
+    return events
+  }
+
   private appendAgentChunk(content: ContentBlock, messageId: string | null): TranscriptEvent[] {
     const text = contentBlockToText(content)
     const events: TranscriptEvent[] = []
     if (!this.currentAgent || messageId !== this.currentAgent.messageId) {
-      events.push(...this.closeOpenGroup(), ...this.finalizeAgent())
+      events.push(...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeUser())
       const id = randomUUID()
       this.currentAgent = { id, messageId, buffer: '' }
       events.push({ type: 'block', id, role: 'AGENT', markdown: '', streaming: true })
@@ -147,7 +182,7 @@ export class SessionTranslator {
     const text = contentBlockToText(content)
     const events: TranscriptEvent[] = []
     if (!this.currentThought || messageId !== this.currentThought.messageId) {
-      events.push(...this.finalizeThought())
+      events.push(...this.finalizeThought(), ...this.finalizeUser())
       const id = randomUUID()
       this.currentThought = { id, messageId, buffer: '' }
       events.push({ type: 'block', id, role: 'THOUGHT', markdown: '', streaming: true })
@@ -190,6 +225,23 @@ export class SessionTranslator {
     this.openGroupId = null
     return [{ type: 'group', id, timed: true, closed: true }]
   }
+}
+
+const TASK_LIST_LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.+)$/
+
+/**
+ * reference/Specification.md「Markdown task lists in agent responses are
+ * treated as interactive choices」の実装: 確定したエージェントの返信に
+ * `- [ ] 選択肢` 形式の行があれば `choices` として抜き出す。原文の Markdown
+ * 自体は変更しない（チェックボックス表示は renderer 側の役割）。
+ */
+function extractChoices(blockId: string, markdown: string): { id: string; label: string }[] | undefined {
+  const choices = markdown
+    .split('\n')
+    .map((line) => line.match(TASK_LIST_LINE))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map((m, index) => ({ id: `${blockId}:${index}`, label: m[2]!.trim() }))
+  return choices.length > 0 ? choices : undefined
 }
 
 function contentBlockToText(block: ContentBlock): string {

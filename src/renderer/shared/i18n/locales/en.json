@@ -75,7 +75,11 @@
   "filer": {
     "copyPath": "Copy path",
     "addToContext": "Add to context",
-    "fileDeleted": "This file has been deleted."
+    "fileDeleted": "This file has been deleted.",
+    "newFolder": "New folder",
+    "newMarkdownFile": "New markdown file",
+    "copy": "Copy",
+    "paste": "Paste"
   },
   "editor": {
     "mode": {
@@ -108,7 +112,10 @@
     "readOnlyNotice": "Read-only history. The agent no longer remembers this conversation.",
     "startNew": "Start new session",
     "empty": "Nothing was recorded for this session.",
-    "confirmDelete": "Delete this session's local history? This cannot be undone."
+    "confirmDelete": "Delete this session's local history? This cannot be undone.",
+    "resume": "Resume",
+    "resuming": "Resuming…",
+    "resumeUnsupported": "This agent cannot resume past sessions. This history can only be viewed, not continued."
   },
   "commands": {
     "hint": "Prompts like [Y/n] can be answered, but full-screen apps such as vim will not work.",
@@ -124,13 +131,17 @@
     "plan": "Plan",
     "thinking": "Thinking",
     "working": "Working…",
-    "worked": "Worked"
+    "worked": "Worked",
+    "copy": "Copy",
+    "viewDiff": "View diff",
+    "sendChoices": "Send"
   },
   "composer": {
     "placeholder": "Message the agent…",
     "send": "Send",
     "stop": "Stop",
-    "removeAttachment": "Remove attachment"
+    "removeAttachment": "Remove attachment",
+    "usageTitle": "{{used}} / {{size}} tokens used in this session's context"
   },
   "errors": {
     "sbxNotFound": "The \"sbx\" (Docker Sandboxes) command line tool was not found. Install it and try again: https://docs.docker.com/ai/sandboxes/"
@@ -139,5 +150,8 @@
     "noProject": "No project was specified.",
     "connecting": "Connecting…",
     "refreshTab": "Start a new session on this tab (reuses the current connection)"
+  },
+  "diff": {
+    "hiddenLines": "… {{count}} lines"
   }
 }

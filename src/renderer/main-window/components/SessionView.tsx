@@ -17,11 +17,13 @@ function chipFromRelPath(relPath: string): AttachmentChip {
 export function SessionView({
   sessionId,
   initialMeta,
-  initialAttachments = []
+  initialAttachments = [],
+  onOpenFile
 }: {
   sessionId: string
   initialMeta: SessionMeta
   initialAttachments?: string[]
+  onOpenFile: (relPath: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [state, dispatch] = useReducer(transcriptReducer, initialTranscriptState)
@@ -35,8 +37,8 @@ export function SessionView({
       if (envelope.sessionId !== sessionId) return
       const event = envelope.event
       if (event.type === 'sessionMeta') {
-        const { modes, currentModeId, configOptions } = event
-        setMeta((prev) => ({ ...prev, modes, currentModeId, configOptions }))
+        const { modes, currentModeId, configOptions, usage } = event
+        setMeta((prev) => ({ ...prev, modes, currentModeId, configOptions, usage }))
         return
       }
       dispatch(event)
@@ -98,6 +100,8 @@ export function SessionView({
         onPermission={(permissionId, optionId) =>
           void window.shovel.session.dispatch({ type: 'permission', sessionId, id: permissionId, optionId })
         }
+        onOpenFile={onOpenFile}
+        onSubmitChoices={(markdown) => void send(markdown)}
       />
       <Composer
         meta={meta}

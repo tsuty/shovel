@@ -28,6 +28,20 @@ function resolveAbsolute(project: Project, relPath: string): string {
   return abs
 }
 
+/** 同名衝突を避け、VSCode 等と同じ「Name」「Name 2」「Name 3」…の規則で空き名前を探す。 */
+async function findAvailableName(dirAbs: string, base: string, ext: string): Promise<string> {
+  let candidate = `${base}${ext}`
+  for (let n = 2; ; n++) {
+    try {
+      await stat(path.join(dirAbs, candidate))
+      candidate = `${base} ${n}${ext}`
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return candidate
+      throw err
+    }
+  }
+}
+
 async function loadIgnore(hostPath: string): Promise<Ignore> {
   const ig = ignore()
   try {
@@ -94,6 +108,22 @@ export async function writeTextFile(projectId: string, relPath: string, content:
   await writeFile(absPath, content, 'utf8')
 }
 
+export async function createDirectory(projectId: string, parentRelPath: string): Promise<string> {
+  const project = requireProject(projectId)
+  const parentAbs = resolveAbsolute(project, parentRelPath)
+  const name = await findAvailableName(parentAbs, 'New Folder', '')
+  await mkdir(path.join(parentAbs, name))
+  return parentRelPath ? `${parentRelPath}/${name}` : name
+}
+
+export async function createMarkdownFile(projectId: string, parentRelPath: string): Promise<string> {
+  const project = requireProject(projectId)
+  const parentAbs = resolveAbsolute(project, parentRelPath)
+  const name = await findAvailableName(parentAbs, 'Untitled', '.md')
+  await writeFile(path.join(parentAbs, name), '', 'utf8')
+  return parentRelPath ? `${parentRelPath}/${name}` : name
+}
+
 export async function renameEntry(projectId: string, relPath: string, newName: string): Promise<void> {
   const project = requireProject(projectId)
   const absPath = resolveAbsolute(project, relPath)
@@ -116,13 +146,21 @@ export async function moveEntry(projectId: string, relPath: string, destDirRelPa
   await fsRename(absPath, destAbs)
 }
 
-export async function copyEntry(projectId: string, relPath: string, destDirRelPath: string): Promise<void> {
+export async function copyEntry(projectId: string, relPath: string, destDirRelPath: string): Promise<string> {
   const project = requireProject(projectId)
   const absPath = resolveAbsolute(project, relPath)
   const destDirAbs = resolveAbsolute(project, destDirRelPath)
   await mkdir(destDirAbs, { recursive: true })
-  const destAbs = path.join(destDirAbs, path.basename(absPath))
+  // 同じフォルダへ貼り付ける「複製」操作でも衝突せず使えるよう、
+  // 移動先に同名が既にあれば createDirectory/createMarkdownFile と同じ規則で回避する。
+  const info = await stat(absPath)
+  const original = path.basename(absPath)
+  const ext = info.isDirectory() ? '' : path.extname(original)
+  const base = info.isDirectory() ? original : original.slice(0, original.length - ext.length)
+  const name = await findAvailableName(destDirAbs, base, ext)
+  const destAbs = path.join(destDirAbs, name)
   await cp(absPath, destAbs, { recursive: true, errorOnExist: true })
+  return destDirRelPath ? `${destDirRelPath}/${name}` : name
 }
 
 export async function openInOS(projectId: string, relPath: string): Promise<void> {

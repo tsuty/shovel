@@ -5,3 +5,12 @@
  * shared に置く。main 側は `src/main/acp/connection.ts` で使う。
  */
 export const AUTH_REQUIRED_MARKER = 'AUTH_REQUIRED'
+
+/**
+ * Electron は `ipcMain.handle` が投げた Error を renderer へ渡すとき
+ * "Error invoking remote method '...': Error: <元の message>" の形に包む。
+ * 完全一致では拾えないため部分一致で判定する（`sbxErrors.ts` と同じ理由）。
+ */
+export function isAuthRequiredMessage(message: string): boolean {
+  return message.includes(AUTH_REQUIRED_MARKER)
+}

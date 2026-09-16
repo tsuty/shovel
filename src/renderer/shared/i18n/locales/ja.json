@@ -75,7 +75,11 @@
   "filer": {
     "copyPath": "パスをコピー",
     "addToContext": "コンテキストに追加",
-    "fileDeleted": "このファイルは削除されました。"
+    "fileDeleted": "このファイルは削除されました。",
+    "newFolder": "新規フォルダ",
+    "newMarkdownFile": "新規Markdownファイル",
+    "copy": "コピー",
+    "paste": "貼り付け"
   },
   "editor": {
     "mode": {
@@ -108,7 +112,10 @@
     "readOnlyNotice": "読み取り専用の履歴です。エージェントはこの会話を覚えていません。",
     "startNew": "新しいセッションとして始める",
     "empty": "このセッションには記録がありません。",
-    "confirmDelete": "このセッションのローカル履歴を削除しますか？元に戻せません。"
+    "confirmDelete": "このセッションのローカル履歴を削除しますか？元に戻せません。",
+    "resume": "この続きから再開",
+    "resuming": "再開しています…",
+    "resumeUnsupported": "このエージェントは過去のセッションの再開に対応していません。読み取り専用の履歴としてのみ表示できます。"
   },
   "commands": {
     "hint": "[Y/n] のような入力には応答できますが、vim などの全画面アプリは動きません。",
@@ -124,13 +131,17 @@
     "plan": "プラン",
     "thinking": "思考中",
     "working": "作業中…",
-    "worked": "完了"
+    "worked": "完了",
+    "copy": "コピー",
+    "viewDiff": "差分を表示",
+    "sendChoices": "送信"
   },
   "composer": {
     "placeholder": "エージェントへメッセージを送る…",
     "send": "送信",
     "stop": "停止",
-    "removeAttachment": "添付を外す"
+    "removeAttachment": "添付を外す",
+    "usageTitle": "このセッションのコンテキストで {{used}} / {{size}} トークンを使用"
   },
   "errors": {
     "sbxNotFound": "Docker Sandboxes の「sbx」コマンドが見つかりません。インストールしてからもう一度お試しください: https://docs.docker.com/ai/sandboxes/"
@@ -139,5 +150,8 @@
     "noProject": "プロジェクトが指定されていません。",
     "connecting": "接続しています…",
     "refreshTab": "このタブで新しいセッションを始める（今の接続を再利用）"
+  },
+  "diff": {
+    "hiddenLines": "… {{count}} 行"
   }
 }

@@ -49,6 +49,8 @@ const api: RendererApi = {
   },
   session: {
     openTab: (projectId) => ipcRenderer.invoke(IpcChannel.SessionOpenTab, projectId),
+    resumeTab: (projectId, snapshotSessionId) =>
+      ipcRenderer.invoke(IpcChannel.SessionResumeTab, projectId, snapshotSessionId),
     closeTab: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionCloseTab, sessionId),
     refresh: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionRefresh, sessionId),
     prompt: (sessionId, text, attachmentRelPaths) =>
@@ -79,7 +81,10 @@ const api: RendererApi = {
       ipcRenderer.invoke(IpcChannel.FsMove, projectId, relPath, destDirRelPath),
     copy: (projectId, relPath, destDirRelPath) =>
       ipcRenderer.invoke(IpcChannel.FsCopy, projectId, relPath, destDirRelPath),
-    openInOS: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.FsOpenInOS, projectId, relPath)
+    openInOS: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.FsOpenInOS, projectId, relPath),
+    mkdir: (projectId, parentRelPath) => ipcRenderer.invoke(IpcChannel.FsMkdir, projectId, parentRelPath),
+    createMarkdownFile: (projectId, parentRelPath) =>
+      ipcRenderer.invoke(IpcChannel.FsCreateMarkdownFile, projectId, parentRelPath)
   },
   changes: {
     list: (projectId) => ipcRenderer.invoke(IpcChannel.ChangesList, projectId),

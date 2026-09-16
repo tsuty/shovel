@@ -14,7 +14,7 @@ import { HistoryView } from './components/HistoryView'
 import { useSettings } from '../shared/useSettings'
 import { SettingsDialog } from '../shared/components/SettingsDialog'
 import { AuthDialog } from './components/AuthDialog'
-import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
+import { isAuthRequiredMessage } from '@shared/authMarker'
 import { useTabSwitchShortcuts } from './useTabShortcuts'
 import { addAttachmentToSession } from './attachmentRegistry'
 import { friendlyErrorMessage } from '../shared/friendlyError'
@@ -83,7 +83,7 @@ export function App(): React.JSX.Element {
       const message = err instanceof Error ? err.message : String(err)
       // 事前チェックを素通りしても、トークン期限切れ等で接続時に認証エラーに
       // なることがある。同じ認証画面へ導く（flows.md §1-2「両方持つ」）。
-      if (message === AUTH_REQUIRED_MARKER) {
+      if (isAuthRequiredMessage(message)) {
         setAuthOpen(true)
         return
       }
@@ -125,6 +125,25 @@ export function App(): React.JSX.Element {
     }
     setTabs((prev) => [...prev, { kind: 'history', sessionId: id, title: snapshot.title, snapshot }])
     setActiveSessionId(id)
+  }
+
+  /**
+   * decisions.md C-1/C-2: 履歴タブの「再開」。main 側が `session/load` か
+   * `session/resume` で文脈を繋ぎ直し、成功したら読み取り専用の履歴タブを
+   * その場でライブのセッションタブへ差し替える。タブ id は元のスナップショット
+   * の id をそのまま引き継ぐ（main 側も同じ id でタブを開いている）。
+   */
+  async function resumeHistory(snapshot: SessionSnapshot): Promise<void> {
+    if (!projectId) return
+    const { sessionId, meta } = await window.shovel.session.resumeTab(projectId, snapshot.sessionId)
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.sessionId === `history:${snapshot.sessionId}`
+          ? { kind: 'session', sessionId, title: snapshot.title, meta, initialAttachments: [] }
+          : tab
+      )
+    )
+    setActiveSessionId(sessionId)
   }
 
   async function closeTab(id: string): Promise<void> {
@@ -218,9 +237,14 @@ export function App(): React.JSX.Element {
                     sessionId={tab.sessionId}
                     initialMeta={tab.meta}
                     initialAttachments={tab.initialAttachments}
+                    onOpenFile={(relPath) => openFile(relPath, relPath.toLowerCase().endsWith('.md'))}
                   />
                 ) : tab.kind === 'history' ? (
-                  <HistoryView snapshot={tab.snapshot} onStartNew={() => void openNewTab()} />
+                  <HistoryView
+                    snapshot={tab.snapshot}
+                    onResume={() => resumeHistory(tab.snapshot)}
+                    onStartNew={() => void openNewTab()}
+                  />
                 ) : tab.isMarkdown ? (
                   <MarkdownEditor projectId={projectId} relPath={tab.relPath} />
                 ) : (

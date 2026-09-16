@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Tree, type NodeRendererProps } from 'react-arborist'
+import { Tree, type NodeRendererProps, type TreeApi } from 'react-arborist'
 import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FsEntry } from '@shared/types/filer'
@@ -7,6 +7,10 @@ import { cn } from '../../shared/lib/utils'
 
 interface FsNode extends FsEntry {
   children?: FsNode[]
+}
+
+interface ClipboardEntry {
+  relPath: string
 }
 
 function toNode(entry: FsEntry): FsNode {
@@ -32,6 +36,13 @@ function replaceChildren(nodes: FsNode[], relPath: string, children: FsNode[]): 
   })
 }
 
+/** 右クリックされたノード（無ければルート）から見た「作成/貼り付け先ディレクトリ」を決める。 */
+function targetDirFor(node: FsNode | null): string {
+  if (!node) return ''
+  if (node.isDir) return node.relPath
+  return node.relPath.includes('/') ? node.relPath.slice(0, node.relPath.lastIndexOf('/')) : ''
+}
+
 /**
  * ui.md §9 / decisions.md N-3-4, N-3-5: `react-arborist` による遅延展開の
  * ファイルツリー。`.gitignore` 対象は薄く表示し、`.git` は既定で非表示。
@@ -49,9 +60,11 @@ export function Filer({
   const [data, setData] = useState<FsNode[]>([])
   const [showGit, setShowGit] = useState(false)
   const [loadedDirs, setLoadedDirs] = useState<Set<string>>(new Set())
-  const [menu, setMenu] = useState<{ x: number; y: number; node: FsNode } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; node: FsNode | null } | null>(null)
   const [renaming, setRenaming] = useState<FsNode | null>(null)
+  const [clipboard, setClipboard] = useState<ClipboardEntry | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const treeRef = useRef<TreeApi<FsNode> | undefined>(undefined)
   const [containerHeight, setContainerHeight] = useState(400)
 
   useEffect(() => {
@@ -65,11 +78,12 @@ export function Filer({
     return () => observer.disconnect()
   }, [])
 
-  async function loadDir(relPath: string): Promise<void> {
+  async function loadDir(relPath: string): Promise<FsNode[]> {
     const entries = await window.shovel.fs.list(projectId, relPath, showGit)
     const nodes = entries.map(toNode)
     setData((prev) => (relPath === '' ? nodes : replaceChildren(prev, relPath, nodes)))
     setLoadedDirs((prev) => new Set(prev).add(relPath))
+    return nodes
   }
 
   useEffect(() => {
@@ -111,6 +125,43 @@ export function Filer({
     await refreshParent(node.relPath)
   }
 
+  /** 作成/貼り付け後: 対象ディレクトリを開いた上で一覧を再取得する。 */
+  async function revealDir(dirRelPath: string): Promise<FsNode[]> {
+    if (dirRelPath) treeRef.current?.open(dirRelPath)
+    return loadDir(dirRelPath)
+  }
+
+  async function handleNewFolder(targetNode: FsNode | null): Promise<void> {
+    setMenu(null)
+    const parent = targetDirFor(targetNode)
+    const newRelPath = await window.shovel.fs.mkdir(projectId, parent)
+    const nodes = await revealDir(parent)
+    const created = findNode(nodes, newRelPath)
+    if (created) setRenaming(created)
+  }
+
+  async function handleNewFile(targetNode: FsNode | null): Promise<void> {
+    setMenu(null)
+    const parent = targetDirFor(targetNode)
+    const newRelPath = await window.shovel.fs.createMarkdownFile(projectId, parent)
+    const nodes = await revealDir(parent)
+    const created = findNode(nodes, newRelPath)
+    if (created) setRenaming(created)
+  }
+
+  function handleCopy(node: FsNode): void {
+    setClipboard({ relPath: node.relPath })
+    setMenu(null)
+  }
+
+  async function handlePaste(targetNode: FsNode | null): Promise<void> {
+    setMenu(null)
+    if (!clipboard) return
+    const destDir = targetDirFor(targetNode)
+    await window.shovel.fs.copy(projectId, clipboard.relPath, destDir)
+    await revealDir(destDir)
+  }
+
   return (
     <div className="flex h-full flex-col" onClick={() => setMenu(null)}>
       <div className="flex items-center justify-between border-b border-border px-2 py-1 text-xs">
@@ -120,8 +171,16 @@ export function Filer({
           .git
         </label>
       </div>
-      <div ref={containerRef} className="relative flex-1 overflow-hidden">
+      <div
+        ref={containerRef}
+        className="relative flex-1 overflow-hidden"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenu({ x: e.clientX, y: e.clientY, node: null })
+        }}
+      >
         <Tree<FsNode>
+          ref={treeRef}
           data={data}
           idAccessor="relPath"
           childrenAccessor="children"
@@ -164,26 +223,36 @@ export function Filer({
           style={{ left: menu.x, top: menu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          <MenuItem onClick={() => void copyPath(menu.node)}>{t('filer.copyPath')}</MenuItem>
-          {!menu.node.isDir && (
+          {menu.node && <MenuItem onClick={() => void copyPath(menu.node!)}>{t('filer.copyPath')}</MenuItem>}
+          {menu.node && !menu.node.isDir && (
             <MenuItem
               onClick={() => {
-                onAddToContext(menu.node.relPath)
+                onAddToContext(menu.node!.relPath)
                 setMenu(null)
               }}
             >
               {t('filer.addToContext')}
             </MenuItem>
           )}
-          <MenuItem
-            onClick={() => {
-              setRenaming(menu.node)
-              setMenu(null)
-            }}
-          >
-            {t('common.rename')}
-          </MenuItem>
-          <MenuItem onClick={() => void handleDelete(menu.node)}>{t('common.delete')}</MenuItem>
+          {menu.node && <div className="my-1 border-t border-border" />}
+          <MenuItem onClick={() => void handleNewFolder(menu.node)}>{t('filer.newFolder')}</MenuItem>
+          <MenuItem onClick={() => void handleNewFile(menu.node)}>{t('filer.newMarkdownFile')}</MenuItem>
+          {menu.node && <MenuItem onClick={() => handleCopy(menu.node!)}>{t('filer.copy')}</MenuItem>}
+          {clipboard && <MenuItem onClick={() => void handlePaste(menu.node)}>{t('filer.paste')}</MenuItem>}
+          {menu.node && (
+            <>
+              <div className="my-1 border-t border-border" />
+              <MenuItem
+                onClick={() => {
+                  setRenaming(menu.node)
+                  setMenu(null)
+                }}
+              >
+                {t('common.rename')}
+              </MenuItem>
+              <MenuItem onClick={() => void handleDelete(menu.node!)}>{t('common.delete')}</MenuItem>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -248,6 +317,13 @@ function FilerRow({
           defaultValue={entry.name}
           className="min-w-0 flex-1 rounded border border-input bg-background px-1"
           onClick={(e) => e.stopPropagation()}
+          onFocus={(e) => {
+            // OS のファイラーと同じ慣習: ファイルは拡張子を除いた部分だけを
+            // 選択状態にし、そのままタイプすれば拡張子が保たれるようにする。
+            const dot = entry.isDir ? -1 : entry.name.lastIndexOf('.')
+            if (dot > 0) e.target.setSelectionRange(0, dot)
+            else e.target.select()
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') onCommitRename((e.target as HTMLInputElement).value)
             if (e.key === 'Escape') onCommitRename(entry.name)

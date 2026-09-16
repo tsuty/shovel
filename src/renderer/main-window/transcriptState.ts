@@ -6,12 +6,18 @@ import type {
   TranscriptEvent
 } from '@shared/types/transcript'
 
+export interface RenderChoice {
+  id: string
+  label: string
+}
+
 export interface RenderBlock {
   id: string
   role: BlockRole
   markdown: string
   streaming: boolean
   chips?: AttachmentChip[]
+  choices?: RenderChoice[]
 }
 
 export interface RenderGroup {
@@ -76,7 +82,10 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
       if (!block) return state
       return {
         ...state,
-        blocks: { ...state.blocks, [event.id]: { ...block, markdown: event.markdown, streaming: false } }
+        blocks: {
+          ...state.blocks,
+          [event.id]: { ...block, markdown: event.markdown, streaming: false, choices: event.choices }
+        }
       }
     }
     case 'group': {

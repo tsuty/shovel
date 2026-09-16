@@ -1,9 +1,23 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { SessionMeta } from '@shared/types/session'
+import type { SessionMeta, SessionUsage } from '@shared/types/session'
 import type { AttachmentChip } from '@shared/types/transcript'
 import { Button } from '../../shared/components/ui/button'
 import { Textarea } from '../../shared/components/ui/input'
+
+const compactNumberFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
+
+/** ui.md §8「トークン使用量は usage_update を受け取ったときだけ表示する」。 */
+function formatUsage(usage: SessionUsage): string {
+  const tokens = `${compactNumberFormat.format(usage.used)} / ${compactNumberFormat.format(usage.size)}`
+  if (usage.costAmount === undefined) return tokens
+  const cost = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: usage.costCurrency ?? 'USD',
+    maximumFractionDigits: 2
+  }).format(usage.costAmount)
+  return `${tokens} · ${cost}`
+}
 
 export function Composer({
   meta,
@@ -111,6 +125,14 @@ export function Composer({
               {opt.label}
             </label>
           )
+        )}
+        {meta.usage && (
+          <span
+            className="text-xs text-muted-foreground"
+            title={t('composer.usageTitle', { used: meta.usage.used, size: meta.usage.size })}
+          >
+            {formatUsage(meta.usage)}
+          </span>
         )}
         <div className="ml-auto">
           {sending ? (

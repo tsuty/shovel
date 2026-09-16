@@ -36,6 +36,18 @@ export interface ConfigOption {
   options?: ConfigOptionValue[]
 }
 
+/**
+ * ui.md §8「トークン使用量は usage_update を受け取ったときだけ表示する」。
+ * `usage_update` を一度も受け取っていないセッションでは undefined のままにする
+ * （0 と未受信を区別する）。
+ */
+export interface SessionUsage {
+  used: number
+  size: number
+  costAmount?: number
+  costCurrency?: string
+}
+
 /** タブが保持するセッションの実行時メタデータ（真実はエージェント側）。 */
 export interface SessionMeta {
   sessionId: string
@@ -45,12 +57,21 @@ export interface SessionMeta {
   modes: SessionMode[]
   currentModeId?: string
   configOptions: ConfigOption[]
+  usage?: SessionUsage
 }
 
 /** 個別 JSON ファイルとして永続化するスナップショット。data-model.md §3。 */
 export interface SessionSnapshot {
   schemaVersion: 1
+  /** shovel のタブ id。スナップショットのファイル名にもなる。 */
   sessionId: string
+  /**
+   * エージェント側のセッション id。`session/load` / `session/resume` はこちらを
+   * 要求する（shovel のタブ id とは別物）。これを持たない古いスナップショットは
+   * 「再開できない履歴」として扱う（decisions.md C-1/C-2 の「非対応」の行と
+   * 同じ扱いに落とす）。
+   */
+  acpSessionId?: string
   projectId: string
   title: string
   savedAt: number
@@ -66,6 +87,12 @@ export interface SnapshotEntry {
   markdown: string
 }
 
+/**
+ * `initialize` の応答が告げるエージェント側の対応状況。
+ * `load` は `agentCapabilities.loadSession`、それ以外は
+ * `agentCapabilities.sessionCapabilities.*`（`{}` = 対応 / 欠落・null = 非対応）
+ * から読む。decisions.md C-1/C-2 の復元戦略はこの4つで分岐する。
+ */
 export interface SessionCapabilities {
   list: boolean
   load: boolean

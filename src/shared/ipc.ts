@@ -46,6 +46,7 @@ export const IpcChannel = {
   AgentsList: 'agents:list',
 
   SessionOpenTab: 'session:openTab',
+  SessionResumeTab: 'session:resumeTab',
   SessionCloseTab: 'session:closeTab',
   SessionRefresh: 'session:refresh',
   SessionPrompt: 'session:prompt',
@@ -65,6 +66,8 @@ export const IpcChannel = {
   FsMove: 'fs:move',
   FsCopy: 'fs:copy',
   FsOpenInOS: 'fs:openInOS',
+  FsMkdir: 'fs:mkdir',
+  FsCreateMarkdownFile: 'fs:createMarkdownFile',
 
   ChangesList: 'changes:list',
   ChangesDiff: 'changes:diff',
@@ -173,6 +176,8 @@ export interface RendererApi {
   }
   session: {
     openTab(projectId: string): Promise<{ sessionId: string; meta: SessionMeta }>
+    /** 過去のセッションを session/load か session/resume で本当に再開する。 */
+    resumeTab(projectId: string, snapshotSessionId: string): Promise<{ sessionId: string; meta: SessionMeta }>
     closeTab(sessionId: string): Promise<void>
     refresh(sessionId: string): Promise<void>
     prompt(sessionId: string, text: string, attachmentRelPaths?: string[]): Promise<void>
@@ -192,8 +197,10 @@ export interface RendererApi {
     rename(projectId: string, relPath: string, newName: string): Promise<void>
     remove(projectId: string, relPath: string): Promise<void>
     move(projectId: string, relPath: string, destDirRelPath: string): Promise<void>
-    copy(projectId: string, relPath: string, destDirRelPath: string): Promise<void>
+    copy(projectId: string, relPath: string, destDirRelPath: string): Promise<string>
     openInOS(projectId: string, relPath: string): Promise<void>
+    mkdir(projectId: string, parentRelPath: string): Promise<string>
+    createMarkdownFile(projectId: string, parentRelPath: string): Promise<string>
   }
   changes: {
     list(projectId: string): Promise<ChangesSummary>

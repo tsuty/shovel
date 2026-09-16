@@ -16,7 +16,10 @@ export function openProjectWindow(projectId: string): void {
 
   const win = createSecureWindow({ width: 1200, height: 800, title: 'shovel' })
   registerProjectWindow(projectId, win)
-  win.on('closed', () => closeAllTabsForWindow(win.webContents))
+  // 'closed' が発火した時点で win は破棄済みのため、win.webContents に触れると
+  // 「Object has been destroyed」で例外になる。破棄前に参照だけ確保しておく。
+  const webContents = win.webContents
+  win.on('closed', () => closeAllTabsForWindow(webContents))
 
   const rendererUrl = process.env.ELECTRON_RENDERER_URL
   const query = `projectId=${encodeURIComponent(projectId)}`

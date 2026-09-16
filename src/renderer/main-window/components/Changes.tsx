@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ChangedFile, ChangesSummary } from '@shared/types/changes'
 import { Button } from '../../shared/components/ui/button'
+import { UnifiedDiffView } from '../../shared/components/DiffView'
 import { cn } from '../../shared/lib/utils'
 
 const STATUS_MARK: Record<ChangedFile['status'], string> = { modified: 'M', added: '+', deleted: 'D' }
@@ -96,8 +97,11 @@ export function Changes({ projectId }: { projectId: string }): React.JSX.Element
       </ul>
 
       {selected && diff !== null && (
-        <div className="h-1/2 overflow-auto border-t border-border p-2">
-          <pre className="whitespace-pre-wrap font-mono text-xs">{diff || t('changes.noDiff')}</pre>
+        <div className="flex h-1/2 shrink-0 flex-col border-t border-border">
+          <div className="truncate border-b border-border px-2 py-1 text-xs text-muted-foreground" title={selected}>
+            {selected}
+          </div>
+          <UnifiedDiffView diff={diff} className="min-h-0 flex-1 py-1" />
         </div>
       )}
 

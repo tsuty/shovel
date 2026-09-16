@@ -4,9 +4,10 @@ import { getAgentEntry } from '@shared/agentTable'
 import type { SessionMeta } from '@shared/types/session'
 import type { TranscriptAction, TranscriptEvent } from '@shared/types/transcript'
 import { IpcChannel, type SessionEnvelope } from '@shared/ipc'
-import { openAcpSession, type OpenedSession } from '../acp/connection'
+import { openAcpSession, type OpenedSession, type RestoreRequest } from '../acp/connection'
 import { projectsStore, sessionTitleStore } from '../persistence/store'
-import { deleteSnapshot, renameSnapshotTitle } from '../persistence/snapshot'
+import { deleteSnapshot, loadSnapshot, renameSnapshotTitle } from '../persistence/snapshot'
+import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
 
 /**
  * 1タブ = 1 ACP セッションのランタイム状態をプロジェクト横断で保持する。
@@ -26,9 +27,11 @@ function tabCountForWindow(webContents: WebContents): number {
 
 const MAX_TABS_PER_WINDOW = 10
 
-export async function openTab(
+async function startTab(
   projectId: string,
-  webContents: WebContents
+  webContents: WebContents,
+  sessionId: string,
+  restore?: RestoreRequest
 ): Promise<{ sessionId: string; meta: SessionMeta }> {
   if (tabCountForWindow(webContents) >= MAX_TABS_PER_WINDOW) {
     throw new Error('タブは最大10個までです。')
@@ -38,12 +41,17 @@ export async function openTab(
   const agent = getAgentEntry(project.agentId)
   if (!agent) throw new Error(`unknown agent: ${project.agentId}`)
 
-  const sessionId = randomUUID()
-  const opened = await openAcpSession(sessionId, project, agent, {
-    onEvent: (event) => sendEnvelope(sessionId, event),
-    onMetaChanged: () => {},
-    onFatalError: (message) => sendEnvelope(sessionId, { type: 'toast', text: message })
-  })
+  const opened = await openAcpSession(
+    sessionId,
+    project,
+    agent,
+    {
+      onEvent: (event) => sendEnvelope(sessionId, event),
+      onMetaChanged: () => {},
+      onFatalError: (message) => sendEnvelope(sessionId, { type: 'toast', text: message })
+    },
+    restore
+  )
   tabs.set(sessionId, { projectId, webContents, opened })
 
   webContents.once('destroyed', () => {
@@ -51,6 +59,41 @@ export async function openTab(
   })
 
   return { sessionId, meta: opened.meta }
+}
+
+export async function openTab(
+  projectId: string,
+  webContents: WebContents
+): Promise<{ sessionId: string; meta: SessionMeta }> {
+  return startTab(projectId, webContents, randomUUID())
+}
+
+/**
+ * flows.md §6 / decisions.md C-1/C-2: 過去のセッションを「読むだけ」ではなく
+ * 本当に再開する。エージェント側の id をスナップショットから取り出し、
+ * `session/load` か `session/resume` で文脈ごと繋ぎ直す。
+ *
+ * タブ id には新しい UUID ではなく元のスナップショットの id をそのまま使う。
+ * スナップショットのファイル名も、`sessionTitleStore` の名前の上書きも
+ * この id に紐づいているため、新しい id を振ると同じ会話が履歴に二重に並ぶ。
+ */
+export async function resumeTab(
+  projectId: string,
+  snapshotSessionId: string,
+  webContents: WebContents
+): Promise<{ sessionId: string; meta: SessionMeta }> {
+  if (tabs.has(snapshotSessionId)) {
+    throw new Error('このセッションはすでに開いています。')
+  }
+  const snapshot = await loadSnapshot(snapshotSessionId)
+  // エージェント側の id が無いのは shovel がそれを保存する前に作られた
+  // 古いスナップショット。再開の手がかりが無いので「非対応」と同じ扱いにする。
+  if (!snapshot?.acpSessionId) throw new Error(RESTORE_UNSUPPORTED_MARKER)
+
+  return startTab(projectId, webContents, snapshot.sessionId, {
+    acpSessionId: snapshot.acpSessionId,
+    entries: snapshot.entries
+  })
 }
 
 export function closeTab(sessionId: string): void {
@@ -104,6 +147,9 @@ export function dispatchTranscriptAction(action: TranscriptAction): void {
       return
     }
     case 'ready':
+      // SAC（JCEF の別ウェブビュー）は起動レースを避けるためにこのハンドシェイクを
+      // 必要とするが、shovel の Transcript は main-window レンダラ内の通常の
+      // React コンポーネントであり、同じ理由が存在しない。恒久的に no-op。
       return
     case 'openUrl':
     case 'openFile':
@@ -112,9 +158,15 @@ export function dispatchTranscriptAction(action: TranscriptAction): void {
     case 'copyBlock':
     case 'copyText':
     case 'submitChoices':
-      // ファイラー・エディタ・クリップボード連携は後続フェーズで実装する。
-      // 現段階では黙って無視する（トランスクリプトの表示・対話・承認・
-      // Mode/Model 切り替えまでが今回のスコープ）。
+      // SAC は JCEF の別ウェブビューなので、これら全てをホスト(Kotlin)経由に
+      // せざるを得なかった。shovel の Transcript は main-window レンダラ内の
+      // 通常の React コンポーネントなので、この境界がそもそも無い:
+      // openFile/openAttachment はコールバック props で App.tsx の
+      // タブ管理へ、copyBlock/copyText は navigator.clipboard で直接、
+      // submitChoices は既存の session.prompt で、openUrl は
+      // createSecureWindow.ts の will-navigate/setWindowOpenHandler で、
+      // それぞれ main を経由せず renderer 側だけで完結する。ここは今後も
+      // 到達しない（TranscriptAction の網羅性のためだけに残す）。
       return
   }
 }

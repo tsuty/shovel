@@ -19,13 +19,12 @@ interface ContextMenuState {
  * flows.md §6: 右クリックで名前変更・削除ができる
  * （ACP に session/rename が無いため、名前はローカルの上書きとして持つ）。
  *
- * スコープの簡略化: 過去セッションの `session/resume` / `session/load` に
- * よる文脈再接続はまだ実装していない（ACP SDK の高水準ヘルパーは
- * `session/new` 用の `ActiveSession` しか提供せず、resume/load は自前で
- * 更新ループを組む必要があり実装量が大きいため）。クリックすると
- * スナップショットを読み取り専用で表示するだけに留め、続きは「新しい
- * セッションとして始める」ボタンで別タブを開いてもらう — 文脈が
- * 引き継がれないことを隠さない設計にしている。
+ * 過去セッションをクリックすると、まずスナップショットを読み取り専用で
+ * 表示する（`HistoryView`）。そこから「再開」を選ぶと
+ * `session/load` / `session/resume` で文脈ごと繋ぎ直してライブのタブに
+ * 変わる（decisions.md C-1/C-2 の復元戦略表）。エージェントがどちらにも
+ * 対応していない場合は読み取り専用のまま、文脈が失われていることを
+ * 明示する — 引き継げないことを隠さない設計にしている。
  */
 export function ChatHistoryPanel({
   projectId,

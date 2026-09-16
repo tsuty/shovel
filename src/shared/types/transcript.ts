@@ -9,7 +9,7 @@
  * `html` ではなく `markdown`（生テキスト）を運ぶ。
  */
 
-import type { ConfigOption, SessionMode } from './session'
+import type { ConfigOption, SessionMode, SessionUsage } from './session'
 
 export type BlockRole = 'USER' | 'AGENT' | 'THOUGHT' | 'PLAN' | 'SYSTEM' | 'COMPLETION' | 'ERROR'
 
@@ -97,9 +97,16 @@ export type TranscriptEvent =
    * 受け取るたびに、その時点の状態を丸ごと送り renderer 側のセレクタを
    * 差し替える（このプロトコルのバージョンでは両方とも常に完全な状態を
    * 運ぶ。data-model.md §6 の部分マージの注記は当時の想定であり、実装した
-   * SDK スキーマでは該当しない）。
+   * SDK スキーマでは該当しない）。`usage_update` も同じ経路に相乗りさせ、
+   * 受信するたびに直近の使用量で `usage` を丸ごと置き換える。
    */
-  | { type: 'sessionMeta'; modes: SessionMode[]; currentModeId?: string; configOptions: ConfigOption[] }
+  | {
+      type: 'sessionMeta'
+      modes: SessionMode[]
+      currentModeId?: string
+      configOptions: ConfigOption[]
+      usage?: SessionUsage
+    }
 
 /** renderer → main */
 export type TranscriptAction =
