@@ -289,6 +289,7 @@ function FilerRow({
   onCommitRename: (name: string) => void
 }): React.JSX.Element {
   const entry = node.data
+  const composingRef = useRef(false)
   return (
     <div
       ref={dragHandle}
@@ -324,7 +325,12 @@ function FilerRow({
             if (dot > 0) e.target.setSelectionRange(0, dot)
             else e.target.select()
           }}
+          onCompositionStart={() => (composingRef.current = true)}
+          onCompositionEnd={() => (composingRef.current = false)}
           onKeyDown={(e) => {
+            // decisions.md G-1-5 と同じ: IME 変換中の Enter / Escape は変換の
+            // 確定・取消であって、名前の確定・取消ではない。
+            if (composingRef.current || e.nativeEvent.isComposing) return
             if (e.key === 'Enter') onCommitRename((e.target as HTMLInputElement).value)
             if (e.key === 'Escape') onCommitRename(entry.name)
           }}

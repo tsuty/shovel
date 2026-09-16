@@ -98,16 +98,16 @@ export function App(): React.JSX.Element {
 
   function openFile(relPath: string, isMarkdown: boolean): void {
     setLastOpenedFilePath(relPath)
-    const existing = tabs.find((tab) => tab.kind === 'file' && tab.relPath === relPath)
-    if (existing) {
-      setActiveSessionId(existing.sessionId)
-      return
-    }
     const id = `file:${relPath}`
-    setTabs((prev) => [
-      ...prev,
-      { kind: 'file', sessionId: id, title: relPath.split('/').pop() ?? relPath, relPath, isMarkdown }
-    ])
+    // 重複判定は updater の中で行う。ダブルクリック等で同じ tick に2回呼ばれると、
+    // クロージャの `tabs` はまだ古いままなので、外で判定すると同じ id のタブが
+    // 2つ積まれてしまう（同じ id が2つあると両方が「アクティブ」に一致して
+    // 上下に並んで描かれる）。
+    setTabs((prev) =>
+      prev.some((tab) => tab.sessionId === id)
+        ? prev
+        : [...prev, { kind: 'file', sessionId: id, title: relPath.split('/').pop() ?? relPath, relPath, isMarkdown }]
+    )
     setActiveSessionId(id)
   }
 
@@ -118,12 +118,11 @@ export function App(): React.JSX.Element {
 
   function openHistory(snapshot: SessionSnapshot): void {
     const id = `history:${snapshot.sessionId}`
-    const existing = tabs.find((tab) => tab.sessionId === id)
-    if (existing) {
-      setActiveSessionId(id)
-      return
-    }
-    setTabs((prev) => [...prev, { kind: 'history', sessionId: id, title: snapshot.title, snapshot }])
+    setTabs((prev) =>
+      prev.some((tab) => tab.sessionId === id)
+        ? prev
+        : [...prev, { kind: 'history', sessionId: id, title: snapshot.title, snapshot }]
+    )
     setActiveSessionId(id)
   }
 
