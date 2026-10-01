@@ -87,7 +87,7 @@ export function App(): React.JSX.Element {
           {projects?.map((project) => (
             <li
               key={project.id}
-              className="group flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3.5 shadow-sm transition-colors hover:border-primary/30 hover:bg-accent/60"
+              className="group flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs transition-colors hover:border-primary/30 hover:bg-accent/60"
             >
               <StatusDot status={project.status} />
               <button

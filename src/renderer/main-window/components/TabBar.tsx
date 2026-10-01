@@ -40,7 +40,7 @@ export function TabBar({
           <div
             key={tab.sessionId}
             className={cn(
-              'relative flex h-7 max-w-[10rem] items-center gap-1.5 rounded-t-md border border-transparent px-2 text-xs',
+              'relative flex h-7 max-w-40 items-center gap-1.5 rounded-t-md border border-transparent px-2 text-xs',
               isActive
                 ? 'border-border border-b-background bg-background text-foreground'
                 : 'text-muted-foreground hover:bg-accent'

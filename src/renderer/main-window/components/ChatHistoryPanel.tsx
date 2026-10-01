@@ -326,7 +326,7 @@ export function ChatHistoryPanel({
 
       {menu && (
         <div
-          className="fixed z-50 min-w-[9rem] rounded-md border bg-popover p-1 text-sm shadow-md"
+          className="fixed z-50 min-w-36 rounded-md border bg-popover p-1 text-sm shadow-md"
           style={{ left: menu.x, top: menu.y }}
           onClick={(e) => e.stopPropagation()}
         >

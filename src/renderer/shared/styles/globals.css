@@ -1,6 +1,55 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* ダークモードは <html> の .dark クラスで切り替える（useSettings）。 */
+@custom-variant dark (&:is(.dark *));
+
+/*
+  デザイントークン。色は :root / .dark の HSL 値（下の @layer base）を参照する。
+  inline にして、ユーティリティが var(--border) などを使う要素で直接解決させる。
+*/
+@theme inline {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-terminal: hsl(var(--terminal));
+  --color-terminal-foreground: hsl(var(--terminal-foreground));
+  --color-terminal-muted: hsl(var(--terminal-muted));
+
+  --text-transcript: var(--transcript-font-size);
+  --text-transcript--line-height: 1.6;
+  --text-transcript-sm: calc(var(--transcript-font-size) * 0.85);
+  --text-transcript-sm--line-height: 1.5;
+  --text-transcript-xs: calc(var(--transcript-font-size) * 0.78);
+  --text-transcript-xs--line-height: 1.5;
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
 
 @layer base {
   :root {
@@ -57,8 +106,25 @@
     --ring: 0 0% 55%;
   }
 
-  * {
+  /* v4 は border の既定色が currentcolor になったので、v3 と同じくトークンの色にする。 */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
     @apply border-border;
+  }
+
+  /* v4 はプレースホルダーの既定色が文字色の 50% になったので、v3 と同じ gray-400 にする。 */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+
+  /* v4 の preflight はボタンを cursor: default にするので、v3 と同じ pointer に戻す。 */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
   }
 
   body {

@@ -394,7 +394,7 @@ export function Filer({
       </div>
       {menu && (
         <div
-          className="fixed z-50 min-w-[10rem] rounded-md border bg-popover p-1 text-sm shadow-md"
+          className="fixed z-50 min-w-40 rounded-md border bg-popover p-1 text-sm shadow-md"
           style={{ left: menu.x, top: menu.y }}
           onClick={(e) => e.stopPropagation()}
         >

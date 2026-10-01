@@ -167,7 +167,7 @@ export function Composer({
         {/* configOptions に category "mode" があればそちらを使い、`modes` は出さない。 */}
         {meta.modes.length > 0 && !meta.configOptions.some((opt) => opt.category === 'mode') && (
           <select
-            className="h-8 min-w-0 max-w-[12rem] truncate rounded-md border border-input bg-transparent px-2 text-xs"
+            className="h-8 min-w-0 max-w-48 truncate rounded-md border border-input bg-transparent px-2 text-xs"
             value={meta.currentModeId ?? ''}
             onChange={(e) => onSetMode(e.target.value)}
           >
@@ -182,7 +182,7 @@ export function Composer({
           opt.kind === 'select' ? (
             <select
               key={opt.configId}
-              className="h-8 min-w-0 max-w-[12rem] truncate rounded-md border border-input bg-transparent px-2 text-xs"
+              className="h-8 min-w-0 max-w-48 truncate rounded-md border border-input bg-transparent px-2 text-xs"
               value={opt.currentValue}
               onChange={(e) => onSetConfigOption(opt.configId, e.target.value)}
               title={opt.label}

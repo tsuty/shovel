@@ -155,18 +155,18 @@ function CodeBlock({
     <div className={cn('group/code relative', foldable && 'my-[0.5em]')}>
       <div
         ref={clipRef}
-        className={cn('relative', foldable && '[&_pre]:!my-0', folded && 'overflow-hidden rounded-md')}
+        className={cn('relative', foldable && '[&_pre]:my-0!', folded && 'overflow-hidden rounded-md')}
         style={folded && foldedHeight !== null ? { maxHeight: foldedHeight } : undefined}
       >
         {html ? (
           <div dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
           // mermaid はボタンを左上に重ねるので、その分だけコードを下げる。
-          <pre {...props} className={cn(props.className, isMermaid && '!pt-11')} />
+          <pre {...props} className={cn(props.className, isMermaid && 'pt-11!')} />
         )}
         {folded && (
           // 続きがあることを、下端を地の色へ溶かして示す。
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-muted to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-linear-to-t from-muted to-transparent" />
         )}
       </div>
       {foldable && (
@@ -182,7 +182,7 @@ function CodeBlock({
       {isMermaid && (
         // 図を開くボタンは常に表示する。
         <button
-          className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md px-2.5 py-1 font-sans text-xs font-medium text-white shadow-sm hover:brightness-110"
+          className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md px-2.5 py-1 font-sans text-xs font-medium text-white shadow-xs hover:brightness-110"
           style={{ backgroundColor: MERMAID_BRAND_COLOR }}
           onClick={() => setDiagramOpen(true)}
         >

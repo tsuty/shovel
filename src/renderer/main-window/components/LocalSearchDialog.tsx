@@ -71,7 +71,7 @@ export function LocalSearchDialog({
           <Search size={14} className="shrink-0 text-muted-foreground" />
           <input
             autoFocus
-            className="h-8 flex-1 bg-transparent text-sm outline-none"
+            className="h-8 flex-1 bg-transparent text-sm outline-hidden"
             value={query}
             placeholder={t('search.placeholder')}
             onChange={(e) => setQuery(e.target.value)}

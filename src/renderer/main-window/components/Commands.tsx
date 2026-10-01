@@ -208,7 +208,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
               {runId ? (
                 <input
                   ref={inputRef}
-                  className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-terminal-muted"
+                  className="min-w-0 flex-1 bg-transparent outline-hidden placeholder:text-terminal-muted"
                   value={stdin}
                   placeholder={t('commands.stdinPlaceholder')}
                   onChange={(e) => setStdin(e.target.value)}
@@ -219,7 +219,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
               ) : (
                 <input
                   ref={inputRef}
-                  className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-terminal-muted"
+                  className="min-w-0 flex-1 bg-transparent outline-hidden placeholder:text-terminal-muted"
                   value={command}
                   placeholder={t('commands.placeholder')}
                   onChange={(e) => {
