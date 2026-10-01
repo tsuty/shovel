@@ -187,7 +187,7 @@ function stripChoiceLines(markdown: string): string {
 /** クリップボードに書き込み、ボタンのアイコンを一時的にチェックマークへ切り替えて完了を示す。 */
 function useCopyFeedback(): [boolean, (text: string) => void] {
   const [copied, setCopied] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   function copy(text: string): void {
     void navigator.clipboard.writeText(text)
     setCopied(true)
@@ -395,7 +395,7 @@ function GroupView({
   onPermission: (permissionId: string, optionId: string) => void
   onOpenFile: (relPath: string) => void
   onOpenDiff: (toolCall: ToolCallPayload) => void
-  scrollContainerRef: React.RefObject<HTMLDivElement>
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>
 }): React.JSX.Element {
   const { t } = useTranslation()
   const pendingByToolCall = new Map<string, RenderPermission>()
