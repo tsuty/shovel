@@ -144,6 +144,15 @@ sbx diagnose
   ダウンロード済みの本体（`node_modules/electron/path.txt`）を前提にしているため。
   本体があれば `install-electron` は何もしない。
 
+  **依存の置き場所**: `dependencies` には、main / preload が実行時に `node_modules` から
+  読み込むパッケージだけを置く（現在は `@agentclientprotocol/sdk`・その peer の `zod`・
+  `ignore`）。electron-builder は `dependencies` を依存先ごと配布物に入れる一方、renderer の
+  ライブラリ（React・Mermaid・shiki など）は Vite が `out/renderer` にバンドル済みで、
+  `node_modules` 側は実行時に一度も読まれないため。renderer 用のライブラリや、main でも
+  バンドルに含めたいもの（ESM 専用の `electron-store`）は `devDependencies` に置く
+  （electron-vite は `dependencies` 以外をバンドルに含める）。これで `app.asar` は
+  約 256 MB → 約 31 MB になった。
+
   TypeScript は 6.0 に留めている。7.0（Go 製のネイティブ版）は従来の JavaScript API を
   持たず、型情報を使う lint（typescript-eslint、対応は `<6.1`）が動かないため。tsconfig は
   7.0 で削除された設定（`baseUrl`、`moduleResolution: "Node"`）を使わない形にしてあるので、

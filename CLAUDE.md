@@ -225,6 +225,10 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
 
 ## Conventions and constraints to preserve
 
+- **`dependencies` = only what main/preload `require` at runtime** (`@agentclientprotocol/sdk`,
+  `zod`, `ignore`). Renderer libraries and anything main should bundle (e.g. ESM-only
+  `electron-store`) go in `devDependencies` — electron-builder ships every `dependencies` entry
+  in `app.asar`, and renderer code is already bundled into `out/renderer` (docs/DEVELOPMENT.md).
 - **Zero native modules.** Do not add `node-pty`, `better-sqlite3`, or anything requiring
   per-OS/per-arch native builds — this is a deliberate constraint to keep code-signing and
   distribution simple (see `decisions.md` F-2b). Terminal needs are met via `sbx exec -i`
