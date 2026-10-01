@@ -112,7 +112,12 @@ export function langFromFence(lang: string): string {
   return aliases[lower] ?? langFromFilename(`x.${lower}`)
 }
 
-export function langFromFilename(name: string): string {
+/**
+ * パスの末尾（ファイル名）の拡張子から言語を決める。拡張子が無ければファイル名そのもの
+ * （`Dockerfile` など）で引く。
+ */
+export function langFromFilename(filePath: string): string {
+  const name = filePath.split(/[\\/]/).pop() ?? ''
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
   return EXT_TO_LANG[ext] ?? 'plaintext'
 }

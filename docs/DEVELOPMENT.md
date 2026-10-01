@@ -134,7 +134,8 @@ sbx diagnose
   pnpm typecheck   # main+preload・renderer・テストを別々の tsconfig で型検査
   pnpm lint        # ESLint（型情報を使うルールを含む）
   pnpm test        # Vitest で単体テストを実行（pnpm test:watch で監視実行）
-  pnpm pack        # ビルド後、署名なしでアンパック済みアプリを release/ に出力（動作確認用）
+  pnpm run pack    # ビルド後、署名なしでアンパック済みアプリを release/ に出力（動作確認用）
+                   # ※ `run` を省くと pnpm 組み込みの pack（tarball 作成）が動く
   pnpm dist        # electron-builder でインストーラを生成（証明書は未設定。decisions.md F-3）
   ```
 
