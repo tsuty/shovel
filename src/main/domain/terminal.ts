@@ -1,11 +1,6 @@
 import { spawn } from 'node:child_process'
 
-/**
- * OS のターミナルアプリを開き、サンドボックス内でコマンドを実行させる
- * （decisions.md N-4, N-2-7b）。フル機能のターミナルが必要な場合や、
- * ブラウザを伴う認証フローを走らせる場合の唯一の逃げ道。
- * `node-pty` は使わない方針（F-2b）のため、ここだけは OS ごとの分岐が要る。
- */
+/** OS のターミナルアプリを開き、サンドボックス内でコマンドを実行させる。 */
 export function openSandboxCommand(sandboxName: string, argv: string[]): void {
   const command = ['sbx', 'exec', '-it', sandboxName, ...argv].map(shellQuote).join(' ')
 
@@ -24,7 +19,7 @@ export function openSandboxCommand(sandboxName: string, argv: string[]): void {
     return
   }
 
-  // Linux（開発環境向け。要求仕様のサポート対象 OS ではない）。
+  // Linux
   spawn('x-terminal-emulator', ['-e', 'bash', '-lc', command], {
     detached: true,
     stdio: 'ignore'

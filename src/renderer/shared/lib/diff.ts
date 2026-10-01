@@ -1,10 +1,4 @@
-/**
- * 行単位の差分計算。decisions.md N-3-8「IDE が無償提供していた Diff ビューアを
- * 自作する」の計算部分。表示は `DiffView` が受け持つ。
- *
- * ツールコールの `diffs`（変更前後の全文）を `DiffRow` の列へ畳んでから渡す
- * （`diffRowsFromTexts`）。
- */
+/** 行単位の差分計算。ツールコールの `diffs`（変更前後の全文）を `DiffRow` の列へ畳む（`diffRowsFromTexts`）。 */
 
 export interface DiffRow {
   kind: 'context' | 'add' | 'remove' | 'gap'
@@ -20,11 +14,7 @@ export interface DiffRow {
 /** 前後3行だけ残して、変更から遠い文脈は畳む。 */
 const CONTEXT_LINES = 3
 
-/**
- * 総当たりの LCS は行数の積だけメモリを食う。巨大ファイル同士の比較で UI を
- * 固まらせないため、共通の前後を削ったうえでこの大きさを超えたら
- * 「まるごと置き換え」として描く。
- */
+/** LCS の表の大きさの上限。共通の前後を削ったうえでこれを超えたら「まるごと置き換え」として扱う。 */
 const LCS_CELL_LIMIT = 4_000_000
 
 function splitLines(text: string): string[] {

@@ -5,13 +5,8 @@ import { projectsStore } from '../persistence/store'
 import { openSandboxCommand } from './terminal'
 
 /**
- * flows.md §1-2 / decisions.md N-2-7b: shovel は OAuth を一切実装しない。
- * 状態確認（`claude auth status --json` 相当。対応表でエージェントごとに
- * 差し替える）と、OS のターミナルへの誘導だけを行う。
- *
- * 「`loggedIn` 以外のフィールドに依存しない」（新しいサンドボックスでは
- * `configDirectory` 等が丸ごと欠落しうる）という規則に従い、ここで読むのは
- * `loggedInPath` が指す1つのキーだけにする。
+ * エージェントの認証状態の確認（対応表の statusCommand を実行し `loggedInPath` のキーだけを読む）と、
+ * OS のターミナルでのサインインの起動を行う。
  */
 export interface AuthStatus {
   loggedIn: boolean
@@ -51,7 +46,7 @@ export async function checkAuthStatus(projectId: string): Promise<AuthStatus> {
 
 export async function setApiKey(projectId: string, apiKey: string): Promise<void> {
   const { agent } = requireProjectAndAgent(projectId)
-  // -t/--token は使わない（shell history に残るため）。stdin 経由で渡す（N-2-7）。
+  // トークンは stdin 経由で渡す。
   await sbxSecretSet(agent.auth.secretService, apiKey)
 }
 

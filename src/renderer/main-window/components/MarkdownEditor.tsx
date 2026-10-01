@@ -18,7 +18,7 @@ interface FileMeta {
   lineEnding: LineEnding
 }
 
-/** 編集中の内容を保存したときのバイト数（main が元の改行コード・BOM に戻して書くのに合わせる）。 */
+/** 保存後のバイト数を、main が元の改行コード・BOM に戻して書くのに合わせて見積もる。 */
 function savedByteSize(text: string, meta: FileMeta): number {
   const bytes = new TextEncoder().encode(text).length
   const newlines = meta.lineEnding === 'CRLF' ? (text.match(/\n/g)?.length ?? 0) : 0
@@ -39,13 +39,11 @@ function conflictPath(relPath: string): string {
 }
 
 /**
- * ui.md §10 / decisions.md N-3-3, N-5: 分割ビュー（ソース/プレビュー）を基本とし、
- * どちらか単独の表示にも切り替えられる。autosave で「保存」ボタンは出さない。
- * 外部（エージェント）による変更は、未保存編集がなければ黙って再読込し、
+ * Markdown エディタ。分割ビュー（ソース/プレビュー）と、どちらか単独の表示を切り替える。
+ * 編集は自動保存する。外部での変更は、未保存編集がなければ黙って再読込し、
  * あれば競合コピーを残してから最新へ切り替える。
  *
- * `variant: 'attached'` はチャットタブの右に添えたとき（ui.md §3「分割表示」）。
- * 横幅が狭いので「分割」モードは出さず、ソースとプレビューの切り替えだけにする。
+ * `variant: 'attached'` はチャットタブの右に添えたときで、ソースとプレビューの切り替えだけにする。
  */
 export function MarkdownEditor({
   projectId,
@@ -73,7 +71,7 @@ export function MarkdownEditor({
   const [deleted, setDeleted] = useState(false)
   const [meta, setMeta] = useState<FileMeta>({ encoding: 'UTF-8', lineEnding: 'none' })
   const [diskSize, setDiskSize] = useState(0)
-  // UTF-8 以外（Shift_JIS・UTF-16 等）は UTF-8 で書き戻すと中身が壊れるので、表示だけにする。
+  // UTF-8 以外のファイルは表示だけにする。
   const readOnly = !isWritableEncoding(meta.encoding)
 
   const savedTextRef = useRef('')
@@ -114,8 +112,7 @@ export function MarkdownEditor({
 
   useEffect(() => registerFlush(flush), [flush])
 
-  // 閉じた（タブを閉じた・チャットの横から外した）ときも、自動保存の待ち時間内の
-  // 編集を失わないよう書き出す。
+  // 閉じたときも、自動保存待ちの編集を書き出す。
   const flushRef = useRef(flush)
   flushRef.current = flush
   useEffect(() => () => void flushRef.current(), [])
@@ -125,13 +122,11 @@ export function MarkdownEditor({
     setText(value)
     dirtyRef.current = true
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    // ここで捕まえた `flush` は今回の入力を反映する前の `text` を持っているので、
-    // 発火時点の最新の flush を呼ぶ（そうしないと最後の1打鍵が保存されない）。
+    // 発火時点の最新の flush を呼ぶ。
     debounceRef.current = setTimeout(() => void flushRef.current(), AUTOSAVE_DEBOUNCE_MS)
   }
 
-  // decisions.md N-3-6 / N-5: ターン終了などの明確な契機を待たず、開いている間は
-  // 軽量なポーリングで外部変更を検知する（chokidar は導入しない方針。V-8）。
+  // 開いている間はポーリングで外部変更を検知する。
   useEffect(() => {
     const interval = setInterval(async () => {
       const result = await window.shovel.fs.readFile(projectId, relPath)

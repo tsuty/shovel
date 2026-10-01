@@ -172,8 +172,7 @@ export function App(): React.JSX.Element {
   )
 }
 
-// Tailwind の JIT は完全なクラス名文字列でないと拾えないため、
-// 動的な文字列結合ではなくルックアップテーブルにする。
+// Tailwind が拾えるよう、完全なクラス名のルックアップテーブルにする。
 const STATUS_DOT_CLASSES: Record<SandboxStatus, string> = {
   running: 'bg-green-500 ring-green-500/15',
   stopped: 'bg-muted-foreground ring-muted-foreground/15',

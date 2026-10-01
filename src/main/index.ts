@@ -10,8 +10,7 @@ if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    // architecture.md §2 / decisions.md G-1-1: 単一インスタンス + 複数ウィンドウ。
-    // 2 回目の起動要求は既存 main に転送し、プロジェクトマネージャを前面に出す。
+    // 単一インスタンス。2 回目の起動要求ではプロジェクトマネージャを前面に出す。
     const existing = getProjectManagerWindow()
     if (existing) existing.focus()
     else openProjectManagerWindow()
@@ -19,8 +18,7 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     installContentSecurityPolicy()
-    // 以前の全プロジェクト共通の置き場から、プロジェクトごとのディレクトリへ
-    // 移す。履歴一覧が旧ファイルを見落とさないよう、ウィンドウを開く前に済ませる。
+    // 旧形式のログをプロジェクトごとのディレクトリへ移す。
     await Promise.all([migrateFlatSnapshots(), migrateFlatLogs()]).catch((err) =>
       console.warn('[startup] migration of local records failed', err)
     )
@@ -29,9 +27,7 @@ if (!gotLock) {
   })
 
   app.on('window-all-closed', () => {
-    // decisions.md N-2-3: アプリ終了時にサンドボックスを自動停止しない。
-    // ここでは単にウィンドウが無くなった状態を許容するだけで、
-    // プロセス自体を終了するかは OS の慣習に従う。
+    // 全ウィンドウが閉じたときの終了は OS の慣習に従う。
     if (process.platform !== 'darwin') app.quit()
   })
 
@@ -42,8 +38,7 @@ if (!gotLock) {
 
 function installContentSecurityPolicy(): void {
   const isDev = !app.isPackaged
-  // 'wasm-unsafe-eval': shiki（ファイルビューアのハイライト）が oniguruma の
-  // WASM をコンパイルするのに要る。JS の eval は許可しない。
+  // 'wasm-unsafe-eval': shiki が oniguruma の WASM をコンパイルするのに要る。
   const scriptSrc = isDev
     ? "'self' 'unsafe-inline' 'wasm-unsafe-eval' http://localhost:*"
     : "'self' 'wasm-unsafe-eval'"

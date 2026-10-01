@@ -10,10 +10,7 @@ export interface TabInfo {
    * 始めると変わる（タブ id の `sessionId` は変わらない）。
    */
   snapshotId?: string
-  /**
-   * ui.md §4「背景タブの通知」。`undefined` はセッション以外のタブ
-   * （ファイル/履歴）で、通知の対象外。
-   */
+  /** 背景タブの通知状態。`undefined` はセッション以外のタブ（ファイル/履歴）。 */
   status?: { sending: boolean; hasPendingPermission: boolean }
 }
 
@@ -36,8 +33,7 @@ export function TabBar({
     <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border px-2">
       {tabs.map((tab) => {
         const isActive = tab.sessionId === activeSessionId
-        // ui.md §4: 前面のタブは承認カード自体が見えているので、通知は
-        // 「前面にないタブにだけ」出す。
+        // 通知は前面にないタブにだけ出す。
         const showPendingBadge = !isActive && tab.status?.hasPendingPermission
         const showPulse = !isActive && tab.status?.sending
         return (

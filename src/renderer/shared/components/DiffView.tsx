@@ -3,15 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { collapseContext, diffRowsFromTexts, type DiffRow } from '../lib/diff'
 import { cn } from '../lib/utils'
 
-/**
- * decisions.md N-3-8 の Diff ビューア。ツールコール単体の前後全文（`TextDiffView`）
- * を `DiffRow` の列に畳んでから描く。
- *
- * 表示は unified（1列）。サイドバーに入る幅でも読めることを優先し、
- * 左右2列の split は採らない。
- */
+/** Diff ビューア。ツールコールの前後全文（`TextDiffView`）を `DiffRow` の列に畳み、unified（1列）で描く。 */
 
-// Tailwind は文字列連結で組み立てたクラス名を拾えないため、完全な形で持つ。
+// Tailwind が拾えるよう、完全なクラス名で持つ。
 const ROW_CLASS: Record<DiffRow['kind'], string> = {
   context: '',
   add: 'bg-green-500/10',

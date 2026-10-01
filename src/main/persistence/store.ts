@@ -2,11 +2,7 @@ import Store from 'electron-store'
 import type { Project } from '@shared/types/project'
 import type { AppSettings } from '@shared/types/settings'
 
-/**
- * `electron-store`（JSON）に保存するもの。data-model.md §5 / decisions.md F-2。
- * SQLite は使わない。セッションのスナップショット本体は個別 JSON ファイル
- * （snapshot.ts）に持ち、ここには置かない。
- */
+/** `electron-store`（JSON）に保存する設定・プロジェクト・履歴。 */
 export type { AppSettings }
 
 interface StoreSchema {
@@ -60,8 +56,7 @@ export const projectsStore = {
 }
 
 export const settingsStore = {
-  // electron-store の既定値はトップレベルのキーにしか効かないので、後から
-  // 足した設定項目（sendKey 等）は読み出し時に既定値で埋める。
+  // 読み出し時に、欠けている設定項目を既定値で埋める。
   get(): AppSettings {
     return { ...defaults.settings, ...store.get('settings') }
   },
@@ -88,11 +83,7 @@ export const sessionTitleStore = {
   }
 }
 
-/**
- * decisions.md N-4「履歴の持ち方」: プロジェクト単位・コマンド文字列のみ
- * （出力・終了コード・実行時刻は保存しない。出力にシークレットが混ざりうる
- * ため）・MRU（同じコマンドは古い方を消して先頭へ積み直す）・最新20件。
- */
+/** コマンド履歴。プロジェクト単位・コマンド文字列のみ・MRU・最新20件。 */
 export const COMMAND_HISTORY_LIMIT = 20
 
 export const commandHistoryStore = {

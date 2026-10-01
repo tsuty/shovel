@@ -4,10 +4,8 @@
 
 @layer base {
   :root {
-    /* ニュートラルトークン（secondary/muted/accent 等）は元の配色バランスを
-       維持しつつ色相を 200 に統一している。primary は #4b4b4b (hsl(0 0% 29%))
-       の無彩色グレーを採用。 */
-    /* 設定で上書きされる（useSettings）。読み込み前の既定値。 */
+    /* ニュートラルトークンは色相 200、primary は無彩色グレー（hsl(0 0% 29%)）。 */
+    /* useSettings が上書きする既定値。 */
     --transcript-font-size: 14px;
     --terminal: 220 13% 13%;
     --terminal-foreground: 0 0% 92%;
@@ -65,8 +63,7 @@
 
   body {
     @apply bg-background text-foreground;
-    /* 日本語UIが前提のため、Windows/Linux 向けの CJK フォールバックまで
-       明示する（macOS だけで確認して終わらせない）。 */
+    /* CJK フォールバックフォント */
     font-family:
       -apple-system,
       BlinkMacSystemFont,
@@ -99,11 +96,7 @@
   }
 }
 
-/**
- * トランスクリプト / Markdown プレビュー共通のスタイル。
- * decisions.md N-1: transcript.css を出発点に、shadcn のテーマ変数
- * （--background 等）へ接続する。ここでは最小限の要素だけを整える。
- */
+/** トランスクリプト / Markdown プレビュー共通のスタイル。 */
 .markdown :where(p, ul, ol, blockquote, pre, table) {
   margin: 0.5em 0;
 }
@@ -125,8 +118,7 @@
 .markdown pre code {
   @apply bg-transparent p-0;
 }
-/* ハイライトしたコードブロックも、素のコードブロックと同じ地の色にする
- * （shiki のテーマの背景色は使わない）。 */
+/* ハイライトしたコードブロックも素のコードブロックと同じ地の色にする。 */
 .markdown pre.shiki,
 .dark .markdown pre.shiki {
   background-color: hsl(var(--muted)) !important;
@@ -138,7 +130,7 @@
 .markdown .markdown-file-link {
   @apply text-primary underline;
 }
-/** 開けないリンク（file:// や絶対パスなど）。文字として見せ、点線だけで元がリンクだったことを示す。 */
+/** 開けないリンク（file:// や絶対パスなど）。点線で元がリンクだったことを示す。 */
 .markdown .markdown-dead-link {
   text-decoration: underline dotted;
   text-underline-offset: 2px;
@@ -154,7 +146,7 @@
   @apply border border-border px-2 py-1;
 }
 
-/** ui.md §9: shiki の出力に行番号を付ける（拡張パッケージ無しで CSS カウンタで実現）。 */
+/** shiki の出力に CSS カウンタで行番号を付ける。 */
 .shiki-lines pre.shiki {
   @apply overflow-x-auto rounded-md p-3;
   counter-reset: line;
@@ -178,11 +170,7 @@
   user-select: none;
 }
 
-/**
- * ui.md §4「背景タブの通知」: ターン実行中は不透明度が約1秒周期で
- * 1.0 ↔ 0.35 に脈動する。Tailwind 標準の animate-pulse は周期・振れ幅が
- * 異なるため、仕様どおりの値で自前定義する。
- */
+/** 背景タブの通知。ターン実行中は不透明度が約1秒周期で 1.0 ↔ 0.35 に脈動する。 */
 @keyframes tab-pulse {
   0%, 100% {
     opacity: 1;

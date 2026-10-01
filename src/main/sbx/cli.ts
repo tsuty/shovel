@@ -9,13 +9,7 @@ function toFriendlyError(err: NodeJS.ErrnoException): Error {
   return err
 }
 
-/**
- * `sbx` CLI との唯一の接点。architecture.md §3 / §7 の規則を守る:
- *   - 引数ベクタを直接組み立て、シェルを介さない（shell: false 固定）
- *   - stdout と stderr を分離する
- * すべての呼び出しはこのモジュールを経由させ、`spawn('sbx', ...)` を
- * 他の場所に書かない。
- */
+/** `sbx` CLI の呼び出し。引数ベクタを直接渡し（shell: false）、stdout と stderr を分離する。 */
 
 const SBX_BIN = 'sbx'
 
@@ -51,14 +45,13 @@ export async function sbxLs(): Promise<SbxLsEntry[]> {
 // eslint-disable-next-line no-control-regex
 const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
 
-/** `sbx diagnose` はカラー出力を含むため、表示・コピー用にANSIエスケープシーケンスを除く。 */
+/** `sbx diagnose` の出力から ANSI エスケープシーケンスを除く。 */
 function stripAnsi(text: string): string {
   return text.replace(ANSI_ESCAPE_PATTERN, '')
 }
 
 export async function sbxDiagnose(): Promise<string> {
-  // sbx diagnose は前提条件が欠けているとき非 0 で終了しうるが、その出力こそ
-  // 利用者に見せたい内容なので、終了コードに関わらずテキストを返す。
+  // 終了コードに関わらず出力テキストを返す。
   const result = await run(['diagnose'])
   const parts = [stripAnsi(result.stdout.trim())]
   if (result.stderr.trim()) parts.push('--- stderr ---', stripAnsi(result.stderr.trim()))
@@ -72,7 +65,7 @@ export interface SbxCreateOptions {
   onOutput?: (line: string, stream: 'stdout' | 'stderr') => void
 }
 
-/** `sbx create` はイメージ取得で数分かかりうるため、進捗を行単位で流す。 */
+/** `sbx create` の進捗を行単位で流す。 */
 export function sbxCreate(opts: SbxCreateOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = ['create', '--name', opts.sandboxName, opts.sbxAgent, opts.hostPath]
@@ -104,7 +97,7 @@ export async function sbxStop(sandboxName: string): Promise<void> {
   await runOk(['stop', sandboxName])
 }
 
-/** 非対話でコマンドを実行し、完了を待つ（生存確認・`pwd` の実測・git 実行など）。 */
+/** 非対話でコマンドを実行し、完了を待つ。 */
 export async function sbxExecCapture(
   sandboxName: string,
   command: string[],
@@ -116,13 +109,13 @@ export async function sbxExecCapture(
   return run(args)
 }
 
-/** 生存確認。終了コードのみで判定する（architecture.md §3）。 */
+/** 生存確認。終了コードのみで判定する。 */
 export async function sbxLivenessCheck(sandboxName: string): Promise<boolean> {
   const result = await sbxExecCapture(sandboxName, ['echo', 'shovel-liveness-check'])
   return result.code === 0
 }
 
-/** サンドボックス内のワークスペースパスを実測する（architecture.md §4）。 */
+/** サンドボックス内のワークスペースパスを実測する。 */
 export async function sbxMeasureSandboxPath(sandboxName: string): Promise<string> {
   const result = await sbxExecCapture(sandboxName, ['pwd'])
   if (result.code !== 0) {
@@ -131,11 +124,7 @@ export async function sbxMeasureSandboxPath(sandboxName: string): Promise<string
   return result.stdout.trim()
 }
 
-/**
- * `-i` 付きの対話的な子プロセスを起動する。ACP 接続（stdio を JSON-RPC に）と
- * コマンド実行パネル（TTY なしの対話コンソール）の両方から使う。
- * `-t` は付けない（N-4: TTY の有無が境界）。
- */
+/** `-i` 付きの対話的な子プロセスを起動する（`-t` は付けない）。 */
 export function sbxSpawnInteractive(
   sandboxName: string,
   command: string[],
@@ -145,10 +134,7 @@ export function sbxSpawnInteractive(
   if (opts.cwd) args.push('-w', opts.cwd)
   args.push(sandboxName, ...command)
   const child = spawn(SBX_BIN, args, { shell: false })
-  // Node の EventEmitter は 'error' にリスナーが無いと例外を投げ、main
-  // プロセスごと落ちる。呼び出し側（ACP 接続・コマンド実行）は 'close' や
-  // ストリームの終了で子プロセスの消失に気づく設計なので、ここでは
-  // クラッシュを防ぐための最低限のリスナーだけを付けておく。
+  // 'error' で main プロセスが落ちないよう、リスナーを付けておく。
   child.on('error', (err) => {
     console.error(`[sbx] failed to spawn "sbx ${args.join(' ')}":`, err)
   })

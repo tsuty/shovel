@@ -38,32 +38,26 @@ import { sessionTitleStore } from '../persistence/store'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
 
-/** `initialize` のアイドルタイムアウト（既定 180 秒）。architecture.md §3。 */
+/** `initialize` のアイドルタイムアウト（既定 180 秒）。 */
 const INITIALIZE_IDLE_TIMEOUT_MS = 180_000
 
 function isAuthRequiredError(err: unknown): boolean {
   return typeof err === 'object' && err !== null && 'code' in err && (err as { code: unknown }).code === -32000
 }
-/** `session/prompt` を除く、その他のリクエストの締切。architecture.md §3。 */
+/** `session/prompt` を除く、その他のリクエストの締切。 */
 const REQUEST_DEADLINE_MS = 120_000
 
 export interface SessionRuntimeCallbacks {
   onEvent: (event: TranscriptEvent) => void
   onMetaChanged: (meta: SessionMeta) => void
   onFatalError: (message: string) => void
-  /**
-   * ローカル記録のファイル構成が変わった（decisions.md C-4 のバックアップが
-   * 作られた）ことを知らせる。チャット履歴パネルの再読込に使う。
-   */
+  /** ローカル記録のファイル構成が変わった（バックアップが作られた）ことを知らせる。 */
   onLocalRecordsChanged: () => void
-  /**
-   * ターンの記録を保存し終えた。履歴一覧（`session/list` を含む）を取り直す
-   * 契機に使う（decisions.md C-1/C-2 補遺「呼ぶ契機」）。
-   */
+  /** ターンの記録を保存し終えたことを知らせる。 */
   onTurnSaved: () => void
 }
 
-/** `session/list` の1件。decisions.md C-1/C-2 補遺。 */
+/** `session/list` の1件。 */
 export interface AgentSessionInfo {
   acpSessionId: string
   title?: string
@@ -79,17 +73,15 @@ export interface OpenedSession {
   /** `initialize` の応答が告げたエージェントの対応状況。 */
   readonly capabilities: SessionCapabilities
   /**
-   * いま書き込んでいるスナップショットの id（`{snapshotId}.json`）。最初は
-   * タブ id と同じ（復元時は元のスナップショットの id）だが、↻ で新しい
-   * 会話を始めるたびに新しい id に変わる。前の会話の記録を上書きしないため。
+   * いま書き込んでいるスナップショットの id（`{snapshotId}.json`）。
+   * 最初はタブ id と同じ（復元時は元のスナップショットの id）で、↻ のたびに新しい id に変わる。
    */
   readonly snapshotId: string
   readonly meta: SessionMeta
   readonly logger: SessionLogger
   /**
-   * ui.md §7: 添付はプロジェクトルートからの相対パスの配列で渡す。
-   * `resource_link` の ContentBlock としてサンドボックス内の絶対パスへ変換して送る
-   * （中身は読まない。エージェント自身がサンドボックス内でファイルを読む）。
+   * プロジェクトルートからの相対パスで渡された添付を、サンドボックス内の絶対パスの
+   * `resource_link` に変換してプロンプトと一緒に送る。
    */
   prompt(text: string, attachmentRelPaths?: string[]): Promise<void>
   cancel(): Promise<void>
@@ -97,19 +89,13 @@ export interface OpenedSession {
   setConfigOption(configId: string, value: string | boolean): Promise<void>
   resolvePermission(permissionId: string, optionId: string): void
   /**
-   * ui.md §3「タブ内コンテンツ上部の ↻ は、今の接続を再利用して session/new
-   * を送る」。接続の確立（プロセス起動 + npx によるアダプタ取得）は高価
-   * なので、`sbx exec` プロセスと `initialize` 済みの `ClientContext` は
-   * そのまま使い回し、ACP セッションだけを新しく張り直す。
+   * `sbx exec` プロセスと `initialize` 済みの接続を再利用し、`session/new` で
+   * ACP セッションだけを張り直す。
    */
   refresh(): Promise<string>
-  /**
-   * この接続を借りて `session/list` を呼ぶ（`nextCursor` を辿って全件）。
-   * 履歴一覧は同じサンドボックス・同じエージェントなら、どのタブの接続から
-   * 取っても同じ（decisions.md C-1/C-2 補遺）。
-   */
+  /** この接続を借りて `session/list` を呼ぶ（`nextCursor` を辿って全件）。 */
   listAgentSessions(): Promise<AgentSessionInfo[]>
-  /** この接続を借りて `session/delete` を送る（decisions.md C-5 追記）。 */
+  /** この接続を借りて `session/delete` を送る。 */
   deleteAgentSession(acpSessionId: string): Promise<void>
   close(): void
 }
@@ -126,18 +112,12 @@ class IdleWatchdog {
 
 /**
  * サンドボックス内の ACP アダプタへ接続し、1つの ACP セッションを開始する。
- * flows.md §3「ウィンドウを開く 〜 ACP 接続」の手順を実装する:
  *   1. 生存確認（終了コードのみで判定）
  *   2. `sbx exec -i` でプロセス起動、stdout/stderr を分離
  *   3. initialize（アイドルタイムアウト）
  *   4. session/new（`restore` が指定されたときは session/load か session/resume）
  *
- * 戻り値の `sessionId` は shovel 独自に払い出す ID であり、ACP プロトコル上の
- * `SessionId`（`session/new` の応答で初めて分かる）とは別物として扱う。
- * タブは接続開始時点で ID を必要とするため、ACP セッションが確立する前から
- * 安定した識別子を持てるようにこの層で吸収する。以降の ACP 呼び出しは
- * `ActiveSession` オブジェクトが自身の ACP sessionId を内部で保持するため、
- * shovel 側で変換して回す必要はない。
+ * 戻り値の `sessionId` は shovel が払い出すタブ id で、ACP の `SessionId` とは別物。
  */
 export async function openAcpSession(
   sessionId: string,
@@ -162,11 +142,7 @@ export async function openAcpSession(
   const watchdog = new IdleWatchdog()
   /**
    * セッションごとの、受信した `session/update` の通数（SDK に渡す前に数える）。
-   * SDK は応答を受け取った瞬間に request を解決する一方、通知はいくつかの
-   * ハンドラを await で経由してから届く。そのため `session/load` の応答の
-   * 直前に届いた replay の末尾が、await が返った時点ではまだハンドラに
-   * 着いていないことがある。ここで数えた通数と ManualSession が受け取った
-   * 通数を突き合わせ、揃うまで待ってから replay を確定する。
+   * `ManualSession` が受け取った通数と突き合わせ、replay がすべてハンドラに届くまで待つのに使う。
    */
   const inboundUpdateCounts = new Map<string, number>()
   const stream = buildAcpStream({
@@ -191,18 +167,13 @@ export async function openAcpSession(
    * 次回この履歴を選んだときに `session/load` / `session/resume` へ渡せる。
    */
   let currentAcpSessionId: string | null = null
-  /**
-   * 復元したスナップショットのタイトル。replay の内容で記録を置き換えた
-   * （decisions.md C-4）ときも、利用者が見慣れた名前を保つために使う。
-   */
+  /** 復元したスナップショットのタイトル。記録を replay で置き換えるときに引き継ぐ。 */
   let restoredTitle: string | undefined = restore?.title
   /** 書き込み先のスナップショット id（`OpenedSession.snapshotId` の説明を参照）。 */
   let snapshotId = restore?.snapshotId ?? sessionId
   /**
-   * decisions.md C-4「競合防止」: `session/load` の replay とローカル記録の
-   * 比較は裏で非同期に走る。その間に新しいターンが始まった・別セッションへ
-   * 移った（↻）・タブが閉じられた場合は結果を握りつぶすため、そのたびに
-   * 進める世代番号。
+   * replay とローカル記録の非同期比較の世代番号。新しいターン・↻・タブを閉じたときに進め、
+   * 古い比較結果を捨てる。
    */
   let restoreEpoch = 0
   /** `initialize` の応答から読んだ対応状況。接続が確立するまでは全部 false。 */
@@ -220,13 +191,12 @@ export async function openAcpSession(
       sessionId: snapshotId,
       acpSessionId: currentAcpSessionId ?? undefined,
       projectId: project.id,
-      // flows.md §6: 名前変更の上書きがあれば、エージェント発の内容から
-      // 推定したタイトルより優先する。
+      // 名前変更の上書きがあれば、推定したタイトルより優先する。
       title: sessionTitleStore.get(snapshotId) ?? restoredTitle ?? snapshotAcc.title(),
       savedAt: Date.now(),
       entries: snapshotAcc.snapshotEntries()
     }).catch(() => {
-      // スナップショットは表示高速化のための派生物。書き込み失敗で接続は壊さない。
+      // 書き込みに失敗しても接続は維持する。
     })
   }
 
@@ -259,11 +229,8 @@ export async function openAcpSession(
     .onRequest(acp.CLIENT_METHODS.elicitation_create, () => {
       throw acp.RequestError.methodNotFound(acp.CLIENT_METHODS.elicitation_create)
     })
-    // `session/new` のセッションは SDK 内部のルータが ActiveSession のキューへ
-    // 積んでくれる（そのルータは Handled.no を返すので、ここにも同じ通知が
-    // 届く）。復元したセッションにはその仕組みが使えないため、ここで拾って
-    // ManualSession のキューへ流す。表に無い sessionId は ActiveSession 側の
-    // ものなので、二重処理にならないよう黙って捨てる。
+    // 復元したセッション宛ての `session/update` を `ManualSession` のキューへ流す。
+    // 表に無い sessionId は SDK の `ActiveSession` 側で処理されるので捨てる。
     .onNotification(acp.CLIENT_METHODS.session_update, ({ params }) => {
       const manual = manualSessions.get(params.sessionId)
       if (!manual) return
@@ -274,15 +241,11 @@ export async function openAcpSession(
     session: SessionHandle
     modes: SessionModeState | null | undefined
     configOptions: SessionConfigOption[] | null | undefined
-    /**
-     * `session/load` が呼び出し中に流し込んできた過去分のうち、そのまま
-     * 画面に描く（ローカル記録が無いときの）もの。
-     */
+    /** `session/load` が呼び出し中に流し込んできた過去分のうち、そのまま画面に描くもの。 */
     replayed: ActiveSessionMessage[]
     /**
-     * ローカル記録があるときに `session/load` が流し込んできた過去分。
-     * 画面には描かず、ローカル記録との比較にだけ使う（decisions.md C-4）。
-     * 比較しない経路（新規・`session/resume`・ライブ replay）では null。
+     * ローカル記録があるときに `session/load` が流し込んできた過去分。画面には描かず、
+     * ローカル記録との比較にだけ使う。比較しない経路では null。
      */
     replayForComparison: ActiveSessionMessage[] | null
   }
@@ -305,16 +268,13 @@ export async function openAcpSession(
   }
 
   /**
-   * decisions.md C-1/C-2 の復元戦略表（2026-09-30 改定、Local Record First）。
-   * `resume` より `load` を優先する — `load` の replay だけが、ローカル記録と
-   * エージェントの記憶が今も一致しているかを確かめる手段になるため。
-   *
-   *   | ローカル記録 | capability          | 振る舞い                                      |
-   *   | あり         | load                | 記録を即座に描き、load の replay は描かずに比較 |
-   *   | あり         | resume のみ         | 記録を描き resume（replay が無いので比較しない） |
-   *   | 無し／空     | load                | load のライブ replay を描き、完了後に保存       |
-   *   | 無し／空     | resume のみ         | resume（描けるものは無い）                     |
-   *   | どちらでも   | 非対応              | RESTORE_UNSUPPORTED（呼び出し側は読み取り専用） |
+   * 過去のセッションを復元して開く。
+   *   | ローカル記録 | capability  | 振る舞い                                        |
+   *   | あり         | load        | 記録を即座に描き、load の replay は描かずに比較 |
+   *   | あり         | resume のみ | 記録を描き resume（比較しない）                 |
+   *   | 無し／空     | load        | load のライブ replay を描き、完了後に保存       |
+   *   | 無し／空     | resume のみ | resume（描けるものは無い）                      |
+   *   | どちらでも   | 非対応      | RESTORE_UNSUPPORTED                             |
    */
   async function startRestoredSession(
     ctx: ClientContext,
@@ -351,8 +311,7 @@ export async function openAcpSession(
       }
     }
 
-    // ライブで描くときだけ replay モードにする（`user_message_chunk` の扱いが
-    // ライブと replay で変わるため）。比較用の replay は別の翻訳器で読む。
+    // ライブで描くときだけ replay モードにする。比較用の replay は別の翻訳器で読む。
     if (!hasLocal) translator.setReplayMode(true)
     try {
       const response: LoadSessionResponse = await withDeadline(
@@ -384,16 +343,14 @@ export async function openAcpSession(
   }
 
   /**
-   * decisions.md C-4: `session/load` の replay をローカル記録と `messageId` の
-   * 並びで比較し、食い違っていたら
+   * `session/load` の replay をローカル記録と `messageId` の並びで比較し、食い違っていたら
    *   1. 今のローカル記録を `.backup` へ退避し、
    *   2. replay の内容を新しい `{sessionId}.json` として書き込み、
    *   3. 画面も replay の内容で描き直して notice を1行差し込む。
-   * 一致・比較不能なら何もしない（ローカル記録を表示し続ける）。
+   * 一致・比較不能なら何もしない。
    *
-   * replay 中に届いたメタ情報（モード・configOptions・利用可能コマンド等）は
-   * 比較とは無関係なので、ここで同期的にライブの状態へ反映しておく。比較と
-   * 置き換えだけが非同期で、その途中で `restoreEpoch` が進んだら結果を捨てる。
+   * replay 中に届いたメタ情報（モード・configOptions・利用可能コマンド等）は同期的に反映する。
+   * 比較と置き換えは非同期で、途中で `restoreEpoch` が進んだら結果を捨てる。
    */
   function reconcileReplay(replay: ActiveSessionMessage[], localEntries: SnapshotEntry[], metaState: MutableMetaState): void {
     const replayTranslator = new SessionTranslator(project.sandboxPath)
@@ -414,7 +371,7 @@ export async function openAcpSession(
     const replayEntries = replayAcc.snapshotEntries()
     const verdict = compareByMessageId(localEntries, replayEntries)
     console.info(`[acp] session/load replay vs local record (${snapshotId}): ${verdict}`)
-    // 何を差分と判断したかを後から追えるよう、セッションログに比較の中身を残す。
+    // 比較の中身をセッションログに残す。
     logger.logDebug(
       `replay-compare snapshot=${snapshotId} verdict=${verdict} ${JSON.stringify(describeMessageIdComparison(localEntries, replayEntries))}`
     )
@@ -425,7 +382,7 @@ export async function openAcpSession(
       try {
         await backupSnapshot(project.id, snapshotId)
       } catch (err) {
-        // 退避できないまま置き換えるとローカル記録が失われる。置き換えない。
+        // 退避できなければ置き換えない。
         console.warn('[acp] failed to back up local snapshot; keeping it as-is', err)
         return
       }
@@ -483,10 +440,8 @@ export async function openAcpSession(
           }
 
           // ローカル記録が無い `session/load`: 流し込んできた過去分をここで描き切る。翻訳が
-          // 終わるまで replay モードを保つ（`user_message_chunk` の扱いが
-          // ライブと replay で変わるため）。最後に stop を1つ通して開いた
-          // ままのブロックを閉じ、復元後の内容でスナップショットを取り直す
-          // （decisions.md C-1/C-2 の「完了後に新しいスナップショットを保存」）。
+          // 終わるまで replay モードを保ち、最後に stop を1つ通して開いたままのブロックを閉じ、
+          // 復元後の内容でスナップショットを取り直す。
           if (started.replayed.length > 0) {
             for (const message of started.replayed) {
               handleSessionMessage(message, translator, callbacks, metaState, snapshotAcc, () => {})
@@ -523,9 +478,7 @@ export async function openAcpSession(
   } catch (err) {
     child.kill()
     logger.close()
-    // flows.md §1-2: 「接続やターンが認証エラーで失敗したら、同じ認証画面を
-    // 出す」。事前チェック（authService.checkAuthStatus）だけに頼ると、
-    // トークン期限切れのケースを取りこぼすため、ここでも検知する。
+    // 接続・ターンが認証エラーで失敗したら認証が必要であることを通知する。
     if (isAuthRequiredError(err)) throw new Error(AUTH_REQUIRED_MARKER)
     throw err
   }
@@ -610,8 +563,7 @@ export async function openAcpSession(
     async refresh() {
       if (!ready) return snapshotId
       restoreEpoch++
-      // 前の会話の記録を閉じ、新しい会話は新しい `{snapshotId}.json` に書く
-      // （Local Record First: ↻ で前の会話の記録を上書きしない）。
+      // 前の会話の記録を閉じ、新しい会話は新しい `{snapshotId}.json` に書く。
       await persistSnapshot()
       restoredTitle = undefined
       snapshotId = randomUUID()
@@ -626,9 +578,7 @@ export async function openAcpSession(
       resolvedMetaState.modes = newMetaState.modes
       resolvedMetaState.currentModeId = newMetaState.currentModeId
       resolvedMetaState.configOptions = newMetaState.configOptions
-      // 新しいセッションでは使用量・利用可能コマンドはまだ届いていない。
-      // 前のセッションの値を引きずらないよう明示的にクリアする
-      // （usage は undefined = 未受信、ui.md §8。commands は空配列）。
+      // 使用量・利用可能コマンドを未受信の状態に戻す（usage は undefined、commands は空配列）。
       resolvedMetaState.usage = undefined
       resolvedMetaState.commands = []
 
@@ -674,11 +624,6 @@ export async function openAcpSession(
 
 /**
  * `runUpdateLoop` から見たセッションの最小インターフェース。
- *
- * SDK の高レベル API（`ctx.buildSession().start()` が返す `ActiveSession`）は
- * `session/new` 専用で、`session/load` / `session/resume` で開いたセッションを
- * 受け取る口が無い（更新を流し込む `attachSession` が private）。そこで
- * 「更新を1件ずつ取り出せるもの」だけを要求する形に薄く抽象化し、
  * `ActiveSession` はそのまま、復元したセッションは `ManualSession` が満たす。
  */
 interface SessionHandle {
@@ -772,9 +717,7 @@ class ManualSession implements SessionHandle {
 
 /**
  * `initialize` の応答からエージェントの対応状況を読む。
- * `load` だけ `agentCapabilities.loadSession`（boolean）で、他は
- * `sessionCapabilities.*` に「あれば対応」という形で載る（schema 上の経緯で
- * 非対称。SDK の型定義どおり）。
+ * `load` は `agentCapabilities.loadSession`、他は `sessionCapabilities.*` の有無で判定する。
  */
 function readCapabilities(response: unknown): SessionCapabilities {
   const agentCapabilities = (response as InitializeResponse | undefined)?.agentCapabilities
@@ -793,11 +736,7 @@ export interface RestoreRequest {
   snapshotId: string
   /** エージェント側のセッション id（スナップショットに保存してある）。 */
   acpSessionId: string
-  /**
-   * ローカルスナップショットの中身（decisions.md C-1/C-2 では、1件でもあれば
-   * これを正とする）。描画し、かつスナップショットの蓄積にも積み直す。
-   * 積み直さないと次のターンを保存したときに過去分が消えてしまう。
-   */
+  /** ローカルスナップショットの中身。描画し、スナップショットの蓄積にも積み直す。 */
   entries: SnapshotEntry[]
   /** 元のスナップショットのタイトル。記録を保存し直すときに引き継ぐ。 */
   title?: string
@@ -806,10 +745,8 @@ export interface RestoreRequest {
 export type ReplayComparison = 'same' | 'different' | 'incomparable'
 
 /**
- * decisions.md C-4 の比較ロジック。AGENT エントリの `messageId` だけを
- * 出現順に並べ（同じ id の連続は1回に畳む）、両者を比べる。プロンプト・
- * tool call・thought・テキスト内容は比較しない。
- *   - replay 側が1件も `messageId` を持たない → 'incomparable'（何もしない）
+ * AGENT エントリの `messageId` だけを出現順に並べ（同じ id の連続は1回に畳む）、両者を比べる。
+ *   - replay 側が1件も `messageId` を持たない → 'incomparable'
  *   - どちらかに `messageId` の無い AGENT エントリがある → 'different'
  *   - 並びが一致 → 'same'、それ以外 → 'different'
  */
@@ -875,13 +812,9 @@ interface MutableMetaState {
 }
 
 /**
- * data-model.md §3: トランスクリプトのスナップショットをキャッシュとして
- * 保持する。確定済み（ストリーミング中でない）ブロックと、ツールコールの
- * グループを保存する。途中経過は残らず最終テキストだけが積み上がる。
- *
- * 並び順は画面（renderer の `transcriptReducer`）に合わせる: ブロックと
- * グループは最初に現れた位置、思考だけは確定した位置。確定の順で並べると、
- * 「調べます。」の後に始まったツールコールが、その文より前に保存されてしまう。
+ * トランスクリプトのスナップショット用に、確定済みのブロックとツールコールのグループを蓄積する。
+ * 並び順は renderer の `transcriptReducer` に合わせ、ブロックとグループは最初に現れた位置、
+ * 思考だけは確定した位置に置く。
  */
 class SnapshotAccumulator {
   private order: string[] = []
@@ -889,10 +822,8 @@ class SnapshotAccumulator {
   private readonly groups = new Map<string, Map<string, ToolCallPayload>>()
   private readonly chips = new Map<string, AttachmentChip[]>()
   /**
-   * ストリーミング中のブロックの role。確定（`blockMarkdown`）は role を
-   * 運ばないので、開始時の `block` イベントで覚えておく（覚えておかないと
-   * thought や replay の USER が AGENT として保存されてしまい、C-4 の
-   * `messageId` 比較が常に「差分あり」に倒れる）。
+   * ストリーミング中のブロックの role。確定時の `blockMarkdown` は role を運ばないので、
+   * 開始時の `block` イベントで覚えておく。
    */
   private readonly streamingRoles = new Map<string, SnapshotEntry['role']>()
 
@@ -927,7 +858,7 @@ class SnapshotAccumulator {
         const groupId = e.toolCall.groupId
         this.place(groupId)
         const group = this.groups.get(groupId) ?? new Map<string, ToolCallPayload>()
-        // rawInput は表示に使わず、diff の本文と重複して記録が膨らむので保存しない。
+        // rawInput は保存しない。
         const toolCall: ToolCallPayload = { ...e.toolCall }
         delete toolCall.rawInput
         group.set(toolCall.id, toolCall)
@@ -1054,9 +985,7 @@ async function runUpdateLoop(
   snapshotAcc: SnapshotAccumulator,
   onStop: () => void
 ): Promise<void> {
-  // prompt() 呼び出し自体はここでは行わない。OpenedSession.prompt() が
-  // session.prompt() を起動し、その完了は下のループへ `stop` メッセージとして
-  // 流れてくる（ActiveSession の設計: 完了は nextUpdate() にも queue される）。
+  // prompt() の完了は `stop` メッセージとして下のループに流れてくる。
   for (;;) {
     let message: ActiveSessionMessage
     try {

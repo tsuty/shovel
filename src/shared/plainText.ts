@@ -1,9 +1,4 @@
-/**
- * decisions.md C-6: ローカルセッション検索は生 JSON ではなく、
- * `SnapshotEntry.markdown` から Markdown 記法を落とした平文に対して行い、
- * 結果もその平文から一文を抜粋して見せる。完全な Markdown パーサではなく、
- * 「検索とスニペットの読みやすさ」に効く記法だけを正規表現で落とす。
- */
+/** `SnapshotEntry.markdown` から主な Markdown 記法を正規表現で落とし、検索用の平文にする。 */
 export function markdownToPlainText(markdown: string): string {
   return (
     markdown

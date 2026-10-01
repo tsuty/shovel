@@ -21,7 +21,7 @@ import { logsDir } from '../log'
 
 const SANDBOX_NAME_ALLOWED = /[^a-zA-Z0-9.+-]+/g
 
-/** `sbx --name` が許すのは英数字・ハイフン・ピリオド・プラス・マイナスのみ（architecture.md §7）。 */
+/** `sbx --name` に使える文字（英数字・ハイフン・ピリオド・プラス・マイナス）。 */
 export function deriveSandboxName(seed: string, existingNames: ReadonlySet<string>): string {
   const base = seed.replace(SANDBOX_NAME_ALLOWED, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '') || 'project'
   if (!existingNames.has(base)) return base
@@ -32,7 +32,7 @@ export function deriveSandboxName(seed: string, existingNames: ReadonlySet<strin
   return `${base}-${randomUUID().slice(0, 8)}`
 }
 
-/** data-model.md §5 / decisions.md N-2-2: shovel の設定を正とし、sbx ls --json との差分を提示する。 */
+/** shovel に登録されたプロジェクトと `sbx ls --json` を突き合わせた状態。 */
 export async function listProjectsWithStatus(): Promise<ProjectWithStatus[]> {
   const projects = projectsStore.list()
   const sandboxes = await sbxLs().catch(() => [])
@@ -180,14 +180,13 @@ export async function removeProject(id: string, trashHostDir: boolean): Promise<
   if (!project) throw new Error(`project not found: ${id}`)
 
   await sbxRm(project.sandboxName).catch(() => {
-    // 既にサンドボックスが無い場合でも、shovel 側の登録は削除できるようにする。
+    // サンドボックスが無くても登録は削除する。
   })
   if (trashHostDir) {
     await shell.trashItem(project.hostPath)
   }
 
-  // flows.md §9「Project とスナップショットを破棄」。バックアップ・削除済みも
-  // 含めて消す（プロジェクトごと消える以上、Read Only タブで開く入口も無くなる）。
+  // バックアップ・削除済みを含めてスナップショットを削除する。
   await removeAllRecordsForProject(project.id)
 
   projectsStore.remove(id)
@@ -203,10 +202,10 @@ export async function diagnose(): Promise<string> {
   return sbxDiagnose()
 }
 
-/** ui.md §2「プロジェクトの詳細」の診断情報。N-2-6: まとめてコピーできる形にする。 */
+/** プロジェクト詳細ダイアログの診断情報。 */
 const RECENT_LOG_LINES = 500
 
-/** プロジェクトのログディレクトリ（`src/main/log.ts`、`{ms}_{sessionId}.log`）から最後のセッションのログを探す。 */
+/** プロジェクトのログディレクトリから最後のセッションのログを探す。 */
 async function findLatestLogFile(projectId: string): Promise<string | null> {
   const dir = logsDir(projectId)
   const entries = await readdir(dir).catch(() => [])
@@ -216,8 +215,8 @@ async function findLatestLogFile(projectId: string): Promise<string | null> {
 }
 
 /**
- * decisions.md N-2-6「診断情報画面」。SAC 方式のログ行 `{ms} {OUT|IN} {raw JSON}` /
- * `{ms} STDERR {text}` を種別ごとに振り分け、末尾 `RECENT_LOG_LINES` 行に切り詰める。
+ * ログ行 `{ms} {OUT|IN} {raw JSON}` / `{ms} STDERR {text}` を種別ごとに振り分け、
+ * 末尾 `RECENT_LOG_LINES` 行に切り詰める。
  */
 async function readSessionLogs(projectId: string): Promise<Pick<ProjectDiagnostics, 'acpTrafficLog' | 'stderrLog'>> {
   const file = await findLatestLogFile(projectId)
@@ -258,7 +257,7 @@ export async function openDataDir(id: string, kind: DataDirKind): Promise<void> 
     }
   }
   const dir = kind === 'logs' ? logsDir(id) : snapshotDir(id)
-  // まだ一度もセッションを開いていないとディレクトリ自体が無い。
+  // ログディレクトリが無ければ空で返す。
   await mkdir(dir, { recursive: true })
   const error = await shell.openPath(dir)
   if (error) throw new Error(error)

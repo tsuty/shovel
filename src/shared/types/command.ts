@@ -1,4 +1,4 @@
-/** コマンド実行パネルの IPC 契約。ui.md §12 / decisions.md N-4。 */
+/** コマンド実行パネルの IPC 契約。 */
 
 export interface CommandOutputChunk {
   runId: string

@@ -40,12 +40,7 @@ export interface RenderPermission {
 
 export type OrderEntry = { kind: 'block'; id: string } | { kind: 'group'; id: string }
 
-/**
- * ui.md §6「`agent_thought_chunk` はチャットに流さない。入力欄の上の専用
- * エリアに直近数行だけを更新表示する」。ストリーミング中の思考はここに
- * 置き、確定（`blockMarkdown`）したタイミングで初めて通常の `order` へ
- * 折り畳みブロックとして送り込む。
- */
+/** ストリーミング中の思考。確定（`blockMarkdown`）したら `order` へ折り畳みブロックとして移す。 */
 export interface LiveThought {
   id: string
   markdown: string
@@ -76,8 +71,7 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
     case 'reset':
       return initialTranscriptState
     case 'block':
-      // 専用エリアに出すのはストリーミング中の思考だけ。スナップショットから
-      // 戻した確定済みの思考は、最初から折り畳みブロックとして並べる。
+      // スナップショットから戻した確定済みの思考は、最初から折り畳みブロックとして並べる。
       if (event.role === 'THOUGHT' && event.streaming) {
         return { ...state, liveThought: { id: event.id, markdown: event.markdown } }
       }
@@ -108,9 +102,7 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
     }
     case 'blockMarkdown': {
       if (state.liveThought?.id === event.id) {
-        // 確定した瞬間に専用エリアから外し、折り畳みブロックとしてトランス
-        // クリプト本体へ格納する（ui.md §6「ターン終了時にこのエリアは消え、
-        // トランスクリプト下部の折り畳みに格納される」）。
+        // 確定したら専用エリアから外し、折り畳みブロックとしてトランスクリプト本体へ移す。
         return {
           ...state,
           liveThought: null,

@@ -20,7 +20,7 @@ const STATUS_DOT_CLASSES: Record<SandboxStatus, string> = {
 
 const MAX_RECENT = 5
 
-/** ui.md §3 Header / decisions.md G-1-6: 「プロジェクト名▾」の軽い切り替え。 */
+/** 「プロジェクト名▾」のプロジェクト切り替えメニュー。 */
 export function Header({
   displayName,
   status,

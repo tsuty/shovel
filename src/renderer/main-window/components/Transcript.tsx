@@ -32,9 +32,8 @@ function blockDomId(id: string): string {
 }
 
 /**
- * ui.md §5「ターンの先頭」区切り。各 USER ブロックを起点に、次の USER
- * ブロックの直前までを1ターンとしてまとめる（最初の USER ブロックより前の
- * 履歴は先頭に区切りが無いターンとして扱う）。
+ * 各 USER ブロックを起点に、次の USER ブロックの直前までを1ターンとしてまとめる
+ * （最初の USER ブロックより前は区切りの無いターンとして扱う）。
  */
 function splitIntoTurns(order: TranscriptState['order'], blocks: TranscriptState['blocks']) {
   const turns: { userBlockId: string | null; entries: TranscriptState['order'] }[] = []
@@ -69,15 +68,10 @@ export function Transcript({
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
-  /**
-   * decisions.md N-1: 追記時のスクロール追従は「すでに最下部にいたときだけ」
-   * （閾値 24px）。判定は追記の「前」の位置で行う必要がある。追記後に測ると、
-   * 24px を超える追記が1回来ただけで「最下部ではない」と見なされ追従が
-   * 止まってしまうため、ユーザーのスクロールのたびにここへ記録しておく。
-   */
+  /** 追記前に最下部（閾値 24px）にいたか。ユーザーのスクロールのたびに記録し、追記時の追従に使う。 */
   const stickToBottomRef = useRef(true)
   const [diffToolCall, setDiffToolCall] = useState<ToolCallPayload | null>(null)
-  // ui.md §5「最下部より下に何かある間は、右下に『最新へ』ボタンを浮かせる」。
+  // 最下部より下に何かある間は、右下に「最新へ」ボタンを浮かせる。
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
 
   function scrollToLatest(): void {
@@ -87,8 +81,7 @@ export function Transcript({
     container.scrollTop = container.scrollHeight
   }
 
-  // 追記は描画の確定と同じタイミングで追従させる（ResizeObserver だけだと、
-  // DOM 更新から通知までの間に一瞬だけ最下部からずれた状態が挟まる）。
+  // 描画の確定と同じタイミングで最下部へ追従させる。
   useLayoutEffect(() => {
     const container = containerRef.current
     if (container && container.clientHeight > 0 && stickToBottomRef.current) {
@@ -105,11 +98,9 @@ export function Transcript({
       stickToBottomRef.current = distance < 24
       setShowJumpToLatest(distance > 24)
     }
-    // 高さの変化は state の更新に限らない（ツール行の折り畳み、Markdown の
-    // 描画確定など）ので、中身の大きさそのものを見て追従する。
+    // 中身の大きさの変化を見て最下部へ追従する。
     const observer = new ResizeObserver(() => {
-      // 非表示タブ（display: none）では寸法が 0 になる。ここで判定し直すと
-      // 「最下部にいる」扱いに化けるので、見えていない間は何もしない。
+      // 非表示タブ（display: none）では何もしない。
       if (container.clientHeight === 0) return
       if (stickToBottomRef.current) container.scrollTop = container.scrollHeight
       else onScroll()
@@ -182,9 +173,7 @@ export function Transcript({
   )
 }
 
-// main/acp/translate.ts の TASK_LIST_LINE と同じパターン。choices を抜き出した
-// 元になった行は、地の文でも remark-gfm の非活性チェックボックスとして二重に
-// 出てしまうため、prose 側からは取り除き ChoicesView だけに表示させる。
+// choices として抜き出した行を prose から取り除く（main/acp/translate.ts の TASK_LIST_LINE と同じパターン）。
 const TASK_LIST_LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.+)$/
 
 function stripChoiceLines(markdown: string): string {
@@ -249,12 +238,9 @@ function BlockView({
   return (
     <div
       className={cn(
-        // 名前付き group: ネストした Markdown 内のコードブロックにも独自の
-        // group/code があるため、無名の group だと外側を hover しただけで
-        // 内側のコピー ボタンまで出てしまう（実機テストで確認済みの不具合）。
+        // 名前付き group にして、内側のコードブロックのコピー ボタンと区別する。
         'group/message rounded-md border border-border px-3 py-2',
-        // 自分の発言はアイコンだけでは見分けにくいので、背景色を背景よりわずかに
-        // 変える（ライトはごく薄いグレー、ダークは黒よりわずかに明るいグレー）。
+        // 自分の発言は背景色をわずかに変える。
         block.role === 'PLAN' && 'bg-muted/20',
         block.role === 'USER' && 'bg-muted/50'
       )}
@@ -361,10 +347,7 @@ const KIND_VERBS: Record<string, string> = {
   other: 'Tool'
 }
 
-/**
- * ツールコールの種類ごとのアイコン。SAC の対応表（docs/reference/ICONS.md
- * §3.1）の絵柄に、lucide の近いものを当てている。知らない種類は other。
- */
+/** ツールコールの種類ごとのアイコン。知らない種類は other。 */
 const KIND_ICONS: Record<string, LucideIcon> = {
   read: Eye,
   edit: FilePenLine,
@@ -393,9 +376,8 @@ function toolCallLine(tc: ToolCallPayload): string {
   return `${verb} ${tc.title}`
 }
 
-// ui.md §5「read/delete/move は1行。展開しない」「switch_mode は plan 本文が
-// 常時展開」。この3種+switch_mode 以外は content があれば末尾のキャレットで
-// 展開できる「標準の折り畳みアンカー」の対象。
+// read/delete/move は1行で展開しない。switch_mode は plan 本文を常時展開する。
+// それ以外は content があれば末尾のキャレットで展開できる。
 const NON_EXPANDABLE_KINDS = new Set<ToolCallPayload['kind']>(['read', 'delete', 'move', 'switch_mode'])
 
 function GroupView({
@@ -421,15 +403,13 @@ function GroupView({
     if (p.status === 'pending') pendingByToolCall.set(p.toolCallId, p)
   }
 
-  // 連続するツールコールはグループ単位でも畳める。作業中は開いておき、
-  // グループが閉じた（=完了した）ら畳む。ユーザーが自分で開閉したら
-  // それを優先するが、許可待ちのカードがある間は隠さない。
+  // 作業中のグループは開いておき、閉じたら畳む。ユーザーが開閉したらそれを優先し、
+  // 許可待ちのカードがある間は隠さない。
   const [groupOpenOverride, setGroupOpenOverride] = useState<boolean | null>(null)
   const groupOpen = pendingByToolCall.size > 0 || (groupOpenOverride ?? !closed)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const rowRefs = useRef(new Map<string, HTMLElement>())
-  // ui.md §5「折り畳み時はクリックした行を画面上の位置に保つ」。トグル直前の
-  // 行位置を覚えておき、レイアウト確定後の差分だけ scrollTop に足し戻す。
+  // トグルの前後で、クリックした行の画面上の位置を保つ。
   const pendingScrollAdjust = useRef<{ id: string; prevTop: number } | null>(null)
 
   function toggleExpand(id: string): void {
@@ -573,11 +553,7 @@ function PermissionCard({
   )
 }
 
-/**
- * decisions.md N-3-7「トランスクリプトのツールカード → その操作単体の diff」。
- * ui.md §5「チャット内に diff を展開しない。クリックで Diff ビューを開く」に
- * 従い、一覧の中では行数の増減だけを見せ、本文はこのビューアで開く。
- */
+/** ツールコールの diff の行数の増減を表示し、クリックで Diff ビューを開く。 */
 function DiffModal({ toolCall, onClose }: { toolCall: ToolCallPayload; onClose: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   return (
@@ -615,10 +591,8 @@ function DiffModal({ toolCall, onClose }: { toolCall: ToolCallPayload; onClose: 
 }
 
 /**
- * ui.md §6「思考ログ」: `agent_thought_chunk` はチャットに流さず、入力欄の
- * 上のこの専用エリアに直近数行だけを更新表示する。確定すると
- * `transcriptReducer` が `liveThought` を消してトランスクリプト本体の
- * 折り畳みへ送り込むため、このコンポーネントはストリーミング中しか現れない。
+ * ストリーミング中の思考を入力欄の上に直近数行だけ表示する。確定するとトランスクリプト本体の
+ * 折り畳みへ移るので、ストリーミング中しか現れない。
  */
 export function LiveThoughtArea({ markdown }: { markdown: string }): React.JSX.Element {
   const { t } = useTranslation()

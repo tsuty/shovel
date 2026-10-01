@@ -9,17 +9,11 @@ import { projectsStore } from '../persistence/store'
 import { decodeText, encodeForWrite } from './textEncoding'
 
 /**
- * ファイラーの実体。ui.md §9 / decisions.md N-3-4: ファイル操作はホスト側の
- * Node `fs` で行う（バインドマウントなので同じファイル。`sbx exec` より速い）。
- * `.gitignore` の判定は `ignore`（npm）で行い、git コマンドを呼ばない
- * （非 git プロジェクトでも、ホストに git が無くても動く）。
+ * ファイラーのバックエンド。ファイル操作はホスト側の Node `fs` で行い、
+ * `.gitignore` の判定は `ignore` パッケージで行う。
  */
 
-/**
- * アプリ内でプレビューする画像（N-3-1 の「バイナリは OS へ」の例外）。SVG は
- * テキストだが、中身のソースより絵を見たい場面が多いので画像として扱う。
- * `<img>` に data URL で渡すため、SVG 内のスクリプトは実行されない。
- */
+/** アプリ内でプレビューする画像の拡張子と MIME タイプ。 */
 const IMAGE_MIME_BY_EXT: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -48,7 +42,7 @@ function resolveAbsolute(project: Project, relPath: string): string {
   return abs
 }
 
-/** 同名衝突を避け、VSCode 等と同じ「Name」「Name 2」「Name 3」…の規則で空き名前を探す。 */
+/** 「Name」「Name 2」「Name 3」…の規則で空き名前を探す。 */
 async function findAvailableName(dirAbs: string, base: string, ext: string): Promise<string> {
   let candidate = `${base}${ext}`
   for (let n = 2; ; n++) {
@@ -68,15 +62,12 @@ async function loadIgnore(hostPath: string): Promise<Ignore> {
     const content = await readFile(path.join(hostPath, '.gitignore'), 'utf8')
     ig.add(content)
   } catch {
-    // .gitignore が無いプロジェクトもある。無視して続ける。
+    // .gitignore が無ければ無視して続ける。
   }
   return ig
 }
 
-/**
- * decisions.md N-3-5（2026-09-30 改定）: `.git` は常に隠す（表示トグルは
- * 非エンジニアに意味が伝わらないため廃止した）。
- */
+/** ディレクトリ直下のエントリを列挙する。ルートの `.git` は常に隠す。 */
 export async function listDir(projectId: string, relPath: string): Promise<FsEntry[]> {
   const project = requireProject(projectId)
   const dirAbs = resolveAbsolute(project, relPath)
@@ -156,7 +147,7 @@ export async function renameEntry(projectId: string, relPath: string, newName: s
 export async function deleteEntry(projectId: string, relPath: string): Promise<void> {
   const project = requireProject(projectId)
   const absPath = resolveAbsolute(project, relPath)
-  // N-2-4 / A-3-7 と同じ方針: fs.rm ではなく OS のゴミ箱へ。取り返しがつくことを優先する。
+  // OS のゴミ箱へ移す。
   await shell.trashItem(absPath)
 }
 
@@ -177,10 +168,8 @@ export async function copyEntry(projectId: string, relPath: string, destDirRelPa
 }
 
 /**
- * `absPath`（ファイルでもディレクトリでもよい）を `destDirAbs` の直下へコピーし、
- * 付けた名前を返す。同じフォルダへ貼り付ける「複製」操作でも衝突せず使える
- * よう、移動先に同名が既にあれば createDirectory/createMarkdownFile と同じ
- * 「name 2」規則で回避する。
+ * `absPath`（ファイルでもディレクトリでもよい）を `destDirAbs` の直下へコピーし、付けた名前を返す。
+ * 同名があれば「name 2」規則で回避する。
  */
 async function copyInto(absPath: string, destDirAbs: string): Promise<string> {
   await mkdir(destDirAbs, { recursive: true })
@@ -194,12 +183,8 @@ async function copyInto(absPath: string, destDirAbs: string): Promise<string> {
 }
 
 /**
- * ui.md §9「アプリ外からの貼り付け・ドロップ」: OS のファイラー（Finder 等）で
- * コピー／ドラッグされたファイル・フォルダを、プロジェクト内の `destDirRelPath`
- * へ**コピー**する（移動はしない。元の場所のファイルを消さないため。
- * decisions.md N-3-4）。同名は「name 2」規則で回避する。進捗表示は無い
- * （エージェントに読ませる資料を入れる用途を想定し、巨大・大量のコピーは
- * 想定しない）。コピーした先の相対パスを返す。
+ * OS のファイラーからコピー／ドロップされたファイル・フォルダを、プロジェクト内の
+ * `destDirRelPath` へコピーする。同名は「name 2」規則で回避する。コピー先の相対パスを返す。
  */
 export async function copyExternalEntries(
   projectId: string,
@@ -219,8 +204,6 @@ export async function copyExternalEntries(
 
 /**
  * OS のクリップボードにある「コピーされたファイル」の絶対パスを読む。
- * Electron に OS 共通の API は無いため、OS ごとの形式を読み分ける
- * （ネイティブモジュールは使わない。decisions.md F-2b）:
  *   - macOS: `NSFilenamesPboardType`（plist）、無ければ `public.file-url`
  *   - Windows: `FileNameW`（UTF-16LE。先頭の1件のみ取れる）
  *   - Linux: `x-special/gnome-copied-files` / `text/uri-list`

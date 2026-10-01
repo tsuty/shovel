@@ -19,7 +19,7 @@ import type { TabInfo } from './TabBar'
 import { LocalSearchDialog } from './LocalSearchDialog'
 import { MenuItem } from './MenuItem'
 
-/** バックアップのサブリストに出す件数（ファイル自体は無期限に残る。decisions.md C-4）。 */
+/** バックアップのサブリストに出す件数。 */
 const MAX_VISIBLE_BACKUPS = 20
 
 function formatSize(bytes: number): string {
@@ -42,9 +42,8 @@ interface ContextMenuState {
 }
 
 /**
- * decisions.md C-1/C-2 補遺: 行がどちら側に存在するかを、アイコンの差し替えと
- * ツールチップで控えめに示す。`unknown`（`session/list` を取れていない）は
- * 「両方にある」と同じ見た目にする（確かめていないことを「無い」と言わない）。
+ * 行がローカル／エージェントのどちら側に存在するかをアイコンとツールチップで示す。
+ * `unknown` は「両方にある」と同じ見た目にする。
  */
 function HistoryStateIcon({ entry, hasBackups }: { entry: HistoryEntry; hasBackups: boolean }): React.JSX.Element {
   if (entry.state === 'agentOnly') return <Cloud size={14} className="shrink-0" />
@@ -54,26 +53,12 @@ function HistoryStateIcon({ entry, hasBackups }: { entry: HistoryEntry; hasBacku
 }
 
 /**
- * ui.md §3 サイドバー「チャット履歴」。開いているタブ（真実はエージェント側に
- * 接続中）と、過去に保存したスナップショット（このアプリ外で終了した
- * セッションも含む、ローカルキャッシュ）を並べる。data-model.md §3。
- * flows.md §6: 右クリックで名前変更・削除ができる
- * （ACP に session/rename が無いため、名前はローカルの上書きとして持つ）。
- *
- * 過去セッションをクリックすると、まずスナップショットを読み取り専用で
- * 表示する（`HistoryView`）。そこから「再開」を選ぶと
- * `session/load` / `session/resume` で文脈ごと繋ぎ直してライブのタブに
- * 変わる（decisions.md C-1/C-2 の復元戦略表）。エージェントがどちらにも
- * 対応していない場合は読み取り専用のまま、文脈が失われていることを
- * 明示する — 引き継げないことを隠さない設計にしている。
- *
- * ui.md「チャット履歴パネル」（decisions.md C-4 / C-5 / C-6）:
- *   - バックアップを持つ過去セッションの行には展開キャレットを付け、開くと
- *     新しい順に `{日時} {サイズ}` のサブリスト（最大20件）を出す。
- *   - 履歴の末尾の「削除済みを表示」トグル（既定 OFF）で、グレーアウトした
- *     削除済みセクションを出す。
- *   - 「履歴」見出しの右寄せにローカル検索の入口（🔎）を置く。見出しは
- *     何らかのローカル記録（現在・バックアップ・削除済み）が1件でもあれば出す。
+ * サイドバーの「チャット」パネル。開いているタブと過去のセッションを並べる。
+ *   - 過去セッションをクリックすると読み取り専用の `HistoryView` で開く。
+ *   - 右クリックで名前変更・削除。
+ *   - バックアップを持つ行には展開キャレットを付け、`{日時} {サイズ}` のサブリストを出す。
+ *   - 「削除済みを表示」トグルで削除済みセクションを出す。
+ *   - 見出しの右にローカル検索の入口（🔎）を置く。
  *   - バックアップ／削除済みの行はクリックで Read Only タブとして開く。
  */
 export function ChatHistoryPanel({
@@ -110,15 +95,13 @@ export function ChatHistoryPanel({
     void window.shovel.session.listLocalRecords(projectId).then(setRecords)
   }
 
-  // タブの開閉に加え、↻ で snapshotId が変わったときも取り直す（前の会話の
-  // 記録が「過去」側に移るため）。`session/list` の結果も、そのたびに取り直す。
+  // タブの開閉・snapshotId の変化のたびに一覧を取り直す。
   const openRecordsKey = tabs.map((tab) => tab.snapshotId ?? tab.sessionId).join('\n')
   useEffect(() => {
     refreshHistory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, openRecordsKey])
 
-  // decisions.md C-4: 開いているタブで replay との食い違いが見つかり、
   // バックアップが作られたときに一覧を取り直す。
   useEffect(() => {
     return window.shovel.session.onLocalRecordsChanged((changedProjectId) => {
@@ -129,8 +112,7 @@ export function ChatHistoryPanel({
 
   // 開いているタブが書き込んでいるスナップショット（↻ 済みのタブは新しい方）。
   const openIds = new Set(tabs.map((tab) => tab.snapshotId ?? tab.sessionId))
-  // main 側でも開いているタブの分は除いているが、表示中の state が古い間に
-  // 二重に並ばないよう、ここでも除く。
+  // 開いているタブの分は一覧から除く。
   const pastHistory = history.entries.filter((h) => !h.snapshotId || !openIds.has(h.snapshotId))
   const backupsBySession = new Map<string, LocalRecordSummary[]>()
   for (const record of records) {
@@ -150,7 +132,7 @@ export function ChatHistoryPanel({
     })
   }
 
-  /** 名前の上書きはスナップショット id に紐づく。開いているタブならタブ名も変える。 */
+  /** 名前を変える。開いているタブならタブ名も変える。 */
   function commitRename(snapshotId: string, tabId?: string): void {
     const title = renameValue.trim()
     setRenamingId(null)
@@ -163,7 +145,7 @@ export function ChatHistoryPanel({
 
   async function deleteHistory(entry: HistoryEntry): Promise<void> {
     setMenu(null)
-    // 「エージェントのみ」の行はローカルに退避する記録が無く、元に戻せない。
+    // 「エージェントのみ」の行は確認文言を変える。
     if (!confirm(t(entry.snapshotId ? 'history.confirmDelete' : 'history.confirmDeleteAgentOnly'))) return
     await window.shovel.session.deleteHistory(projectId, {
       snapshotId: entry.snapshotId,
@@ -176,7 +158,7 @@ export function ChatHistoryPanel({
     <div className="flex h-full flex-col p-2" onClick={() => setMenu(null)}>
       <div className="mb-2 text-xs font-medium text-muted-foreground">{t('sidebar.tabs')}</div>
       <ul className="flex flex-col gap-1">
-        {/* 「チャット」には会話（セッション・履歴）だけを並べ、開いたファイルは出さない。 */}
+        {/* 会話（セッション・履歴）だけを並べる。 */}
         {tabs.filter((tab) => tab.kind !== 'file').map((tab) => (
           <li key={tab.sessionId}>
             {renamingId === tab.sessionId ? (
@@ -350,8 +332,7 @@ export function ChatHistoryPanel({
         >
           <MenuItem
             icon={<SquarePen size={14} />}
-            // 「エージェントのみ」の行は、再開してローカル記録ができるまで名前を持てない
-            // （名前の上書きはスナップショット id に紐づく。decisions.md C-5 追記）。
+            // 「エージェントのみ」の行は名前を変えられない。
             disabled={menu.kind === 'history' && !menu.entry?.snapshotId}
             onClick={() => {
               setRenamingId(menu.sessionId)
@@ -362,7 +343,7 @@ export function ChatHistoryPanel({
             {t('common.rename')}
           </MenuItem>
           {menu.kind === 'tab' ? (
-            // 開いているタブの行では、記録を消すのではなくタブを閉じるだけ。
+            // 開いているタブの行ではタブを閉じる。
             <MenuItem
               icon={<MessageSquareX size={14} />}
               onClick={() => {

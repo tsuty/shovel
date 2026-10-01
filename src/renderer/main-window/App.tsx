@@ -26,9 +26,9 @@ import { cn } from '../shared/lib/utils'
 import { friendlyErrorMessage } from '../shared/friendlyError'
 
 const MAX_SESSION_TABS = 10
-/** チャットの右に添えた Markdown ペインの既定幅（px）。幅は記憶される。 */
+/** チャットの右に添えた Markdown ペインの既定幅（px）。 */
 const ATTACHED_DEFAULT_WIDTH = 520
-/** コンソール（下部ドロワー）の既定の高さ（px）。高さは記憶される。 */
+/** コンソール（下部ドロワー）の既定の高さ（px）。 */
 const COMMANDS_DEFAULT_HEIGHT = 256
 
 type Tab =
@@ -41,8 +41,7 @@ type Tab =
       meta: SessionMeta
       initialAttachments: string[]
       /**
-       * このチャットタブの右に添えた Markdown（ui.md §3「分割表示」）。添えている
-       * 間はタブバーに独立したタブとして出さず、10タブ上限にも数えない。
+       * このチャットタブの右に添えた Markdown。添えている間はタブバーに出さず、タブ数にも数えない。
        * チャットタブを閉じると一緒に閉じる。
        */
       attachedMarkdown?: string
@@ -53,16 +52,12 @@ type Tab =
       sessionId: string
       title: string
       snapshot: SessionSnapshot
-      /** バックアップ／削除済みを開いた Read Only タブ（decisions.md C-4 / C-5）。 */
+      /** バックアップ／削除済みを開いた Read Only タブ。 */
       readOnlyKind?: ReadOnlyKind
       recordTimestamp?: number
-      /**
-       * `session/list` にだけあってローカル記録が無い行（decisions.md C-1/C-2
-       * 補遺）。`snapshot` は中身の無い仮のもので、「再開」は
-       * `resumeAgentSession` を使う。
-       */
+      /** `session/list` にだけあってローカル記録が無い行。`snapshot` は中身の無い仮のもの。 */
       agentOnly?: boolean
-      /** 再開していない履歴の横にも Markdown を添えられる（並べるだけ）。再開後も引き継ぐ。 */
+      /** 右に添えた Markdown。再開後も引き継ぐ。 */
       attachedMarkdown?: string
     }
 
@@ -73,10 +68,7 @@ function isChatTab(tab: Tab): tab is ChatTab {
   return tab.kind === 'session' || tab.kind === 'history'
 }
 
-/**
- * G-1-3b「タブ数の上限は 10」に数えるタブ。バックアップ／削除済みの
- * Read Only タブは通常のセッションタブと合算する（decisions.md C-5）。
- */
+/** タブ数の上限に数えるタブ。 */
 function countsTowardTabLimit(tab: Tab): boolean {
   return tab.kind === 'session' || (tab.kind === 'history' && tab.readOnlyKind !== undefined)
 }
@@ -124,9 +116,7 @@ export function App(): React.JSX.Element {
     setError(null)
 
     try {
-      // flows.md §1-2: 接続前に高速な事前チェックを行い、未ログインなら接続を
-      // 試みずに認証画面を出す。`sbx` 自体が無い等でこのチェック自体が失敗
-      // した場合も、下の catch でエラー表示に落とす（画面が固まらないように）。
+      // 接続前に認証状態を確認し、未ログインなら認証画面を出す。
       const status = await window.shovel.auth.status(projectId)
       if (!status.checkFailed && !status.loggedIn) {
         setAuthOpen(true)
@@ -134,9 +124,7 @@ export function App(): React.JSX.Element {
       }
 
       const { sessionId, snapshotId, meta } = await window.shovel.session.openTab(projectId)
-      // ui.md §7: アクティブファイルの自動添付は設定項目（既定 off）。
-      // ここでは「タブを開いた時点で最後に開いていたファイル」を初期チップとして
-      // 種付けする、という簡略化で実装している。
+      // 自動添付が有効なら、最後に開いていたファイルを初期チップにする。
       const initialAttachments = settings?.autoAttachActiveFile && lastOpenedFilePath ? [lastOpenedFilePath] : []
       setTabs((prev) => [
         ...prev,
@@ -152,8 +140,7 @@ export function App(): React.JSX.Element {
       setActiveSessionId(sessionId)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      // 事前チェックを素通りしても、トークン期限切れ等で接続時に認証エラーに
-      // なることがある。同じ認証画面へ導く（flows.md §1-2「両方持つ」）。
+      // 接続時の認証エラーでも認証画面を出す。
       if (isAuthRequiredMessage(message)) {
         setAuthOpen(true)
         return
@@ -162,9 +149,7 @@ export function App(): React.JSX.Element {
     }
   }
 
-  // React.StrictMode はマウント時に effect を二重発火させる。`tabs.length === 0`
-  // だけをガードにすると、両方の発火が同じ古い state を見て素通りし、
-  // セッション（=sbx exec プロセス）が2つ開いてしまう。ref で一度だけに絞る。
+  // StrictMode の二重発火でセッションが2つ開かないよう、ref で一度だけに絞る。
   const didOpenInitialTabRef = useRef(false)
   useEffect(() => {
     if (projectId && !didOpenInitialTabRef.current) {
@@ -176,17 +161,14 @@ export function App(): React.JSX.Element {
 
   function openFile(relPath: string, isMarkdown: boolean): void {
     setLastOpenedFilePath(relPath)
-    // チャットの横に添えてあるなら、そのチャットタブを前に出す（二重に開かない）。
+    // チャットの横に添えてあるなら、そのチャットタブを前に出す。
     const holder = tabs.find((tab) => isChatTab(tab) && tab.attachedMarkdown === relPath)
     if (holder) {
       setActiveSessionId(holder.sessionId)
       return
     }
     const id = `file:${relPath}`
-    // 重複判定は updater の中で行う。ダブルクリック等で同じ tick に2回呼ばれると、
-    // クロージャの `tabs` はまだ古いままなので、外で判定すると同じ id のタブが
-    // 2つ積まれてしまう（同じ id が2つあると両方が「アクティブ」に一致して
-    // 上下に並んで描かれる）。
+    // 重複判定は updater の中で行う。
     setTabs((prev) =>
       prev.some((tab) => tab.sessionId === id)
         ? prev
@@ -195,7 +177,7 @@ export function App(): React.JSX.Element {
     setActiveSessionId(id)
   }
 
-  /** ui.md §7: ファイラーの右クリック「コンテキストに追加」。アクティブなセッションタブへ渡す。 */
+  /** ファイラーの「コンテキストに追加」。アクティブなセッションタブへ渡す。 */
   function addToContext(relPath: string): void {
     if (activeSessionId) addAttachmentToSession(activeSessionId, relPath)
   }
@@ -211,9 +193,8 @@ export function App(): React.JSX.Element {
   }
 
   /**
-   * 履歴一覧の行を開く。ローカル記録があればそれを読み取り表示し、
-   * 「エージェントのみ」の行は中身の無い仮のスナップショットで開く。どちらも
-   * この時点では接続を張らない（decisions.md C-1/C-2 補遺）。
+   * 履歴一覧の行を開く。ローカル記録があればそれを表示し、「エージェントのみ」の行は
+   * 中身の無い仮のスナップショットで開く。どちらも接続は張らない。
    */
   async function openHistoryEntry(entry: HistoryEntry): Promise<void> {
     if (!projectId) return
@@ -238,13 +219,10 @@ export function App(): React.JSX.Element {
   }
 
   /**
-   * チャット履歴パネル（バックアップのサブリスト・削除済みセクション）と
-   * ローカル検索（decisions.md C-6）から、ローカル記録を開く。
-   *   - 現行の記録（`.json`）: 過去セッションの行をクリックしたのと同じ。
-   *     既にタブで開いていればそのタブを前面に出す。
-   *   - バックアップ／削除済み: Read Only タブで開く。タブ id は本セッションの
-   *     id と衝突しないよう `{sessionId}::{kind}::{epochMillis}` とし、同じ
-   *     ファイルを複数タブで開くことも妨げない（2つ目以降は連番を足す）。
+   * ローカル記録を開く。
+   *   - 現行の記録（`.json`）: 過去セッションの行と同じ。既にタブで開いていればそのタブを前面に出す。
+   *   - バックアップ／削除済み: Read Only タブで開く。タブ id は `{sessionId}::{kind}::{epochMillis}`
+   *     （2つ目以降は連番を足す）。
    */
   async function openLocalRecord(record: LocalRecordSummary): Promise<void> {
     if (!projectId) return
@@ -290,10 +268,8 @@ export function App(): React.JSX.Element {
   }
 
   /**
-   * decisions.md C-1/C-2: 履歴タブの「再開」。main 側が `session/load` か
-   * `session/resume` で文脈を繋ぎ直し、成功したら読み取り専用の履歴タブを
-   * その場でライブのセッションタブへ差し替える。タブ id は元のスナップショット
-   * の id をそのまま引き継ぐ（main 側も同じ id でタブを開いている）。
+   * 履歴タブの「再開」。成功したら履歴タブをライブのセッションタブへ差し替える。
+   * タブ id は元のスナップショットの id を引き継ぐ。
    */
   async function resumeHistory(snapshot: SessionSnapshot, agentOnly = false): Promise<void> {
     if (!projectId) return
@@ -319,8 +295,7 @@ export function App(): React.JSX.Element {
     setActiveSessionId(sessionId)
   }
 
-  // mermaid の図はポップアップで描く。大きいライブラリなので、ウィンドウが
-  // 開いた後の空き時間に読み込んでおき、ボタンを押したときに待たせない。
+  // mermaid をウィンドウが開いた後の空き時間に読み込んでおく。
   useEffect(() => preloadMermaid(), [])
 
   useEffect(() => {
@@ -334,9 +309,8 @@ export function App(): React.JSX.Element {
   const canAttachMarkdown = chatTabs.length > 0
 
   /**
-   * ui.md §3「分割表示」: Markdown をチャットタブの右に添える。添え先は、今の
-   * タブがチャットならそれ、チャットが1つしか無ければそれ。どちらでもなく
-   * 決まらないときは黙って選ばず、どのチャットに添えるかを尋ねる。
+   * Markdown をチャットタブの右に添える。添え先は、今のタブがチャットならそれ、
+   * チャットが1つしか無ければそれ。決まらなければ添え先を選ばせる。
    */
   function attachMarkdown(relPath: string): void {
     const active = tabs.find((tab) => tab.sessionId === activeSessionId)
@@ -345,7 +319,7 @@ export function App(): React.JSX.Element {
     else if (chatTabs.length > 1) setAttachPickerPath(relPath)
   }
 
-  /** 同じファイルの独立したタブがあれば閉じ（二重に並べない）、既に別の Markdown を添えていれば置き換える。 */
+  /** 同じファイルの独立したタブがあれば閉じ、既に別の Markdown を添えていれば置き換える。 */
   function attachMarkdownTo(targetId: string, relPath: string): void {
     setTabs((prev) =>
       prev
@@ -362,9 +336,8 @@ export function App(): React.JSX.Element {
   }
 
   /**
-   * Cmd/Ctrl+数字で選んだタブは、そのタブだけを表示する。チャットの横に
-   * Markdown を添えていれば分割を解除し、Markdown はチャットのすぐ右の独立した
-   * タブに戻す（マウスでタブを選んだときは分割を保つ）。
+   * Cmd/Ctrl+数字で選んだタブだけを表示する。チャットの横に Markdown を添えていれば分割を解除し、
+   * Markdown はチャットのすぐ右の独立したタブに戻す。
    */
   function selectTabExclusively(id: string): void {
     setTabs((prev) => {
@@ -409,7 +382,7 @@ export function App(): React.JSX.Element {
     })
   }
 
-  /** ui.md §4「背景タブの通知」。変化がなければ同一参照を返し、無駄な再レンダリングを避ける。 */
+  /** 背景タブの通知状態。変化がなければ同一参照を返す。 */
   function updateTabStatus(
     sessionId: string,
     status: { sending: boolean; hasPendingPermission: boolean }
@@ -423,10 +396,7 @@ export function App(): React.JSX.Element {
     })
   }
 
-  /**
-   * ↻ で同じタブが新しい会話に移った。前の会話の記録（前の `snapshotId`）は
-   * 閉じられて履歴に並ぶので、タブ名も新しい会話の既定名に戻す。
-   */
+  /** ↻ で新しい会話に移ったタブの名前を既定名に戻す。 */
   function handleRefreshed(sessionId: string, snapshotId: string): void {
     setTabs((prev) =>
       prev.map((tab) =>
@@ -525,7 +495,7 @@ export function App(): React.JSX.Element {
               >
                 {isChatTab(tab) ? (
                   <div className="flex flex-1 overflow-hidden">
-                    {/* 右に Markdown を添えても、チャットは読める幅を保つ（足りなければ Markdown 側が縮む）。 */}
+                    {/* チャットの最小幅を保ち、足りなければ Markdown 側が縮む。 */}
                     <div className={cn('flex flex-1 flex-col overflow-hidden', tab.attachedMarkdown ? 'min-w-[320px]' : 'min-w-0')}>
                       {tab.kind === 'session' ? (
                         <SessionView

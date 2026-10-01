@@ -11,18 +11,10 @@ import { Transcript } from './Transcript'
 export type ReadOnlyKind = 'backup' | 'deleted'
 
 /**
- * 過去セッションのスナップショットを表示する。
+ * 過去セッションのスナップショットを表示する。「再開」でライブのタブに切り替えられる。
  *
- * `readOnlyKind` を渡すと、バックアップ（decisions.md C-4）／削除済み
- * （C-5）の記録を開く Read Only タブになる: 「再開」「新規開始」を両方隠し、
- * 上部バーの文言を `Backup · {日時}` / `Deleted · {日時}` に切り替える。
- * 中身を今のライブセッションへ書き戻す操作は提供しない。
- *
- * decisions.md C-1/C-2 の復元戦略表:
- * エージェントが `session/load` か `session/resume` に対応していれば
- * 「再開」で文脈ごと繋ぎ直してライブのタブに変わる。対応していない
- * （あるいはエージェント側の id を持たない古いスナップショットの）ときは
- * ここが読み取り専用のまま残り、文脈が失われていることを明示する。
+ * `readOnlyKind` を渡すと、バックアップ／削除済みの記録を開く Read Only タブになる。
+ * 「再開」「新規開始」を隠し、上部バーの文言を `Backup · {日時}` / `Deleted · {日時}` に切り替える。
  */
 export function HistoryView({
   snapshot,
@@ -37,20 +29,14 @@ export function HistoryView({
   readOnlyKind?: ReadOnlyKind
   /** `readOnlyKind` のとき上部バーに出す日時（退避・削除した時刻）。 */
   recordTimestamp?: number
-  /**
-   * ローカル記録が無く `session/list` にだけある行（decisions.md C-1/C-2 補遺）。
-   * 中身は描けないので説明だけを出し、「再開」で `session/load` のライブ
-   * replay を描いてもらう。
-   */
+  /** ローカル記録が無く `session/list` にだけある行。中身の代わりに説明を出す。 */
   agentOnly?: boolean
   onResume: () => Promise<void>
   onStartNew: () => void
   onOpenFile: (relPath: string) => void
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
-  // ライブのタブと同じ Transcript で描く（ツールコールや添付も同じ見た目になる）。
-  // 選択肢（GFM タスクリスト）の「送信」は読み取り専用では意味が無いので外し、
-  // 通常の Markdown のチェックボックスとして見せる。
+  // ライブのタブと同じ Transcript で描く。選択肢の「送信」は外し、通常のチェックボックスとして見せる。
   const state = useMemo(
     () =>
       snapshotEntriesToEvents(snapshot.entries.map((entry) => ({ ...entry, choices: undefined }))).reduce(

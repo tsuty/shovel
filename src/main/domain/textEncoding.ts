@@ -2,9 +2,7 @@ import type { LineEnding, TextEncoding } from '@shared/types/filer'
 
 /**
  * テキストファイルの文字コード・改行コードの判定と、書き戻し時の復元。
- * エディタ（textarea）は改行を LF に揃えてしまうため、読むときに LF へ
- * 正規化し、書くときにディスク上の元の改行コードと BOM へ戻す。そうしないと
- * CRLF のファイルを1文字直しただけで全行の改行が書き換わってしまう。
+ * 読むときに LF へ正規化し、書くときにディスク上の元の改行コードと BOM へ戻す。
  */
 
 const BINARY_SNIFF_BYTES = 8000
@@ -21,10 +19,7 @@ function tryDecode(label: string, bytes: Uint8Array): string | null {
   }
 }
 
-/**
- * decisions.md N-3-2: バイナリ判定は先頭数 KB の NULL バイトで行う。ただし
- * UTF-16 は NULL バイトを含むのが普通なので、BOM を先に見て振り分ける。
- */
+/** 先頭数 KB の NULL バイトでバイナリを判定する。UTF-16 は BOM を先に見て振り分ける。 */
 export function decodeText(buffer: Buffer): DecodedText {
   let encoding: TextEncoding
   let raw: string
@@ -74,7 +69,7 @@ export function detectLineEnding(text: string): LineEnding {
   return crlf > 0 ? 'CRLF' : cr > 0 ? 'CR' : 'LF'
 }
 
-/** 混在しているファイルは多い方に揃える（CR 単独は稀なので LF と CRLF だけで比べる）。 */
+/** 混在しているファイルは LF と CRLF の多い方に揃える。 */
 function dominantLineEnding(text: string): '\n' | '\r\n' {
   const crlf = text.match(/\r\n/g)?.length ?? 0
   const lf = (text.match(/\n/g)?.length ?? 0) - crlf
@@ -82,9 +77,8 @@ function dominantLineEnding(text: string): '\n' | '\r\n' {
 }
 
 /**
- * LF に揃えた編集内容を、ディスク上の既存ファイル（`existing`、新規なら null）
- * の改行コード・BOM に合わせてバイト列にする。UTF-8 で読めないファイル
- * （Shift_JIS・UTF-16 等）への上書きは、中身を壊すので拒否する。
+ * LF に揃えた編集内容を、既存ファイル（`existing`、新規なら null）の改行コード・BOM に合わせて
+ * バイト列にする。UTF-8 で読めないファイルへの上書きは拒否する。
  */
 export function encodeForWrite(content: string, existing: Buffer | null): Buffer {
   const normalized = content.replace(/\r\n?/g, '\n')

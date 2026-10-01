@@ -4,8 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { renderMermaid } from '../lib/mermaid'
 
 /**
- * ```mermaid ブロックの図をポップアップで見せる。開くたびに、その時点の
- * テーマで描き直す。文法エラーはエラー内容と元のコードを出す。
+ * ```mermaid ブロックの図をポップアップで見せる。開くたびに、その時点のテーマで描き直す。
+ * 文法エラーはエラー内容と元のコードを出す。
  */
 export function MermaidDialog({
   code,

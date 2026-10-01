@@ -1,11 +1,7 @@
 import { ShovelIcon } from './icons/ShovelIcon'
 import { cn } from '../lib/utils'
 
-/**
- * ui.md §3 Header「アプリアイコン」。resources/icon.png（アプリアイコン）と同じ意匠だが、
- * アプリ内で使う分にはラスター画像より SVG（ShovelIcon）の方が任意サイズで綺麗に出せる
- * ので、そちらを bg-primary の色付きボックスに乗せて表示する。
- */
+/** ヘッダーのアプリアイコン。ShovelIcon を bg-primary の色付きボックスに乗せて表示する。 */
 export function AppLogo({ size = 32, className }: { size?: number; className?: string }): React.JSX.Element {
   return (
     <div

@@ -21,12 +21,9 @@ import type {
 } from '@shared/types/transcript'
 
 /**
- * ACP の `session/update` / `session/request_permission` を
- * `TranscriptEvent` へ翻訳する。decisions.md N-1 「ACP → イベントへの変換ロジックは
- * 仕様として継承し、TypeScript で再実装する」。
- *
- * 1つの `SessionTranslator` が1タブ（1 ACP セッション）に対応する。
- * ブロックの id・グループの開閉など、ターンをまたぐ状態をここで保持する。
+ * ACP の `session/update` / `session/request_permission` を `TranscriptEvent` へ翻訳する。
+ * 1つの `SessionTranslator` が1タブ（1 ACP セッション）に対応し、ブロックの id・グループの
+ * 開閉など、ターンをまたぐ状態を保持する。
  */
 interface OpenBlock {
   id: string
@@ -54,21 +51,14 @@ export class SessionTranslator {
    */
   constructor(private readonly sandboxPath: string) {}
 
-  /**
-   * `session/load` は過去の会話を `session/update` として流し直す
-   * （decisions.md C-1/C-2）。replay 中だけ `user_message_chunk` を
-   * 描画対象にする: ライブのターンでは `userPrompt()` が既にユーザーの
-   * 発言を描いており、エージェントがそれをエコーし返した場合に二重に
-   * なってしまうため。
-   */
+  /** replay 中だけ `user_message_chunk` を USER ブロックとして描画する。 */
   setReplayMode(on: boolean): void {
     this.replaying = on
   }
 
   /**
-   * ユーザーが送信したプロンプトを、エージェントの返信を待たずにその場で
-   * 描画する。ui.md §7: 添付は USER ブロックにチップとして可視化する
-   * （内容は運ばず、パスのみ）。
+   * ユーザーが送信したプロンプトを、エージェントの返信を待たずに描画する。
+   * 添付は USER ブロックにチップとして載せる。
    */
   userPrompt(text: string, attachments: AttachmentChip[] = []): TranscriptEvent[] {
     const events = [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser()]
@@ -112,12 +102,10 @@ export class SessionTranslator {
       case 'plan_removed':
       case 'compaction_update':
       case 'compaction_summary_chunk':
-        // これらはセッションのメタ状態（モード・configOptions・使用量など）
-        // であり、main 側の SessionRuntime が別途キャッシュを更新する。
-        // トランスクリプト本文には流さない。
+        // メタ状態（モード・configOptions・使用量など）はトランスクリプトには流さない。
         return []
       default:
-        // 未知のバリアントはログに残して無視する（architecture.md §3）。
+        // 未知のバリアントはログに残して無視する。
         console.warn('[acp] unknown session/update variant', (update as { sessionUpdate?: string }).sessionUpdate)
         return []
     }
@@ -137,9 +125,8 @@ export class SessionTranslator {
   }
 
   /**
-   * ストリーミング中はプレーンテキストで表示し、ブロック確定後に Markdown
-   * で描画し直す（decisions.md N-1「必ず継承する挙動」）。`blockMarkdown` が
-   * その確定タイミングを運ぶ。
+   * ストリーミング中はプレーンテキストで表示し、ブロック確定時に `blockMarkdown` で
+   * Markdown として描き直す。
    */
   private finalizeAgent(): TranscriptEvent[] {
     if (!this.currentAgent) return []
@@ -171,11 +158,8 @@ export class SessionTranslator {
   }
 
   /**
-   * replay（session/load）中のユーザー発言。添付は `resource_link` のまま返って
-   * くるとは限らず、claude-agent-acp は `[@name](file://…)` という Markdown の
-   * メンションに変換したテキストとして流し直す。どちらもライブ送信時と同じ
-   * チップに戻し、本文からは取り除く（リンク文字列がそのまま USER ブロックに
-   * 出ないように）。プロジェクト外を指すものはチップにできないので本文に残す。
+   * replay 中のユーザー発言。`resource_link` と `[@name](file://…)` 形式のメンションを
+   * 添付チップに戻して本文から取り除く。プロジェクト外を指すものは本文に残す。
    */
   private appendUserChunk(content: ContentBlock, messageId: string | null): TranscriptEvent[] {
     const { text, chips } = this.extractUserAttachments(content)
@@ -257,8 +241,7 @@ export class SessionTranslator {
   private upsertToolCall(payload: ToolCall | ToolCallUpdate): TranscriptEvent[] {
     const events: TranscriptEvent[] = []
     const previous = this.toolCalls.get(payload.toolCallId)
-    // 既知のツールコールの更新は、元のグループのまま差し替える（グループが
-    // 閉じた後に届いた更新で、同じ行が新しいグループに重複して出ないように）。
+    // 既知のツールコールの更新は、元のグループのまま差し替える。
     if (!previous && this.openGroupId === null) {
       this.openGroupId = randomUUID()
       events.push({ type: 'group', id: this.openGroupId, timed: true, closed: false })
@@ -300,10 +283,8 @@ const ATTACHMENT_MENTION = /\[@[^\]]*\]\((file:\/\/[^)]*)\)/g
 const TASK_LIST_LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.+)$/
 
 /**
- * reference/Specification.md「Markdown task lists in agent responses are
- * treated as interactive choices」の実装: 確定したエージェントの返信に
- * `- [ ] 選択肢` 形式の行があれば `choices` として抜き出す。原文の Markdown
- * 自体は変更しない（チェックボックス表示は renderer 側の役割）。
+ * 確定したエージェントの返信から `- [ ] 選択肢` 形式の行を `choices` として抜き出す。
+ * 原文の Markdown は変更しない。
  */
 function extractChoices(blockId: string, markdown: string): { id: string; label: string }[] | undefined {
   const choices = markdown
@@ -348,9 +329,7 @@ function toolCallPayload(payload: ToolCall | ToolCallUpdate, groupId: string): T
   const diffs = (payload.content ?? [])
     .filter((c): c is ToolCallContent & { type: 'diff' } & Diff => c.type === 'diff')
     .map((diff) => diffToPayload(diff))
-  // ui.md §5「その他 → 標準の折り畳みアンカー」「search → ヒット一覧は展開部に」
-  // 「fetch → 取得内容のみ末尾のキャレットで展開」。ACP はこれらを diff とは別の
-  // `type: "content"` ブロックとして運んでくるので、結合してそのまま展開領域に流す。
+  // diff 以外の `type: "content"` ブロックを結合して展開領域に流す。
   const textParts = (payload.content ?? [])
     .filter((c): c is ToolCallContent & { type: 'content' } => c.type === 'content')
     .map((c) => contentBlockToText(c.content))
@@ -368,11 +347,7 @@ function toolCallPayload(payload: ToolCall | ToolCallUpdate, groupId: string): T
   }
 }
 
-/**
- * ACP の `tool_call_update` は「変わったフィールドだけ」を送ってくる。丸ごと
- * 置き換えると、status だけの更新で kind が other に、タイトルが id に戻って
- * しまうため、送られてきたフィールドだけを前回の値に重ねる。
- */
+/** `tool_call_update` で送られてきたフィールドだけを前回の値に重ねる。 */
 function mergeToolCallUpdate(previous: ToolCallPayload, payload: ToolCall | ToolCallUpdate): ToolCallPayload {
   const fresh = toolCallPayload(payload, previous.groupId)
   return {

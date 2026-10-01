@@ -3,10 +3,8 @@ import type { AppSettings } from '@shared/types/settings'
 import i18n from './i18n'
 
 /**
- * ui.md §13/§14: テーマ・文字サイズ・言語。プロジェクトマネージャとメイン
- * ウィンドウの両方（別々の renderer プロセス）から使うため共有フックにする。
- * テーマは DOM に `dark` クラスを付け外しするだけで、DOM は作り直さない
- * （ui.md §13「テーマや文字サイズの変更では DOM を作り直さない」）。
+ * テーマ・文字サイズ・言語の設定を読み、DOM に反映する共有フック。
+ * テーマは DOM に `dark` クラスを付け外しする。
  */
 export function useSettings(): {
   settings: AppSettings | null

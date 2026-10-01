@@ -15,10 +15,8 @@ type ViewState =
   | { kind: 'error'; message: string }
 
 /**
- * ui.md §9 / decisions.md N-3-1: Markdown 以外のテキストはアプリ内で閲覧のみ。
- * shiki でハイライトし行番号を付ける。編集はできない。画像はアプリ内で
- * プレビューし、それ以外のバイナリは確認のうえ OS の関連付けアプリで開く
- * （勝手には開かない）。
+ * Markdown 以外のファイルのビューア。テキストは shiki でハイライトし行番号を付けて表示する。
+ * 画像はアプリ内でプレビューし、それ以外のバイナリは OS の関連付けアプリで開くボタンを出す。
  */
 export function FileViewer({ projectId, relPath }: { projectId: string; relPath: string }): React.JSX.Element {
   const { t } = useTranslation()

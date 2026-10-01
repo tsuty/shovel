@@ -1,11 +1,7 @@
 import type { SnapshotEntry } from './types/session'
 import type { TranscriptEvent } from './types/transcript'
 
-/**
- * ローカルスナップショットの各エントリを、描画用の確定済みイベントに戻す。
- * 復元したライブのタブ（main）と、読み取り専用の履歴タブ（renderer）が
- * 同じ見た目になるよう、両方からこれを使う。
- */
+/** ローカルスナップショットの各エントリを、描画用の確定済みイベントに戻す。 */
 export function snapshotEntriesToEvents(entries: SnapshotEntry[]): TranscriptEvent[] {
   const events: TranscriptEvent[] = []
   for (const entry of entries) {

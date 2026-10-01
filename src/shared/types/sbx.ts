@@ -1,4 +1,4 @@
-/** `sbx ls --json` の1エントリ。architecture.md §7。main/renderer 双方から使う。 */
+/** `sbx ls --json` の1エントリ。 */
 export interface SbxLsEntry {
   name: string
   id: string

@@ -1,9 +1,6 @@
 /**
- * ui.md §7「追加はファイラーの右クリック→『コンテキストに追加』」。
- * ファイラーはどのセッションタブにも属さないグローバルなサイドパネルなので、
- * 「今アクティブなタブへ追加する」という操作を、タブ側（Composer を持つ
- * SessionView）が登録したハンドラへ委譲する簡易 pub-sub で実現する
- * （editorRegistry.ts と同じパターン）。
+ * ファイラーの「コンテキストに追加」を、アクティブなタブ（SessionView）が登録したハンドラへ
+ * 届ける簡易 pub-sub。
  */
 const handlers = new Map<string, (relPath: string) => void>()
 

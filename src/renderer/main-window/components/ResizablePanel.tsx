@@ -5,15 +5,10 @@ const DEFAULT_MIN_WIDTH = 160
 const DEFAULT_MAX_WIDTH = 480
 
 /**
- * ui.md §3「既定のサイズはあるが可変。サイズは記憶される」。
- * サイドバーの各サイドコンテンツ（チャット履歴/ファイラー/変更）を包み、
- * 右端のドラッグでリサイズする。確定した幅だけを `onResizeEnd` で親へ渡し、
- * 親側で `window.shovel.sidebar.setWidth` に保存する（ドラッグ中に毎回 IPC を
- * 叩かないよう、確定時のみ通知する）。
+ * 右端のドラッグで幅を変えられるパネル。確定した幅だけを `onResizeEnd` で親へ渡す。
  *
- * `edge: 'left'` は右側に置くペイン用（チャットの右に添えた Markdown）で、
- * 左端をつかんで広げる。`edge: 'top'` は下に置くドロワー用（コンソール）で、
- * 上端をつかんで高さを変える（このときの `width` / `minWidth` / `maxWidth` は高さ）。
+ * `edge: 'left'` は左端を、`edge: 'top'` は上端をつかんでリサイズする
+ * （`top` のときの `width` / `minWidth` / `maxWidth` は高さ）。
  */
 export function ResizablePanel({
   width,
@@ -36,8 +31,7 @@ export function ResizablePanel({
   const [liveWidth, setLiveWidth] = useState(width)
   const draggingRef = useRef(false)
 
-  // 幅の永続化はロード非同期のため、確定値が後から届いても反映する
-  // （ドラッグ中に上書きしないよう、ドラッグ中は無視する）。
+  // 後から届いた保存値を反映する（ドラッグ中は無視する）。
   useEffect(() => {
     if (!draggingRef.current) setLiveWidth(width)
   }, [width])

@@ -5,18 +5,12 @@ import type { CommandExit, CommandOutputChunk } from '@shared/types/command'
 import { cn } from '../../shared/lib/utils'
 
 const MAX_LINES = 2000
-/** decisions.md N-4「履歴の持ち方」: 最新20件（main 側の保存と同じ上限）。 */
+/** 履歴の表示件数。 */
 const HISTORY_LIMIT = 20
 
 /**
- * ui.md §12 / decisions.md N-4: TTY なしの対話コンソール。`vim` 等の全画面
- * アプリは動かない。`\r` で上書きされる進捗行は1行として畳み、出力行数には
- * 上限を設ける。
- *
- * 履歴（decisions.md N-4「履歴の持ち方」/ ui.md §11）: プロジェクト単位・
- * コマンド文字列のみ・MRU・最新20件。↑↓キーでの呼び戻しと、ドロワー右側の
- * 履歴一覧を併用する。どちらも入力欄に差し込むだけで、実行はユーザーが
- * 改めて Enter／実行ボタンを押すまで行わない。
+ * コマンド実行パネル。`\r` で上書きされる進捗行は1行として畳み、出力行数には上限を設ける。
+ * 履歴は ↑↓キーと右側の一覧から入力欄に呼び戻す（実行はしない）。
  */
 export function Commands({ projectId, onClose }: { projectId: string; onClose: () => void }): React.JSX.Element {
   const { t } = useTranslation()
@@ -33,12 +27,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
   const historyIndexRef = useRef(-1)
   /** 履歴を辿り始める前に入力欄にあった下書き。↓で戻ってきたときに戻す。 */
   const draftRef = useRef('')
-  /**
-   * 実行中の runId。購読側からは state ではなくこちらを見る: すぐ終わる
-   * コマンドは `command.run` の応答（=runId が分かる）より前、あるいは
-   * 再描画より前に出力・終了を送ってくることがあり、state で判定すると
-   * それを取りこぼして「実行中」のまま固まる。
-   */
+  /** 実行中の runId。出力・終了の購読側は state ではなくこちらを見る。 */
   const runIdRef = useRef<string | null>(null)
   /** runId が分かる前に届いた出力・終了。分かった時点で流し込む。 */
   const earlyRef = useRef(new Map<string, Array<CommandOutputChunk | CommandExit>>())
@@ -63,8 +52,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
         handleRunEvent(event)
         return
       }
-      // 自分がまだ runId を知らない実行のものかもしれない（他のウィンドウの
-      // 実行の分も混ざるが、どの runId も一度しか使われないので無害）。
+      // runId が未確定の実行の分として保留する。
       const early = earlyRef.current.get(event.runId) ?? []
       early.push(event)
       earlyRef.current.set(event.runId, early)
@@ -82,7 +70,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [lines])
 
-  // 実行の開始・終了で入力欄（`$` ⇔ `>`）が入れ替わるので、フォーカスを移し直す。
+  // 実行の開始・終了で入力欄にフォーカスを移し直す。
   useEffect(() => {
     inputRef.current?.focus()
   }, [runId])
@@ -125,7 +113,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
     historyIndexRef.current = -1
   }
 
-  /** 入力欄を書き換えるだけ。実行はしない（decisions.md N-4）。 */
+  /** 履歴のコマンドを入力欄に差し込む。 */
   function recall(index: number): void {
     if (historyIndexRef.current === -1) draftRef.current = command
     historyIndexRef.current = index
@@ -167,7 +155,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
 
   return (
     <div className="flex h-full flex-col border-t-2 border-border">
-      {/* 見出しバー: チャット（上）とコンソールの境目をはっきりさせる。 */}
+      {/* 見出しバー */}
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-2 py-1 text-xs">
         <SquareTerminal size={14} className="shrink-0 text-muted-foreground" />
         <span className="font-medium" title={t('commands.hint')}>
@@ -197,7 +185,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
         </button>
       </div>
       <div className="flex min-h-0 flex-1">
-        {/* 出力と入力を1つのターミナル風の面にまとめる（入力は出力の続きに打つ）。 */}
+        {/* 出力と入力をまとめたターミナル風の面。 */}
         <div
           className="flex min-w-0 flex-1 flex-col bg-terminal font-mono text-xs text-terminal-foreground"
           onClick={(e) => {
@@ -213,7 +201,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
             ))}
             <div ref={bottomRef} />
           </div>
-          {/* 入力はフォームとして見せる（出力との間に線を引き、枠のある入力欄にする）。 */}
+          {/* 入力フォーム */}
           <div className="flex shrink-0 items-center gap-2 border-t border-white/15 p-2">
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-white/20 bg-white/5 px-2 py-1.5 focus-within:border-white/50">
               <span className="select-none text-terminal-muted">{runId ? '>' : '$'}</span>
@@ -275,7 +263,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
                   >
                     {entry}
                   </button>
-                  {/* 打ち間違いも残ってしまうので、確認なしで即座に消せるようにする。 */}
+                  {/* 確認なしで即座に消す。 */}
                   <button
                     className="mr-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/history:opacity-100"
                     title={t('commands.removeHistory')}

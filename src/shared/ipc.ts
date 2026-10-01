@@ -1,14 +1,7 @@
 /**
  * main ⇔ renderer の IPC チャンネル定義。
- *
- * トランスクリプトのイベント (`TranscriptEvent`) は SAC のプロトコルをそのまま
- * 継承しているが、SAC は 1 webview = 1 セッションだったのに対し、shovel は
- * 1 ウィンドウ（1 webContents）に最大 10 タブ = 10 セッションが同居する
- * (architecture.md §1)。そのため、イベント自体には sessionId を持たせず、
- * `{ sessionId, event }` の封筒でラップして送る。main が持つ
- * `sessionId → webContents` のマップ (architecture.md §5) は「どのウィンドウに
- * 送るか」を決め、封筒の sessionId が「そのウィンドウの中のどのタブか」を
- * renderer 側で振り分ける。
+ * トランスクリプトのイベントは `{ sessionId, event }` の封筒でラップして送り、
+ * renderer 側で sessionId によってタブへ振り分ける。
  */
 
 import type { TranscriptAction, TranscriptEvent } from './types/transcript'
@@ -135,20 +128,19 @@ export interface SessionEnvelope {
   event: TranscriptEvent
 }
 
-/** ui.md §2「プロジェクトの詳細」の診断情報。まとめてクリップボードにコピーできる。 */
+/** プロジェクトの詳細の診断情報。 */
 export interface ProjectDiagnostics {
   project: Project
   diagnoseOutput: string
   sbxLsEntry: SbxLsEntry | null
   /**
-   * decisions.md N-2-6「診断情報画面」。このプロジェクトが最後に開いたセッション
-   * の `src/main/log.ts` ログファイルから、ACP トラフィック（`IN`/`OUT` 行）と
-   * エージェントの `stderr`（`STDERR` 行）をそれぞれ抜き出したもの。末尾側を
-   * `RECENT_LOG_LINES` 行に切り詰める。一度もセッションを開いていなければ `null`。
+   * 最後に開いたセッションのログファイルから抜き出した ACP トラフィック（`IN`/`OUT` 行）と
+   * エージェントの `stderr`（`STDERR` 行）。末尾側を `RECENT_LOG_LINES` 行に切り詰める。
+   * 一度もセッションを開いていなければ `null`。
    */
   acpTrafficLog: string | null
   stderrLog: string | null
-  /** ログ／セッションキャッシュ（スナップショット）の置き場。全プロジェクト共通の1ディレクトリ。 */
+  /** ログ／セッションキャッシュ（スナップショット）の置き場。 */
   logsDir: string
   snapshotsDir: string
 }
@@ -157,8 +149,7 @@ export interface ProjectDiagnostics {
 export type DataDirKind = 'logs' | 'snapshots'
 
 export interface RendererApi {
-  /** ui.md §3「切り替えショートカットを『修飾キー + 0〜9』に割り当てる」の
-   * 修飾キーを OS ごとに出し分けるために使う（macOS は Cmd、それ以外は Ctrl）。 */
+  /** タブ切り替えショートカットの修飾キーを出し分けるための OS 種別。 */
   platform: NodeJS.Platform
   app: {
     openProjectManager(): Promise<void>
@@ -166,11 +157,11 @@ export interface RendererApi {
   settings: {
     get(): Promise<AppSettings>
     update(patch: Partial<AppSettings>): Promise<AppSettings>
-    /** どのウィンドウで変えても、開いている全ウィンドウに即座に反映する。 */
+    /** 変更は開いている全ウィンドウに反映する。 */
     onChanged(cb: (settings: AppSettings) => void): () => void
   }
   sidebar: {
-    /** ui.md §3「サイズは記憶される」。パネル id(tabs/filer) ごとの幅(px)。 */
+    /** パネル id(tabs/filer) ごとの幅(px)。 */
     getWidths(): Promise<Record<string, number>>
     setWidth(panel: string, width: number): Promise<void>
   }
@@ -195,8 +186,7 @@ export interface RendererApi {
     openTerminal(id: string): Promise<void>
     /**
      * ログ／セッションキャッシュのディレクトリを OS のファイルマネージャーで開く。
-     * ログは全プロジェクト共通のディレクトリなので、このプロジェクトの最新の
-     * ログファイルがあればそれを選択した状態で開く。
+     * このプロジェクトの最新のログファイルがあれば、それを選択した状態で開く。
      */
     openDataDir(id: string, kind: DataDirKind): Promise<void>
     onProgress(cb: (p: ProjectProgress) => void): () => void
@@ -205,17 +195,14 @@ export interface RendererApi {
     list(): Promise<AgentEntry[]>
   }
   session: {
-    /**
-     * `sessionId` はタブ id、`snapshotId` はそのタブがいま書き込んでいる
-     * スナップショットの id（↻ で変わる。`OpenedSession.snapshotId` 参照）。
-     */
+    /** `sessionId` はタブ id、`snapshotId` はそのタブがいま書き込んでいるスナップショットの id。 */
     openTab(projectId: string): Promise<{ sessionId: string; snapshotId: string; meta: SessionMeta }>
-    /** 過去のセッションを session/load か session/resume で本当に再開する。 */
+    /** 過去のセッションを session/load か session/resume で再開する。 */
     resumeTab(
       projectId: string,
       snapshotSessionId: string
     ): Promise<{ sessionId: string; snapshotId: string; meta: SessionMeta }>
-    /** 「エージェントのみ」の行（ローカル記録が無い）を再開する。decisions.md C-1/C-2 補遺。 */
+    /** 「エージェントのみ」の行（ローカル記録が無い）を再開する。 */
     resumeAgentSession(
       projectId: string,
       acpSessionId: string,
@@ -230,25 +217,19 @@ export interface RendererApi {
     setConfigOption(sessionId: string, configId: string, value: string | boolean): Promise<void>
     dispatch(action: TranscriptAction): Promise<void>
     onEvent(cb: (envelope: SessionEnvelope) => void): () => void
-    /** 履歴一覧（`session/list` とローカル記録の和集合）。decisions.md C-1/C-2 補遺。 */
+    /** 履歴一覧（`session/list` とローカル記録の和集合）。 */
     listHistory(projectId: string): Promise<HistoryListing>
     /** 引数はスナップショット id（開いているタブならその `snapshotId`）。 */
     rename(projectId: string, snapshotId: string, title: string): Promise<void>
-    /** decisions.md C-5: ソフトデリート（`.deleted` へ退避。バックアップも一緒に）。 */
+    /** ソフトデリート（`.deleted` へ退避。バックアップも一緒に）。 */
     deleteHistory(projectId: string, target: { snapshotId?: string; acpSessionId?: string }): Promise<void>
     /** 現在・バックアップ・削除済みを含む、このプロジェクトの全ローカル記録の要約。 */
     listLocalRecords(projectId: string): Promise<LocalRecordSummary[]>
     /** ファイル名で指定したローカル記録（バックアップ・削除済みを含む）を読む。 */
     readLocalRecord(projectId: string, fileName: string): Promise<SessionSnapshot | null>
-    /**
-     * decisions.md C-6: ローカルセッション検索。新しい検索に追い越された
-     * ときは null（呼び出し側は結果を捨てる）。
-     */
+    /** ローカルセッション検索。新しい検索に追い越されたときは null。 */
     searchLocal(projectId: string, query: string, includeDeleted: boolean): Promise<LocalSearchResult[] | null>
-    /**
-     * 履歴一覧を取り直すべきときの通知（引数は projectId）: バックアップが
-     * 作られた、ターンの記録が保存された。
-     */
+    /** 履歴一覧を取り直すべきときの通知（引数は projectId）。 */
     onLocalRecordsChanged(cb: (projectId: string) => void): () => void
   }
   fs: {

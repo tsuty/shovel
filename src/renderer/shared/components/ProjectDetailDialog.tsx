@@ -11,12 +11,10 @@ import {
 import { Button } from './ui/button'
 
 /**
- * ui.md §2「プロジェクトの詳細」。基本情報・操作（停止/OSターミナル）・
- * 診断情報（`sbx diagnose` 出力、ACP トラフィックログ、エージェントの stderr、
- * `sbx ls --json` の該当エントリ）をまとめ、丸ごとクリップボードにコピー
- * できる（decisions.md N-2-6）。ACP トラフィックログ・stderr は最後に開いた
- * セッションのログファイル（`src/main/log.ts`）から読む — 一度もセッションを
- * 開いていないプロジェクトでは `null` になり、その節はそもそも表示しない。
+ * プロジェクトの詳細ダイアログ。基本情報・操作（停止/OSターミナル）・診断情報（`sbx diagnose` 出力、
+ * ACP トラフィックログ、エージェントの stderr、`sbx ls --json` の該当エントリ）をまとめ、
+ * 丸ごとクリップボードにコピーできる。ログは最後に開いたセッションのログファイルから読み、
+ * 無ければその節は表示しない。
  */
 export function ProjectDetailDialog({
   projectId,
@@ -137,7 +135,7 @@ export function ProjectDetailDialog({
   )
 }
 
-/** 全プロジェクト共通のディレクトリなので、パスを見せたうえで OS のファイルマネージャーで開く導線を置く。 */
+/** ディレクトリのパスと、OS のファイルマネージャーで開くボタンを表示する。 */
 function DataDirRow({ path, onOpen }: { path: string; onOpen: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   return (

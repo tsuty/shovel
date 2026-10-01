@@ -5,12 +5,8 @@ import { projectsStore, commandHistoryStore } from '../persistence/store'
 import type { Project } from '@shared/types/project'
 
 /**
- * コマンド実行パネル（下付き）。decisions.md N-4: `sbx exec -i`（TTY なし）＋
- * 入力欄＋中断ボタン。`vim` 等の全画面アプリは動かない。ユーザーが打つコマンドは
- * シェル構文（`&&` 等）を使いたいはずなので、サンドボックス**内**の `/bin/sh -lc`
- * に丸ごと渡す。host 側では `spawn(..., { shell: false })` のままであり
- * （architecture.md §3 の禁止事項はホストでシェル文字列を組み立てないことを指す）、
- * シェル解釈はサンドボックス内で完結する。
+ * コマンド実行パネルのバックエンド。入力されたコマンドを `sbx exec -i` でサンドボックス内の
+ * `/bin/sh -lc` に渡して実行し、出力を流す。
  */
 
 // eslint-disable-next-line no-control-regex
@@ -70,7 +66,7 @@ export function commandHistory(projectId: string): string[] {
   return commandHistoryStore.get(projectId)
 }
 
-/** 履歴から1件消す（打ち間違いを残さないため。確認は取らない）。消した後の一覧を返す。 */
+/** 履歴から1件消し、消した後の一覧を返す。 */
 export function removeCommandHistory(projectId: string, command: string): string[] {
   return commandHistoryStore.remove(projectId, command)
 }

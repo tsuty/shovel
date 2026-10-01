@@ -10,10 +10,7 @@ import {
 } from '../../shared/components/ui/dialog'
 import { Button } from '../../shared/components/ui/button'
 
-/**
- * 「チャットの横に表示」の添え先が1つに決まらないとき（今のタブがチャットで
- * なく、チャット／履歴タブが複数ある）に、どれに添えるかを選ばせる。
- */
+/** 「チャットの横に表示」の添え先となるチャット／履歴タブを選ばせる。 */
 export function AttachTargetDialog({
   relPath,
   chatTabs,

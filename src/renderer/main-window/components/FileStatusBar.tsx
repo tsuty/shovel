@@ -9,8 +9,7 @@ export function formatFileSize(bytes: number): string {
 
 /**
  * テキストファイル（閲覧・Markdown エディタ）の下端に出すステータスバー。
- * ファイルサイズ・文字コード・改行コードを示す。Windows で作られた CRLF や
- * Shift_JIS のファイルに気づけるようにするためのもの。
+ * ファイルサイズ・文字コード・改行コードを示す。
  */
 export function FileStatusBar({
   size,
@@ -21,7 +20,7 @@ export function FileStatusBar({
   size: number
   encoding: TextEncoding
   lineEnding: LineEnding
-  /** Markdown エディタで、書き戻すと中身が壊れる文字コードのため編集できないとき。 */
+  /** 書き戻せない文字コードのため編集できないとき。 */
   readOnly?: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()

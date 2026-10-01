@@ -3,10 +3,7 @@ import { IpcChannel, type ProjectProgress, type RendererApi, type SessionEnvelop
 import type { CommandExit, CommandOutputChunk } from '@shared/types/command'
 import type { AppSettings } from '@shared/types/settings'
 
-/**
- * `contextBridge` で型付き API のみを renderer に公開する。Node の API を
- * 直接渡さない（architecture.md §2 / §5）。
- */
+/** `contextBridge` で型付き API を renderer に公開する。 */
 const api: RendererApi = {
   platform: process.platform,
   app: {

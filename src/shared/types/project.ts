@@ -1,7 +1,4 @@
-/**
- * ドメインモデル。docs/design/data-model.md §1-2 を参照。
- * main/renderer の双方から参照される、値のみの型定義。
- */
+/** ドメインモデル。main/renderer の双方から参照される、値のみの型定義。 */
 
 export type SandboxStatus = 'running' | 'stopped' | 'missing' | 'workspace_missing'
 
@@ -24,7 +21,7 @@ export interface Project {
   createdAt: number
 }
 
-/** `sbx ls --json` と shovel の設定を突き合わせた結果。data-model.md §5。 */
+/** `sbx ls --json` と shovel の設定を突き合わせた結果。 */
 export interface ProjectWithStatus extends Project {
   status: SandboxStatus
 }
@@ -35,7 +32,7 @@ export type AuthMethod =
   | { type: 'acp-authenticate'; methodId: string }
   | { type: 'agent-command'; argv: string[] }
 
-/** エージェント対応表のエントリ。data-model.md §2 / decisions.md N-2-5, N-2-7b。 */
+/** エージェント対応表のエントリ。 */
 export interface AgentEntry {
   id: string
   label: string

@@ -1,11 +1,6 @@
 import type { Highlighter } from 'shiki'
 
-/**
- * ui.md §9「シンタックスハイライトは shiki を採用する」。
- * `shiki` の既定エクスポート（フルバンドル）は全言語・全テーマを対象に
- * コード分割するため、チャンク数が肥大化する。ここでは実際に使う言語だけを
- * 指定した highlighter をシングルトンで生成する。
- */
+/** 実際に使う言語だけを指定した shiki の highlighter をシングルトンで生成する。 */
 const LANGS = [
   'javascript',
   'jsx',
@@ -46,14 +41,6 @@ function getHighlighter(): Promise<Highlighter> {
   }
   return highlighterPromise
 }
-
-// メモ（バンドルサイズの最適化余地）: `shiki` の既定エクスポートは全言語を指す
-// 動的 import テーブルを内包しているため、`langs` を絞ってもビルド時には
-// 全言語ぶんのチャンクが出力される（実行時に読み込まれるのは実際に使う言語
-// だけなので機能上の問題は無い）。チャンク数を削るには `shiki/core` +
-// `shiki/engine/*` + `shiki/langs/*.mjs` を個別に静的 import する
-// "fine-grained bundle" 構成への切り替えが要るが、配布サイズの最適化であり
-// 動作には影響しないため後回しにしている。
 
 const EXT_TO_LANG: Record<string, string> = {
   js: 'javascript',
@@ -107,9 +94,8 @@ export function langFromFilename(name: string): string {
 }
 
 /**
- * ライト／ダーク両方の配色を1回で出力する（ダーク側は `--shiki-dark*` の CSS
- * 変数に入り、globals.css が `.dark` のときに切り替える）。表示中にテーマを
- * 変えても再ハイライトは要らない。
+ * ライト／ダーク両方の配色を1回で出力する（ダーク側は `--shiki-dark*` の CSS 変数に入り、
+ * globals.css が `.dark` のときに切り替える）。
  */
 export async function highlightToHtml(code: string, lang: string): Promise<string> {
   const highlighter = await getHighlighter()

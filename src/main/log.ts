@@ -4,11 +4,7 @@ import { mkdir, readdir, rename, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { safeProjectSegment } from './persistence/snapshot'
 
-/**
- * ACP トラフィックログとエージェントの stderr。data-model.md §5 /
- * decisions.md N-2-6「診断情報画面」の材料になる。
- * SAC 方式のフォーマット: `{ms} {OUT|IN} {raw JSON}`。
- */
+/** ACP トラフィックログとエージェントの stderr。フォーマット: `{ms} {OUT|IN} {raw JSON}`。 */
 
 function logsRootDir(): string {
   return path.join(app.getPath('userData'), 'logs')
@@ -25,9 +21,8 @@ export function logsDir(projectId: string): string {
 const FLAT_LOG_RE = /^(\d+)_([^_]+)_(.+\.log)$/
 
 /**
- * 以前は全プロジェクト共通の `userData/logs` 直下にファイル名へ projectId を
- * 刻んで置いていた。起動時に1回、プロジェクトごとのディレクトリへ移す
- * （`{ms}_{sessionId}.log` に改名）。移し先に同名があれば触らない。
+ * 旧形式（`userData/logs` 直下）のログを、プロジェクトごとのディレクトリへ
+ * `{ms}_{sessionId}.log` として移す。移し先に同名があれば触らない。
  */
 export async function migrateFlatLogs(): Promise<void> {
   const root = logsRootDir()
@@ -60,10 +55,7 @@ export class SessionLogger {
   private readonly stream: WriteStream
   private readonly stderrRing: string[] = []
 
-  /**
-   * プロジェクトのディレクトリに `{ms}_{sessionId}.log` として書く。プロジェクト
-   * 詳細ダイアログ（decisions.md N-2-6）はそのディレクトリの最新のファイルを読む。
-   */
+  /** プロジェクトのディレクトリに `{ms}_{sessionId}.log` として書く。 */
   constructor(
     readonly sessionId: string,
     readonly projectId: string
@@ -76,7 +68,7 @@ export class SessionLogger {
     this.stream.write(`${Date.now()} ${direction} ${raw}\n`)
   }
 
-  /** 不具合調査用の補足（`{ms} DEBUG {text}`）。診断情報ダイアログには出さない。 */
+  /** デバッグ用の補足（`{ms} DEBUG {text}`）。 */
   logDebug(text: string): void {
     this.stream.write(`${Date.now()} DEBUG ${text}\n`)
   }

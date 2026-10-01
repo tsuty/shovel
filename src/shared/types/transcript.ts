@@ -1,12 +1,6 @@
 /**
- * トランスクリプトの IPC 契約（main ⇔ renderer）。
- * SAC (docs/reference/) のプロトコルを継承する。docs/design/data-model.md §6、
- * docs/design/decisions.md N-1 を参照。ACP の生イベントを UI が扱える語彙に翻訳した中間表現。
- *
- * SAC からの意図的な差分が1点ある: SAC はホスト(JVM)側で Markdown→HTML 変換まで
- * 行ってから `html` を送っていたが、decisions.md N-1 の決定により shovel は
- * その変換を `react-markdown` に置き換えてレンダラ側で行う。そのためここでは
- * `html` ではなく `markdown`（生テキスト）を運ぶ。
+ * トランスクリプトの IPC 契約（main ⇔ renderer）。ACP の生イベントを UI が扱える語彙に翻訳した中間表現。
+ * ブロックの本文は `markdown`（生テキスト）で運び、renderer 側で描画する。
  */
 
 import type { ConfigOption, SessionCommand, SessionMode, SessionUsage } from './session'
@@ -80,11 +74,7 @@ export type TranscriptEvent =
       id: string
       markdown: string
       choices?: { id: string; label: string }[]
-      /**
-       * AGENT ブロックのときだけ、ACP の `messageId`（あれば）を運ぶ。renderer は
-       * 使わない。main 側のスナップショット蓄積が `SnapshotEntry.messageId` と
-       * して保存するためのもの（decisions.md C-4 の比較に使う）。
-       */
+      /** AGENT ブロックのときだけ、ACP の `messageId`（あれば）を運ぶ。スナップショットの保存に使う。 */
       messageId?: string
     }
   | { type: 'attachments'; id: string; chips: AttachmentChip[] }
@@ -104,22 +94,14 @@ export type TranscriptEvent =
   | { type: 'toast'; text: string }
   /**
    * トランスクリプトに差し込む控えめな地の文（SYSTEM ブロックと同じ見た目）。
-   * 文言は renderer 側の i18n で `transcript.notice.{key}` から引く
-   * （main はロケールを知らないため、キーだけを運ぶ）。
-   *   - `replayAdopted`: decisions.md C-4。`session/load` の replay とローカル
-   *     記録が食い違ったため、ローカルをバックアップへ退避して表示を
-   *     エージェント側の記録に置き換えた。
+   * 文言は renderer 側の i18n で `transcript.notice.{key}` から引く。
+   *   - `replayAdopted`: `session/load` の replay とローカル記録が食い違ったため、
+   *     ローカルをバックアップへ退避して表示をエージェント側の記録に置き換えた。
    */
   | { type: 'notice'; id: string; key: 'replayAdopted' }
   /**
-   * ui.md §8「Mode / Model は session/new が返す modes / configOptions から
-   * 構成する」の実装: `current_mode_update` / `config_option_update` を
-   * 受け取るたびに、その時点の状態を丸ごと送り renderer 側のセレクタを
-   * 差し替える（このプロトコルのバージョンでは両方とも常に完全な状態を
-   * 運ぶ。data-model.md §6 の部分マージの注記は当時の想定であり、実装した
-   * SDK スキーマでは該当しない）。`usage_update` / `available_commands_update`
-   * も同じ経路に相乗りさせ、受信するたびに直近の状態で `usage` / `commands`
-   * を丸ごと置き換える。
+   * セッションのメタ状態（モード・configOptions・使用量・利用可能コマンド）。
+   * 更新を受け取るたびに、その時点の状態を丸ごと送る。
    */
   | {
       type: 'sessionMeta'

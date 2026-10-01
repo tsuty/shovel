@@ -9,23 +9,17 @@ import { highlightToHtml, langFromFence } from '../lib/shiki'
 import { cn } from '../lib/utils'
 
 /**
- * decisions.md D-5: Markdown エディタのプレビューとトランスクリプトは
- * 同じレンダラ（`react-markdown` + `remark-gfm`）を共有する。
+ * Markdown エディタのプレビューとトランスクリプト共通のレンダラ（`react-markdown` + `remark-gfm`）。
  *
- * リンクはウィンドウ内では決して遷移させない（遷移するとアプリの画面そのものが
- * 置き換わる）。`http(s)` / `mailto` だけを外部ブラウザ等で開き、プロジェクト内の
- * 相対パスは呼び出し側が渡した `onOpenFileLink` で開く。それ以外（`file://`・
- * 絶対パス・未知のスキーム）はリンクにせず、文字として見せる。
- * 以前は対象外の URL の href を空にしていたが、`href=""` のクリックは現在の
- * ページの再読み込みになり、ウィンドウの状態が失われていた。
+ * `http(s)` / `mailto` は外部で開き、プロジェクト内の相対パスは `onOpenFileLink` で開く。
+ * それ以外（`file://`・絶対パス・未知のスキーム）はリンクにせず、文字として見せる。
  */
 const EXTERNAL_LINK = /^(https?:|mailto:)/i
 
 /** スキームを持たない相対パス（`#` だけのページ内リンク・`//host`・`/abs` は除く）。 */
 function asProjectRelativePath(href: string): string | null {
   if (!href || href.startsWith('#') || href.startsWith('/')) return null
-  // `foo.ts:12` / `foo.ts#L12` の行指定と、クエリは落とす（`README.md:3` が
-  // スキーム付きの URL に見えないよう、スキームの判定より先に落とす）。
+  // `foo.ts:12` / `foo.ts#L12` の行指定とクエリを、スキームの判定より先に落とす。
   const pathPart = href.replace(/[?#].*$/, '').replace(/:\d+(?::\d+)?$/, '')
   if (/^[a-z][a-z0-9+.-]*:/i.test(pathPart)) return null
   const normalized = pathPart.replace(/^\.\//, '')
@@ -60,14 +54,8 @@ function fenceLanguage(code: HastNode | undefined): string | null {
 }
 
 /**
- * reference/TRANSCRIPT_WEBVIEW.md「コピー用ボタンは pre の中ではなく、
- * それを包むラッパーの上に載せる」: pre は横スクロールするため、中に
- * 置くとボタンがコードと一緒に流れてしまう。
- *
- * 言語の指定があるフェンスは shiki でハイライトする（ファイルビューアと同じ
- * ハイライタ）。ハイライトは非同期なので、終わるまでは素のコードを見せる。
- * Markdown として描くのは確定したブロックだけなので、ストリーミング中に
- * 何度もハイライトし直すことはない。
+ * コードブロック。コピー用ボタンは横スクロールする pre ではなく、それを包むラッパーの上に載せる。
+ * 言語の指定があるフェンスは shiki で非同期にハイライトし、終わるまでは素のコードを見せる。
  */
 /** これより長いコードブロックは、トランスクリプトでは最初の数行だけを見せて畳む。 */
 const COLLAPSED_LINES = 5
@@ -103,7 +91,7 @@ function CodeBlock({
   const toggleRef = useRef<HTMLButtonElement>(null)
   /** 畳んだときの高さ（px）。行の高さは文字サイズの設定で変わるので実測する。 */
   const [foldedHeight, setFoldedHeight] = useState<number | null>(null)
-  /** 開閉の直前のトグルの画面上の位置。開閉後にこの位置へ戻す（読んでいる場所が飛ばないように）。 */
+  /** 開閉の直前のトグルの画面上の位置。開閉後にこの位置へ戻す。 */
   const toggleTopRef = useRef<number | null>(null)
 
   useLayoutEffect(() => {
@@ -111,13 +99,12 @@ function CodeBlock({
     const pre = clipRef.current?.querySelector('pre')
     if (!pre) return
     const measure = (): void => {
-      // 計算上の line-height は、pre と code の文字サイズの違いで実際の行送りと
-      // ずれるので、描画された高さを行数で割って実際の行送りを求める。
+      // 描画された高さを行数で割って実際の行送りを求める。
       const style = getComputedStyle(pre)
       const paddingTop = parseFloat(style.paddingTop)
       const contentHeight = pre.scrollHeight - paddingTop - parseFloat(style.paddingBottom)
       const lineHeight = contentHeight / lineCount
-      // 5行ははっきり見せ、6行目の上端だけを下端のフェードに覗かせて続きがあると示す。
+      // 5行を見せ、6行目の上端だけを下端のフェードに覗かせる。
       setFoldedHeight(Math.round(paddingTop + lineHeight * (COLLAPSED_LINES + 0.5)))
     }
     measure()
@@ -150,7 +137,7 @@ function CodeBlock({
         if (!cancelled) setHtml(result)
       })
       .catch(() => {
-        // ハイライトできなくても素のコードは見えているので、そのままにする。
+        // ハイライトできなければ素のコードのままにする。
       })
     return () => {
       cancelled = true
@@ -164,8 +151,7 @@ function CodeBlock({
   }
 
   return (
-    // 畳めるブロックは pre の上下マージンを外側へ移す（切り取る範囲にマージンが
-    // 入ると、見える行数がその分だけ減る）。
+    // 畳めるブロックは pre の上下マージンを外側へ移す。
     <div className={cn('group/code relative', foldable && 'my-[0.5em]')}>
       <div
         ref={clipRef}
@@ -194,7 +180,7 @@ function CodeBlock({
         </button>
       )}
       {isMermaid && (
-        // 図は自動では描かないので、補助的なコピーとは違い、常に見える目立つボタンにする。
+        // 図を開くボタンは常に表示する。
         <button
           className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md px-2.5 py-1 font-sans text-xs font-medium text-white shadow-sm hover:brightness-110"
           style={{ backgroundColor: MERMAID_BRAND_COLOR }}
@@ -245,7 +231,7 @@ function MarkdownLink({
   }
   const relPath = onOpenFileLink ? asProjectRelativePath(target) : null
   if (relPath && onOpenFileLink) {
-    // href を持たせない（中クリック等で別ウィンドウ扱いの遷移が起きないように）。
+    // href を持たせない。
     return (
       <button type="button" className="markdown-file-link" title={relPath} onClick={() => onOpenFileLink(relPath)}>
         {children}
@@ -276,9 +262,7 @@ export function Markdown({
     <div className={`markdown ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        // リンクの判定は MarkdownLink で行うので href だけ素通しにする（既定の変換は
-        // 未知のスキームを空にしてしまい、空の href はページの再読み込みになる）。
-        // 画像の src などは既定の無害化のまま。
+        // リンクの判定は MarkdownLink で行うので href は素通しにする。画像の src などは既定の無害化のまま。
         urlTransform={(uri, key) => (key === 'href' ? uri : defaultUrlTransform(uri))}
         components={{
           pre: ({ node, ...props }) => (

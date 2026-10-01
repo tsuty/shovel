@@ -24,10 +24,7 @@ import { MenuItem } from './MenuItem'
 
 interface FsNode extends FsEntry {
   children?: FsNode[]
-  /**
-   * decisions.md N-3-9: `readdir` に失敗したディレクトリの下に置く「…」の
-   * 1行。実在するファイルではないので、開く・右クリック・D&D の対象にしない。
-   */
+  /** `readdir` に失敗したディレクトリの下に置く「…」の1行。開く・右クリック・D&D の対象にしない。 */
   placeholder?: true
 }
 
@@ -46,17 +43,12 @@ interface ClipboardEntry {
   relPath: string
   /**
    * アプリ内で「コピー」した時点で OS のクリップボードにあったファイル一覧。
-   * 貼り付け時に OS 側の一覧がこれと違えば、その後に Finder 等でコピーされた
-   * とみなし、そちら（アプリ外のファイル）を貼り付ける。
+   * 貼り付け時に OS 側の一覧がこれと違えば、アプリ外のファイルを貼り付ける。
    */
   osSignature: string
 }
 
-/**
- * 一覧を読み直したとき、残っているディレクトリの読み込み済みの中身を引き継ぐ。
- * 引き継がないと、展開済みのサブフォルダが空の `children` で上書きされる一方
- * 「読み込み済み」の印は残り、開き直しても再読込されずに空に見える。
- */
+/** 一覧を読み直したとき、残っているディレクトリの読み込み済みの中身を引き継ぐ。 */
 function mergeLoadedChildren(fresh: FsNode[], previous: FsNode[] | undefined): FsNode[] {
   if (!previous) return fresh
   const byPath = new Map(previous.map((node) => [node.relPath, node]))
@@ -66,7 +58,7 @@ function mergeLoadedChildren(fresh: FsNode[], previous: FsNode[] | undefined): F
   })
 }
 
-/** ui.md §9「OS のファイラーで開く」の文言は OS に合わせる。 */
+/** 「OS のファイラーで開く」の文言を OS に合わせて返す。 */
 function openInOsLabelKey(): string {
   if (window.shovel.platform === 'darwin') return 'filer.openInFinder'
   if (window.shovel.platform === 'win32') return 'filer.openInExplorer'
@@ -104,10 +96,8 @@ function targetDirFor(node: FsNode | null): string {
 }
 
 /**
- * ui.md §9 / decisions.md N-3-4, N-3-5: `react-arborist` による遅延展開の
- * ファイルツリー。`.gitignore` 対象は薄く表示し、`.git` は常に非表示。
- * 見出しの更新ボタンで、展開中のフォルダを読み直す（外部での変更の反映用）。
- * アプリ外（Finder 等）からの貼り付け・ドロップはコピーとして取り込む。
+ * `react-arborist` による遅延展開のファイルツリー。`.gitignore` 対象は薄く表示する。
+ * 見出しの更新ボタンで展開中のフォルダを読み直す。アプリ外からの貼り付け・ドロップはコピーとして取り込む。
  */
 export function Filer({
   projectId,
@@ -119,16 +109,13 @@ export function Filer({
   projectId: string
   onOpenFile: (relPath: string, isMarkdown: boolean) => void
   onAddToContext: (relPath: string) => void
-  /** Markdown を今のチャットタブの右に添える（ui.md §3「分割表示」）。 */
+  /** Markdown を今のチャットタブの右に添える。 */
   onAttachMarkdown: (relPath: string) => void
   canAttachMarkdown: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [data, setDataState] = useState<FsNode[]>([])
-  /**
-   * ツリーの最新値。読み直し（`loadDir`）は直前の中身を引き継ぐ計算を伴うため、
-   * state の更新関数の中ではなく、ここを正として同期的に計算する。
-   */
+  /** ツリーの最新値。読み直しの計算はここを基準に同期的に行う。 */
   const dataRef = useRef<FsNode[]>([])
   function setData(next: FsNode[]): void {
     dataRef.current = next
@@ -162,9 +149,7 @@ export function Filer({
     try {
       entries = await window.shovel.fs.list(projectId, relPath)
     } catch {
-      // decisions.md N-3-9: 権限エラー・Windows の MAX_PATH・その他 OS 由来の
-      // 失敗を区別せず、淡色の「…」を1行出すだけにする（ダイアログや通知は
-      // 出さない）。読み込み済みにはしないので、開き直せば再試行する。
+      // 失敗したら淡色の「…」を1行出す。読み込み済みにはしないので、開き直せば再試行する。
       if (relPath !== '') setData(replaceChildren(dataRef.current, relPath, [unreadablePlaceholder(relPath)]))
       return []
     }
@@ -174,9 +159,7 @@ export function Filer({
       relPath === '' ? current : findNode(current, relPath)?.children
     )
     setData(relPath === '' ? nodes : replaceChildren(current, relPath, nodes))
-    // 中身を引き継いだサブフォルダ以外（消えた・新しく現れたもの）の配下は
-    // 「読み込み済み」の印を外す（同名で作り直されたフォルダを空のまま
-    // 読み込み済み扱いにしないため）。
+    // 中身を引き継いだサブフォルダ以外の配下は「読み込み済み」の印を外す。
     const keptDirs = new Set(nodes.filter((node) => node.isDir && node.children?.length).map((node) => node.relPath))
     setLoadedDirs((prev) => {
       const prefix = relPath ? `${relPath}/` : ''
@@ -274,10 +257,7 @@ export function Filer({
     setMenu(null)
   }
 
-  /**
-   * アプリ内でのコピーより後に Finder 等でファイルがコピーされていれば、そちらを
-   * 貼り付ける（プロジェクト内へコピーとして取り込む）。
-   */
+  /** アプリ内でのコピーより後に OS 側でファイルがコピーされていれば、そちらを貼り付ける。 */
   function externalFilesToPaste(): string[] {
     if (osClipboardFiles.length === 0) return []
     if (clipboard && clipboard.osSignature === osClipboardFiles.join('\n')) return []
@@ -318,7 +298,7 @@ export function Filer({
     return targetDirFor(node && !node.placeholder ? node : null)
   }
 
-  /** ui.md §9: Finder 等からのドロップは、プロジェクト内へのコピーとして取り込む。 */
+  /** アプリ外からのドロップを、プロジェクト内へのコピーとして取り込む。 */
   async function handleExternalDrop(e: React.DragEvent): Promise<void> {
     setDropTarget(null)
     const files = Array.from(e.dataTransfer.files)
@@ -538,8 +518,7 @@ function FilerRow({
           className="min-w-0 flex-1 rounded border border-input bg-background px-1"
           onClick={(e) => e.stopPropagation()}
           onFocus={(e) => {
-            // OS のファイラーと同じ慣習: ファイルは拡張子を除いた部分だけを
-            // 選択状態にし、そのままタイプすれば拡張子が保たれるようにする。
+            // ファイルは拡張子を除いた部分だけを選択状態にする。
             const dot = entry.isDir ? -1 : entry.name.lastIndexOf('.')
             if (dot > 0) e.target.setSelectionRange(0, dot)
             else e.target.select()
@@ -547,8 +526,7 @@ function FilerRow({
           onCompositionStart={() => (composingRef.current = true)}
           onCompositionEnd={() => (composingRef.current = false)}
           onKeyDown={(e) => {
-            // decisions.md G-1-5 と同じ: IME 変換中の Enter / Escape は変換の
-            // 確定・取消であって、名前の確定・取消ではない。
+            // IME 変換中の Enter / Escape は無視する。
             if (composingRef.current || e.nativeEvent.isComposing) return
             if (e.key === 'Enter') onCommitRename((e.target as HTMLInputElement).value)
             if (e.key === 'Escape') onCommitRename(entry.name)

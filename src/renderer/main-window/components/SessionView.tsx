@@ -28,7 +28,7 @@ export function SessionView({
   initialMeta: SessionMeta
   initialAttachments?: string[]
   onOpenFile: (relPath: string) => void
-  /** ui.md §4「背景タブの通知」。TabBar が非アクティブなタブに反映する。 */
+  /** 背景タブの通知状態。TabBar が非アクティブなタブに反映する。 */
   onStatusChange?: (status: { sending: boolean; hasPendingPermission: boolean }) => void
   /** ↻ の完了。新しい会話の書き込み先スナップショット id を渡す。 */
   onRefreshed?: (snapshotId: string) => void
@@ -51,8 +51,7 @@ export function SessionView({
     })
   }, [sessionId])
 
-  // ui.md §7: ファイラーの右クリック「コンテキストに追加」を、今アクティブな
-  // セッションのチップへ反映させるための購読。
+  // ファイラーの「コンテキストに追加」を、このセッションの添付チップへ反映する。
   useEffect(() => {
     return registerAttachHandler(sessionId, (relPath) => {
       setAttachments((prev) => (prev.some((c) => c.path === relPath) ? prev : [...prev, chipFromRelPath(relPath)]))
@@ -60,18 +59,14 @@ export function SessionView({
   }, [sessionId])
 
   const hasPendingPermission = Object.values(state.permissions).some((p) => p.status === 'pending')
-  // ui.md §4「背景タブの通知」。親（TabBar）へ状態を伝える。onStatusChange を
-  // 依存に含めると呼び出し側で新しい関数が渡されるたびに発火してしまうため、
-  // sending / hasPendingPermission の実際の変化だけをトリガーにする。
+  // sending / hasPendingPermission の変化を親（TabBar）へ伝える。
   useEffect(() => {
     onStatusChange?.({ sending, hasPendingPermission })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sending, hasPendingPermission])
 
   async function send(text: string): Promise<void> {
-    // flows.md §4: 送信時に未保存の Markdown 編集をディスクへフラッシュする
-    // （エージェントは IDE のバッファではなくディスクを読むため）。書き込みの
-    // 完了を待ってから送る。
+    // 未保存の Markdown 編集をディスクへ書き出してから送信する。
     setSending(true)
     try {
       await flushAllEditors()

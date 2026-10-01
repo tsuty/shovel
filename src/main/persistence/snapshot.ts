@@ -5,19 +5,13 @@ import { randomUUID } from 'node:crypto'
 import type { LocalRecordKind, LocalRecordSummary, SessionSnapshot } from '@shared/types/session'
 
 /**
- * セッションのトランスクリプトスナップショット。data-model.md §3 / §4、F-2。
- * decisions.md C-1/C-2（Local Record First）により、過去のやり取りの内容は
- * このローカル記録を正とする。保存先はプロジェクトツリーの外の
- * プロジェクトごとのディレクトリ（`userData/snapshots/{projectId}`）、書き込みは
- * 一時ファイル経由のアトミックな move。プロジェクトごとに分けるのは、一覧・
- * ローカル検索が他のプロジェクトの記録を読まずに済むようにするため
- * （以前は全プロジェクト共通の1ディレクトリだった。`migrateFlatSnapshots`）。
+ * セッションのトランスクリプトスナップショット。
+ * 保存先は `userData/snapshots/{projectId}`、書き込みは一時ファイル経由のアトミックな move。
  *
  * 各ディレクトリに3種類のファイルが並ぶ:
- *   - `{sessionId}.json`                    現行の記録
- *   - `{sessionId}.json.{epochMillis}.backup`  食い違い検出時の退避（C-4）
- *   - `{sessionId}.json.{epochMillis}.deleted` ソフトデリート（C-5）
- * バックアップ・削除済みはどちらも自動削除しない（無期限に保持）。
+ *   - `{sessionId}.json`                       現行の記録
+ *   - `{sessionId}.json.{epochMillis}.backup`  食い違い検出時の退避
+ *   - `{sessionId}.json.{epochMillis}.deleted` ソフトデリート
  */
 
 const SCHEMA_VERSION = 1 as const
@@ -28,7 +22,7 @@ function snapshotRootDir(): string {
   return path.join(app.getPath('userData'), 'snapshots')
 }
 
-/** プロジェクト id はディレクトリ名になるので、パスの外へ出られない形に限る。 */
+/** プロジェクト id がディレクトリ名として安全な形か判定する。 */
 export function safeProjectSegment(projectId: string): string {
   if (!projectId || path.basename(projectId) !== projectId || projectId === '.' || projectId === '..') {
     throw new Error(`invalid project id: ${projectId}`)
@@ -61,9 +55,8 @@ function parseRecordName(fileName: string): ParsedRecordName | null {
 }
 
 /**
- * renderer から渡されたファイル名を、スナップショットディレクトリ内の
- * 既知の形式のファイルに限って絶対パスへ解決する（`../` 等で外へ出られない
- * ように、形式に合わないものは拒否する）。
+ * renderer から渡されたファイル名を、スナップショットディレクトリ内の既知の形式の
+ * ファイルに限って絶対パスへ解決する。形式に合わないものは拒否する。
  */
 function resolveRecordPath(projectId: string, fileName: string): string {
   if (path.basename(fileName) !== fileName || !parseRecordName(fileName)) {
@@ -83,10 +76,8 @@ async function exists(filePath: string): Promise<boolean> {
 }
 
 /**
- * `{sessionId}.json.{epochMillis}.{suffix}` の空き名前を探す。同じミリ秒の
- * ファイルが既にあれば +1ms してリトライする（decisions.md C-4）。
- * shovel の main プロセスはこのディレクトリの唯一の書き手なので、
- * 存在確認 → rename の間の競合は考えなくてよい。
+ * `{sessionId}.json.{epochMillis}.{suffix}` の空き名前を探す。同じミリ秒のファイルが
+ * 既にあれば +1ms してリトライする。
  */
 async function availableTimestampedPath(
   projectId: string,
@@ -112,8 +103,7 @@ async function writeAtomically(finalPath: string, content: string): Promise<void
 function parseSnapshot(raw: string): SessionSnapshot | null {
   try {
     const parsed = JSON.parse(raw) as SessionSnapshot
-    // 移行経路の無いバージョンは「履歴なし」として破棄する（読み込み失敗で
-    // 接続そのものを壊さないため）。
+    // 移行経路の無いバージョンは「履歴なし」として扱う。
     if (parsed.schemaVersion !== SCHEMA_VERSION) return null
     return parsed
   } catch {
@@ -134,10 +124,8 @@ export async function loadSnapshot(projectId: string, sessionId: string): Promis
 }
 
 /**
- * decisions.md C-4: 現在の `{sessionId}.json` の中身を、そのまま
- * `{sessionId}.json.{epochMillis}.backup` へ退避する（元ファイルはこの時点では
- * 残す。呼び出し側がこの後で replay の内容を書き込む）。書き込みは一時
- * ファイル経由のアトミックな move。退避する記録が無ければ null を返す。
+ * 現在の `{sessionId}.json` の中身を `{sessionId}.json.{epochMillis}.backup` へ退避する
+ * （元ファイルは残す）。退避する記録が無ければ null を返す。
  */
 export async function backupSnapshot(projectId: string, sessionId: string): Promise<string | null> {
   let raw: string
@@ -153,15 +141,9 @@ export async function backupSnapshot(projectId: string, sessionId: string): Prom
 }
 
 /**
- * decisions.md C-5: ソフトデリート。`{sessionId}.json` を
- * `{sessionId}.json.{削除時刻}.deleted` へリネームし、続けてそのセッションの
- * バックアップをそれぞれ `{sessionId}.json.{バックアップの元の epochMillis}.deleted`
- * へリネームする（バックアップが `.backup` のまま残ると、削除したはずの
- * セッションが通常のローカル検索に引っかかり続けるため）。
- *
- * 本体のリネームが失敗したら（例外を投げて）バックアップには触らない。
- * どの段階で失敗しても「一覧には出ないのに一部だけ検索に残る」半端な状態に
- * ならないよう、本体を先に動かす。
+ * ソフトデリート。`{sessionId}.json` を `{sessionId}.json.{削除時刻}.deleted` へリネームし、
+ * 続けてバックアップをそれぞれ `{sessionId}.json.{バックアップの epochMillis}.deleted` へリネームする。
+ * 本体のリネームが失敗したらバックアップには触らない。
  */
 export async function softDeleteSnapshot(projectId: string, sessionId: string): Promise<void> {
   const dir = snapshotDir(projectId)
@@ -184,13 +166,7 @@ export async function softDeleteSnapshot(projectId: string, sessionId: string): 
   }
 }
 
-/**
- * flows.md §6「名前変更: ACP に session/rename が無いため、shovel 側に
- * タイトルの上書きを保存し…」。永続化済みのスナップショットがあれば、その
- * `title` も書き換えておく（履歴一覧が次のターンを待たずに新しい名前を
- * 表示できるように）。スナップショットがまだ無いセッションは何もしない
- * （呼び出し側の `sessionTitleStore` への保存だけで、次回保存時に反映される）。
- */
+/** 永続化済みのスナップショットがあれば、その `title` を書き換える。 */
 export async function renameSnapshotTitle(projectId: string, sessionId: string, title: string): Promise<void> {
   const existing = await loadSnapshot(projectId, sessionId)
   if (!existing) return
@@ -206,21 +182,13 @@ export async function listSnapshotsForProject(projectId: string): Promise<Sessio
     .sort((a, b) => b.savedAt - a.savedAt)
 }
 
-/**
- * プロジェクトのローカル記録（現在・バックアップ・削除済み）をすべて
- * 要約として返す（新しい順）。チャット履歴パネル（ui.md「チャット履歴
- * パネル」）のバックアップ展開・削除済みトグル・検索アイコンの表示条件に使う。
- */
+/** プロジェクトのローカル記録（現在・バックアップ・削除済み）をすべて要約として返す（新しい順）。 */
 export async function listLocalRecords(projectId: string): Promise<LocalRecordSummary[]> {
   const records = await readRecordsForProject(projectId, () => true)
   return records.map(({ summary }) => summary).sort((a, b) => b.timestamp - a.timestamp)
 }
 
-/**
- * flows.md §9: プロジェクトの削除に伴い、そのプロジェクトのローカル記録
- * （現在・バックアップ・削除済み）をすべて破棄する。セッション単位の削除
- * （`softDeleteSnapshot`）と違い、プロジェクトごと消える以上は退避しない。
- */
+/** プロジェクトのローカル記録（現在・バックアップ・削除済み）をすべて削除する。 */
 export async function removeAllRecordsForProject(projectId: string): Promise<void> {
   await rm(snapshotDir(projectId), { recursive: true, force: true })
 }
@@ -240,9 +208,8 @@ export interface LoadedRecord {
 }
 
 /**
- * プロジェクトに属するローカル記録を1ファイルずつ読む。`shouldContinue` が
- * false を返したら途中で打ち切る（ローカル検索が新しいクエリに追い越された
- * ときのキャンセル用）。壊れたファイル・移行経路の無いバージョンは無視する。
+ * プロジェクトに属するローカル記録を1ファイルずつ読む。`shouldContinue` が false を返したら
+ * 途中で打ち切る。壊れたファイル・移行経路の無いバージョンは無視する。
  */
 export async function readRecordsForProject(
   projectId: string,
@@ -285,10 +252,8 @@ export async function readRecordsForProject(
 }
 
 /**
- * 以前の保存形式（全プロジェクト共通の `userData/snapshots` 直下）のファイルを、
- * 中身の `projectId` を見てプロジェクトごとのディレクトリへ移す。起動時に1回
- * 呼ぶ。移し先に同名ファイルがあれば上書きせずに残す（どちらも消さない）。
- * 読めない・プロジェクトの分からないファイルはそのまま置いておく。
+ * 旧形式（`userData/snapshots` 直下）のファイルを、中身の `projectId` を見てプロジェクトごとの
+ * ディレクトリへ移す。移し先に同名ファイルがあれば移さない。読めないファイルはそのまま残す。
  */
 export async function migrateFlatSnapshots(): Promise<void> {
   const root = snapshotRootDir()

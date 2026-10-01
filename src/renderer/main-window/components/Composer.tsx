@@ -8,7 +8,7 @@ import { cn } from '../../shared/lib/utils'
 
 const compactNumberFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 
-/** ui.md §8「トークン使用量は usage_update を受け取ったときだけ表示する」。 */
+/** トークン使用量の表示。usage_update を受け取ったときだけ表示する。 */
 function formatUsage(usage: SessionUsage): string {
   const tokens = `${compactNumberFormat.format(usage.used)} / ${compactNumberFormat.format(usage.size)}`
   if (usage.costAmount === undefined) return tokens
@@ -31,7 +31,7 @@ export function Composer({
   onSetConfigOption,
   sendKey = 'enter'
 }: {
-  /** 送信キーの設定（ui.md §8）。`modEnter` は Cmd/Ctrl+Enter で送信し、Enter は改行。 */
+  /** 送信キーの設定。`modEnter` は Cmd/Ctrl+Enter で送信し、Enter は改行。 */
   sendKey?: 'enter' | 'modEnter'
   meta: SessionMeta
   sending: boolean
@@ -47,9 +47,7 @@ export function Composer({
   const composingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // ui.md §8「行頭の / でスラッシュコマンド補完（available_commands_update
-  // の候補）」。テキスト全体が「/」+ 空白を含まない語のときだけ候補を出す
-  // （複数行入力の途中に出てくる「/」は対象外という単純化）。
+  // テキスト全体が「/」+ 空白を含まない語のとき、スラッシュコマンドの候補を出す。
   const slashMatch = /^\/(\S*)$/.exec(text)
   const [dismissed, setDismissed] = useState(false)
   const [commandIndex, setCommandIndex] = useState(0)
@@ -153,7 +151,7 @@ export function Composer({
                 return
               }
             }
-            // decisions.md G-1-5: IME 合成中の Enter で誤送信しない。
+            // IME 合成中の Enter では送信しない。
             if (e.key !== 'Enter' || composingRef.current || e.nativeEvent.isComposing) return
             const modPressed = window.shovel.platform === 'darwin' ? e.metaKey : e.ctrlKey
             const shouldSend = sendKey === 'enter' ? !e.shiftKey && !modPressed : modPressed
@@ -164,11 +162,9 @@ export function Composer({
           }}
         />
       </div>
-      {/* 幅が狭いとき（チャットの横に Markdown を添えたとき等）は折り返し、
-          長いラベルのセレクタは省略表示にして、チャット欄の外へはみ出さない。 */}
+      {/* 幅が狭いときは折り返し、長いラベルのセレクタは省略表示にする。 */}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {/* ACP: configOptions に category "mode" があれば、そちらがモードの正。
-            旧来の `modes` は互換用に並行して届くだけなので出さない（2つ並ぶため）。 */}
+        {/* configOptions に category "mode" があればそちらを使い、`modes` は出さない。 */}
         {meta.modes.length > 0 && !meta.configOptions.some((opt) => opt.category === 'mode') && (
           <select
             className="h-8 min-w-0 max-w-[12rem] truncate rounded-md border border-input bg-transparent px-2 text-xs"
@@ -216,7 +212,7 @@ export function Composer({
             {formatUsage(meta.usage)}
           </span>
         )}
-        {/* title はボタンではなく外側に付ける（無効化したボタンにはホバーが届かない）。 */}
+        {/* 無効化したボタンにもツールチップが出るよう、title は外側に付ける。 */}
         <div
           className="ml-auto"
           title={

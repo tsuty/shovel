@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from '../../shared/components/ui/d
 
 const DEBOUNCE_MS = 200
 
-/** 月日だけ（年内）、年をまたぐものは年も付ける。decisions.md C-6「右寄せの日付」。 */
+/** 月日だけ（年内）、年をまたぐものは年も付ける。 */
 export function formatShortDate(timestamp: number, locale: string): string {
   const date = new Date(timestamp)
   const sameYear = date.getFullYear() === new Date().getFullYear()
@@ -18,14 +18,11 @@ export function formatShortDate(timestamp: number, locale: string): string {
 }
 
 /**
- * decisions.md C-6 / ui.md「チャット履歴パネル」: ローカルセッション検索。
- * このプロジェクトの全ローカル記録（現行・バックアップ、指定すれば削除済みも）
- * を、Markdown 記法を落とした平文で検索する。約200msデバウンスし、新しい
- * クエリが来たら前の検索は捨てる（main 側でも打ち切る）。
+ * ローカルセッション検索。このプロジェクトの全ローカル記録（現行・バックアップ、指定すれば削除済みも）を
+ * 検索する。約200msデバウンスし、新しいクエリが来たら前の検索は捨てる。
  *
  * 結果行はタイトル＋マッチ箇所を含む一文（マッチ語だけ太字）＋右寄せの日付。
- * プレビュー欄は持たない。バックアップ／削除済みの行だけ、日付を
- * 「バックアップ・{日付}」「削除済み・{日付}」に置き換える。
+ * バックアップ／削除済みの行は、日付を「バックアップ・{日付}」「削除済み・{日付}」に置き換える。
  */
 export function LocalSearchDialog({
   projectId,

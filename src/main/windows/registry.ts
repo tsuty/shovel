@@ -1,9 +1,6 @@
 import { BrowserWindow } from 'electron'
 
-/**
- * decisions.md G-1-6: プロジェクトは常に新しいウィンドウで開き、すでに
- * 開いていればそのウィンドウを前面に出す。「現在のウィンドウで開く」は無い。
- */
+/** プロジェクト id ごとに開いているウィンドウを管理する。 */
 const windowsByProjectId = new Map<string, BrowserWindow>()
 let projectManagerWindow: BrowserWindow | null = null
 

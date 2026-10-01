@@ -1,15 +1,6 @@
 /**
- * セッション関連の型。docs/design/data-model.md §3 を参照。
- * 履歴の真実はエージェント側にあり、ここでの型は「UI が扱う軽量な写像」と
- * 「表示高速化・劣化防止のためのローカルスナップショット」の2つに分かれる。
- *
- * 実際の ACP スキーマ（@agentclientprotocol/sdk 1.4.0）では「Mode」と
- * 「Model」は非対称: Mode は `session/new` の応答が返す専用の
- * `SessionModeState`（`modes` フィールド）を持つが、Model には専用フィールドが
- * 無く、`configOptions` のうち `category: "model"` のもの（`SessionConfigSelect`
- * = ドロップダウン）として表現される。ui.md §8 の「Mode / Model は modes /
- * models から構成する」は設計時点の見立てであり、実装はプロトコルの実際の
- * 形に合わせて Model も configOptions 経由に統一する。
+ * セッション関連の型。UI が扱う実行時の状態と、ローカルスナップショットの形を定義する。
+ * Model は `configOptions` のうち `category: "model"` のものとして扱う。
  */
 
 import type { AttachmentChip, ToolCallPayload } from './transcript'
@@ -28,7 +19,7 @@ export interface ConfigOptionValue {
 
 export interface ConfigOption {
   configId: string
-  /** "mode" | "model" | "model_config" | "thought_level" | 独自文字列。UI 分類のヒントに過ぎない。 */
+  /** "mode" | "model" | "model_config" | "thought_level" | 独自文字列。 */
   category: string
   label: string
   description?: string
@@ -38,11 +29,7 @@ export interface ConfigOption {
   options?: ConfigOptionValue[]
 }
 
-/**
- * ui.md §8「トークン使用量は usage_update を受け取ったときだけ表示する」。
- * `usage_update` を一度も受け取っていないセッションでは undefined のままにする
- * （0 と未受信を区別する）。
- */
+/** トークン使用量。`usage_update` を一度も受け取っていなければ undefined。 */
 export interface SessionUsage {
   used: number
   size: number
@@ -50,22 +37,18 @@ export interface SessionUsage {
   costCurrency?: string
 }
 
-/**
- * ui.md §8「行頭の `/` でスラッシュコマンド補完（`available_commands_update`
- * の候補）」。`input.hint` はコマンド名の後に続ける引数のプレースホルダ
- * （エージェントが省略すれば引数なしコマンドとして扱う）。
- */
+/** スラッシュコマンドの候補（`available_commands_update`）。`input.hint` は引数のプレースホルダ。 */
 export interface SessionCommand {
   name: string
   description: string
   inputHint?: string
 }
 
-/** タブが保持するセッションの実行時メタデータ（真実はエージェント側）。 */
+/** タブが保持するセッションの実行時メタデータ。 */
 export interface SessionMeta {
   sessionId: string
   projectId: string
-  /** ACP に session/rename が無いため、ローカルで名前の上書きを持つ (C-1)。 */
+  /** ローカルで保持する名前の上書き。 */
   titleOverride?: string
   modes: SessionMode[]
   currentModeId?: string
@@ -74,55 +57,46 @@ export interface SessionMeta {
   commands: SessionCommand[]
 }
 
-/** 個別 JSON ファイルとして永続化するスナップショット。data-model.md §3。 */
+/** 個別 JSON ファイルとして永続化するスナップショット。 */
 export interface SessionSnapshot {
   schemaVersion: 1
   /** shovel のタブ id。スナップショットのファイル名にもなる。 */
   sessionId: string
   /**
-   * エージェント側のセッション id。`session/load` / `session/resume` はこちらを
-   * 要求する（shovel のタブ id とは別物）。これを持たない古いスナップショットは
-   * 「再開できない履歴」として扱う（decisions.md C-1/C-2 の「非対応」の行と
-   * 同じ扱いに落とす）。
+   * エージェント側のセッション id（`session/load` / `session/resume` に渡す）。
+   * これを持たないスナップショットは再開できない。
    */
   acpSessionId?: string
   projectId: string
   title: string
   savedAt: number
-  /** エージェントが報告する最終更新時刻。無ければスナップショットを正とみなす。 */
+  /** エージェントが報告する最終更新時刻。 */
   agentUpdatedAt?: number
-  /** 描画済みの TranscriptEvent の再生に足りる最小限の情報を保つ簡易履歴。 */
+  /** トランスクリプトの再描画に使うエントリ。 */
   entries: SnapshotEntry[]
 }
 
 export interface SnapshotEntry {
   /** ブロックの id。`TOOL_GROUP` のときはツールコールのグループ id。 */
   id: string
-  /**
-   * `TOOL_GROUP` は連続するツールコールのまとまり（`markdown` は空、中身は
-   * `toolCalls`）。比較（C-4）には使わないが、表示に要るものは比較対象で
-   * なくても保持する。
-   */
+  /** `TOOL_GROUP` は連続するツールコールのまとまり（`markdown` は空、中身は `toolCalls`）。 */
   role: 'USER' | 'AGENT' | 'THOUGHT' | 'PLAN' | 'SYSTEM' | 'COMPLETION' | 'ERROR' | 'TOOL_GROUP'
   markdown: string
-  /** `TOOL_GROUP` のツールコール（`rawInput` は表示に使わず、diff と中身が重複するので落とす）。 */
+  /** `TOOL_GROUP` のツールコール（`rawInput` は保存しない）。 */
   toolCalls?: ToolCallPayload[]
   /** USER ブロックに付けた添付（コンテキスト）チップ。 */
   chips?: AttachmentChip[]
   /** AGENT ブロックから抜き出した GFM タスクリストの選択肢。 */
   choices?: { id: string; label: string }[]
   /**
-   * AGENT エントリだけが持つ、ACP `agent_message_chunk` の `messageId`
-   * （任意フィールド。エージェントが送ってこなければ undefined）。
-   * decisions.md C-4: ローカル記録と `session/load` の replay が食い違って
-   * いるかは、テキストではなくこの id の並びだけで判定する。
+   * AGENT エントリだけが持つ、ACP `agent_message_chunk` の `messageId`（無ければ undefined）。
+   * ローカル記録と `session/load` の replay の比較に使う。
    */
   messageId?: string
 }
 
 /**
- * ローカルスナップショットのファイル種別。decisions.md C-4 / C-5、
- * data-model.md §4:
+ * ローカルスナップショットのファイル種別。
  *   - `current`: `{sessionId}.json`（現行の記録）
  *   - `backup`:  `{sessionId}.json.{epochMillis}.backup`（食い違い検出時の退避）
  *   - `deleted`: `{sessionId}.json.{epochMillis}.deleted`（ソフトデリート）
@@ -148,12 +122,11 @@ export interface LocalRecordSummary {
 }
 
 /**
- * decisions.md C-1/C-2 補遺: 履歴一覧の1行が「どちら側に存在するか」。
+ * 履歴一覧の1行がどちら側に存在するか。
  *   - `both`: `session/list` にあり、ローカル記録もある
  *   - `localOnly`: `session/list` を取得できたが、そこに無い
  *   - `agentOnly`: `session/list` にあるが、ローカル記録が無い
- *   - `unknown`: `session/list` を取得できていない（接続が無い・非対応・失敗）。
- *     確かめていないので「ローカルのみ」とは表示しない
+ *   - `unknown`: `session/list` を取得できていない（接続が無い・非対応・失敗）
  */
 export type HistoryEntryState = 'both' | 'localOnly' | 'agentOnly' | 'unknown'
 
@@ -175,13 +148,12 @@ export interface HistoryListing {
   entries: HistoryEntry[]
   /**
    * いま `session/delete` を送れるか（同じウィンドウにライブタブがあり、
-   * エージェントが `delete` に対応している）。「エージェントのみ」の行は
-   * これが false のとき削除できない（decisions.md C-5 追記）。
+   * エージェントが `delete` に対応している）。
    */
   canDeleteAgentSessions: boolean
 }
 
-/** decisions.md C-6: ローカルセッション検索の結果1行。 */
+/** ローカルセッション検索の結果1行。 */
 export interface LocalSearchResult {
   record: LocalRecordSummary
   /**
@@ -194,8 +166,7 @@ export interface LocalSearchResult {
 /**
  * `initialize` の応答が告げるエージェント側の対応状況。
  * `load` は `agentCapabilities.loadSession`、それ以外は
- * `agentCapabilities.sessionCapabilities.*`（`{}` = 対応 / 欠落・null = 非対応）
- * から読む。decisions.md C-1/C-2 の復元戦略はこの4つで分岐する。
+ * `agentCapabilities.sessionCapabilities.*`（`{}` = 対応 / 欠落・null = 非対応）から読む。
  */
 export interface SessionCapabilities {
   list: boolean

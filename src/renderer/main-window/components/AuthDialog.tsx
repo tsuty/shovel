@@ -11,11 +11,7 @@ import {
 import { Button } from '../../shared/components/ui/button'
 import { Input } from '../../shared/components/ui/input'
 
-/**
- * flows.md §1-2 / decisions.md N-2-7b: shovel は OAuth を一切実装しない。
- * ブラウザの起動もコールバックの受け取りもターミナルとエージェントに任せ、
- * shovel は状態確認と誘導だけを行う。
- */
+/** エージェントのサインイン状態を表示し、OS のターミナルでのサインインへ誘導する。 */
 export function AuthDialog({
   open,
   onOpenChange,

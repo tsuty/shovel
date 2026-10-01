@@ -2,9 +2,8 @@ import { app, BrowserWindow, shell } from 'electron'
 import path from 'node:path'
 
 /**
- * すべての `BrowserWindow` に共通のセキュリティ設定。architecture.md §2:
- * `contextIsolation: true` / `nodeIntegration: false`、`will-navigate` と
- * `setWindowOpenHandler` を塞ぎリンクは外部ブラウザへ。
+ * `contextIsolation: true` / `nodeIntegration: false` で `BrowserWindow` を作り、
+ * `will-navigate` と `setWindowOpenHandler` を塞いでリンクは外部ブラウザへ渡す。
  */
 export function createSecureWindow(options: {
   width: number
@@ -24,11 +23,8 @@ export function createSecureWindow(options: {
     }
   })
 
-  // ウィンドウ内の遷移・新規ウィンドウは一切許さない（アプリの画面が別の
-  // ページに置き換わると状態がすべて失われる）。外へ渡すのは http(s) と mailto
-  // だけ — `file://` や任意のスキームを OS に渡すと、ローカルのファイルや別の
-  // アプリを開けてしまう。アプリ自身の origin への遷移は外へも渡さず捨てる。
-  // 例外は開発時の同じページの再読み込み（Vite のフルリロード）だけ。
+  // ウィンドウ内の遷移・新規ウィンドウは許さない。http(s) と mailto だけを外部へ渡し、
+  // アプリ自身の origin への遷移は捨てる。開発時の同じページの再読み込みだけは許す。
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (!isSameOrigin(url, win.webContents.getURL())) openExternalIfSafe(url)
     return { action: 'deny' }

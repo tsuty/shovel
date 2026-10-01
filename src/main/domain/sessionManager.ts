@@ -16,22 +16,15 @@ import {
 import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
 
 /**
- * 1タブ = 1 ACP セッションのランタイム状態をプロジェクト横断で保持する。
- * architecture.md §5「main は sessionId → webContents のマップを持ち、
- * イベントを sessionId でルーティングする」の実装。
+ * 1タブ = 1 ACP セッションのランタイム状態をプロジェクト横断で保持し、
+ * イベントを sessionId で webContents へルーティングする。
  */
 const tabs = new Map<string, { projectId: string; webContents: WebContents; opened: OpenedSession }>()
 
-/**
- * 接続を開いている最中（`openAcpSession` が返る前）に出たイベントの一時置き場。
- * 復元時はローカル記録の描き起こしや `session/load` のライブ replay がこの
- * 段階で流れるが、まだ `tabs` に登録されていないので `sendEnvelope` が
- * 送り先を知らない。開けたらまとめて送り、失敗したら捨てる（開けなかった
- * タブのイベントを renderer に残さない）。
- */
+/** `openAcpSession` が返る前に出たイベントの一時置き場。開けたらまとめて送り、失敗したら捨てる。 */
 const pendingEvents = new Map<string, TranscriptEvent[]>()
 
-/** ウィンドウ（webContents）ごとに開いているタブ数。G-1-3b: 最大10。 */
+/** ウィンドウ（webContents）ごとに開いているタブ数。 */
 function tabCountForWindow(webContents: WebContents): number {
   let count = 0
   for (const tab of tabs.values()) {
@@ -95,15 +88,9 @@ export async function openTab(projectId: string, webContents: WebContents): Prom
 }
 
 /**
- * flows.md §6 / decisions.md C-1/C-2: 過去のセッションを「読むだけ」ではなく
- * 本当に再開する。エージェント側の id をスナップショットから取り出し、
- * `session/load` か `session/resume` で文脈ごと繋ぎ直す。
- *
- * 書き込み先には元のスナップショットの id をそのまま使う（`RestoreRequest.snapshotId`）。
- * スナップショットのファイル名も、`sessionTitleStore` の名前の上書きも
- * この id に紐づいているため、新しい id を振ると同じ会話が履歴に二重に並ぶ。
- * タブ id も原則は同じ id にするが、↻ で別の会話に移ったタブがまだその id を
- * 使っている場合は、衝突を避けて新しい UUID を振る。
+ * スナップショットからエージェント側の id を取り出し、`session/load` か `session/resume` で
+ * 過去のセッションを再開する。書き込み先は元のスナップショットの id。タブ id も同じ id にするが、
+ * 既にライブタブが使っていれば新しい UUID を振る。
  */
 export async function resumeTab(
   projectId: string,
@@ -114,8 +101,7 @@ export async function resumeTab(
     if (tab.opened.snapshotId === snapshotSessionId) throw new Error('このセッションはすでに開いています。')
   }
   const snapshot = await loadSnapshot(projectId, snapshotSessionId)
-  // エージェント側の id が無いのは shovel がそれを保存する前に作られた
-  // 古いスナップショット。再開の手がかりが無いので「非対応」と同じ扱いにする。
+  // エージェント側の id が無ければ再開できないので「非対応」として扱う。
   if (!snapshot?.acpSessionId) throw new Error(RESTORE_UNSUPPORTED_MARKER)
   requireNotOpen(snapshot.acpSessionId)
 
@@ -129,9 +115,7 @@ export async function resumeTab(
 }
 
 /**
- * decisions.md C-1/C-2 補遺: 「エージェントのみ」の行（ローカル記録が無い）の
- * 「再開」。復元戦略表の「無し／空」の行に当たる（`load` ならライブ replay を
- * 描き、完了後に最初のスナップショットとして保存する）。書き込み先の
+ * ローカル記録が無い「エージェントのみ」のセッションを再開する。
  * スナップショット id とタブ id は新しく振る。
  */
 export async function resumeAgentSession(
@@ -160,11 +144,9 @@ function liveTabFor(projectId: string): OpenedSession | null {
 }
 
 /**
- * decisions.md C-1/C-2 補遺: 履歴一覧を `session/list` とローカル記録の和集合
- * として作る。今タブで開いているセッション（書き込み中のスナップショット・
- * 接続中の ACP セッション）と、ソフトデリート済み（`.deleted` の
- * `acpSessionId`）は一覧から除く。`session/list` を取得できなければ、ローカル
- * 記録だけを状態 `unknown` で返す。
+ * `session/list` とローカル記録の和集合として履歴一覧を作る。開いているセッションと
+ * ソフトデリート済み（`.deleted` の `acpSessionId`）は除く。`session/list` を取得できなければ、
+ * ローカル記録だけを状態 `unknown` で返す。
  */
 export async function listHistory(projectId: string): Promise<HistoryListing> {
   const openSnapshotIds = new Set<string>()
@@ -233,28 +215,17 @@ export async function refreshTab(sessionId: string): Promise<string> {
   return requireTab(sessionId).opened.refresh()
 }
 
-/**
- * flows.md §6「名前変更」: ACP に session/rename が無いため、ローカルに上書きを保存する。
- * 引数はタブ id ではなくスナップショット id（開いているタブなら `snapshotId`）。
- */
+/** セッション名の上書きをローカルに保存する。引数はスナップショット id。 */
 export async function renameSession(projectId: string, sessionId: string, title: string): Promise<void> {
   sessionTitleStore.set(sessionId, title)
   await renameSnapshotTitle(projectId, sessionId, title)
 }
 
 /**
- * flows.md §6「削除」/ decisions.md C-5（追記を含む）:
- *   1. 同じプロジェクトにライブタブがあり、エージェントが `delete` に対応して
- *      いれば、その接続を借りて `session/delete` を送る（失敗しても続行）。
- *   2. ローカル記録は即座に消さず `.deleted` へ退避する（バックアップも一緒に）。
- *      送れなかった場合も、`.deleted` の `acpSessionId` が目印になって一覧から
- *      外れる（`listHistory`）。
- * 「エージェントのみ」の行（`snapshotId` が無い）は退避するファイルが無いので、
- * `session/delete` を送れないときは失敗にする（renderer は削除メニューを無効に
- * している）。
- *
- * 名前の上書きは残しておく — 削除済みを Read Only タブで開いたときに、
- * 利用者が付けた名前で見られるように。
+ * セッションを削除する。
+ *   1. ライブタブがあり、エージェントが `delete` に対応していれば `session/delete` を送る（失敗しても続行）。
+ *   2. ローカル記録はバックアップと一緒に `.deleted` へ退避する。
+ * `snapshotId` が無く `session/delete` も送れない場合は失敗にする。名前の上書きは残す。
  */
 export async function deleteHistorySession(
   projectId: string,
@@ -277,10 +248,7 @@ export async function deleteHistorySession(
   }
 }
 
-/**
- * 履歴一覧を取り直す契機を renderer に知らせる（バックアップの作成、
- * ターンの保存）。
- */
+/** 履歴一覧を取り直すよう renderer に知らせる。 */
 function notifyHistoryChanged(webContents: WebContents, projectId: string): void {
   if (!webContents.isDestroyed()) webContents.send(IpcChannel.SessionLocalRecordsChanged, projectId)
 }
@@ -313,9 +281,7 @@ export function dispatchTranscriptAction(action: TranscriptAction): void {
       return
     }
     case 'ready':
-      // SAC（JCEF の別ウェブビュー）は起動レースを避けるためにこのハンドシェイクを
-      // 必要とするが、shovel の Transcript は main-window レンダラ内の通常の
-      // React コンポーネントであり、同じ理由が存在しない。恒久的に no-op。
+      // 何もしない。
       return
     case 'openUrl':
     case 'openFile':
@@ -324,15 +290,7 @@ export function dispatchTranscriptAction(action: TranscriptAction): void {
     case 'copyBlock':
     case 'copyText':
     case 'submitChoices':
-      // SAC は JCEF の別ウェブビューなので、これら全てをホスト(Kotlin)経由に
-      // せざるを得なかった。shovel の Transcript は main-window レンダラ内の
-      // 通常の React コンポーネントなので、この境界がそもそも無い:
-      // openFile/openAttachment はコールバック props で App.tsx の
-      // タブ管理へ、copyBlock/copyText は navigator.clipboard で直接、
-      // submitChoices は既存の session.prompt で、openUrl は
-      // createSecureWindow.ts の will-navigate/setWindowOpenHandler で、
-      // それぞれ main を経由せず renderer 側だけで完結する。ここは今後も
-      // 到達しない（TranscriptAction の網羅性のためだけに残す）。
+      // renderer 側で処理されるため main には届かない。
       return
   }
 }
