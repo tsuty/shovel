@@ -43,7 +43,7 @@ import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
 const INITIALIZE_IDLE_TIMEOUT_MS = 180_000
 
 function isAuthRequiredError(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && 'code' in err && (err as { code: unknown }).code === -32000
+  return typeof err === 'object' && err !== null && 'code' in err && err.code === -32000
 }
 /** `session/prompt` を除く、その他のリクエストの締切。 */
 const REQUEST_DEADLINE_MS = 120_000
@@ -480,7 +480,7 @@ export async function openAcpSession(
     child.kill()
     logger.close()
     // 接続・ターンが認証エラーで失敗したら認証が必要であることを通知する。
-    if (isAuthRequiredError(err)) throw new Error(AUTH_REQUIRED_MARKER)
+    if (isAuthRequiredError(err)) throw new Error(AUTH_REQUIRED_MARKER, { cause: err })
     throw err
   }
   let currentSession = resolvedSession

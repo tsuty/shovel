@@ -105,6 +105,9 @@ export class SessionTranslator {
       case 'compaction_summary_chunk':
         // メタ状態（モード・configOptions・使用量など）はトランスクリプトには流さない。
         return []
+      case 'notice':
+        // clientCapabilities で notices を宣言していないので、仕様上は届かない。
+        return []
       default:
         // 未知のバリアントはログに残して無視する。
         console.warn('[acp] unknown session/update variant', (update as { sessionUpdate?: string }).sessionUpdate)

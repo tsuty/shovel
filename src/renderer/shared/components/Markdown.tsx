@@ -266,7 +266,7 @@ export function Markdown({
         urlTransform={(uri, key) => (key === 'href' ? uri : defaultUrlTransform(uri))}
         components={{
           pre: ({ node, ...props }) => (
-            <CodeBlock node={node as HastNode | undefined} collapsible={collapseCodeBlocks} {...props} />
+            <CodeBlock node={node} collapsible={collapseCodeBlocks} {...props} />
           ),
           a: ({ href, children }) => (
             <MarkdownLink href={href} onOpenFileLink={onOpenFileLink}>

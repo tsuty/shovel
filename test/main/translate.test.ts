@@ -5,10 +5,10 @@ import type { TranscriptEvent } from '@shared/types/transcript'
 const SANDBOX = '/workspace/project'
 
 function agent(text: string, messageId?: string): SessionUpdate {
-  return { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text }, messageId } as SessionUpdate
+  return { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text }, messageId }
 }
 function thought(text: string, messageId?: string): SessionUpdate {
-  return { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text }, messageId } as SessionUpdate
+  return { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text }, messageId }
 }
 function user(content: unknown, messageId?: string): SessionUpdate {
   return { sessionUpdate: 'user_message_chunk', content, messageId } as SessionUpdate
@@ -254,7 +254,7 @@ describe('SessionTranslator: その他', () => {
         { content: '調査', status: 'completed', priority: 'high' },
         { content: '実装', status: 'pending', priority: 'medium' }
       ]
-    } as SessionUpdate)
+    })
     expect(events).toEqual([
       { type: 'block', id: expect.any(String), role: 'PLAN', markdown: '- [x] 調査\n- [ ] 実装', streaming: false }
     ])
@@ -262,7 +262,7 @@ describe('SessionTranslator: その他', () => {
 
   it('メタ情報の更新はトランスクリプトに流さない', () => {
     const t = new SessionTranslator(SANDBOX)
-    expect(t.handleSessionUpdate({ sessionUpdate: 'current_mode_update', currentModeId: 'plan' } as SessionUpdate)).toEqual([])
+    expect(t.handleSessionUpdate({ sessionUpdate: 'current_mode_update', currentModeId: 'plan' })).toEqual([])
   })
 
   it('未知のバリアントは無視する', () => {
@@ -282,7 +282,7 @@ describe('permissionRequestToEvent', () => {
         { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
         { optionId: 'deny', name: 'Deny', kind: 'reject_once' }
       ]
-    } as RequestPermissionRequest
+    }
   }
 
   it('コマンド実行は本文にコマンドをコードブロックで出す', () => {
