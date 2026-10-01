@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
+    // dependencies は実行時に require する。ESM 専用の electron-store は CJS の main から
+    // require できないので devDependencies に置き、バンドルに含める。
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
