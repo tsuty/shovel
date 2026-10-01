@@ -4,48 +4,59 @@
 
 @layer base {
   :root {
+    /* ニュートラルトークン（secondary/muted/accent 等）は元の配色バランスを
+       維持しつつ色相を 200 に統一している。primary は #4b4b4b (hsl(0 0% 29%))
+       の無彩色グレーを採用。 */
+    /* 設定で上書きされる（useSettings）。読み込み前の既定値。 */
+    --transcript-font-size: 14px;
+    --terminal: 220 13% 13%;
+    --terminal-foreground: 0 0% 92%;
+    --terminal-muted: 220 8% 60%;
     --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
+    --foreground: 200 10% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
+    --card-foreground: 200 10% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
-    --primary: 222 89% 55%;
+    --popover-foreground: 200 10% 4%;
+    --primary: 0 0% 29%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 240 5% 92%;
-    --accent-foreground: 240 6% 10%;
+    --secondary: 200 5% 96%;
+    --secondary-foreground: 200 6% 10%;
+    --muted: 200 5% 96%;
+    --muted-foreground: 200 4% 46%;
+    --accent: 200 5% 92%;
+    --accent-foreground: 200 6% 10%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 222 89% 55%;
+    --border: 200 6% 90%;
+    --input: 200 6% 90%;
+    --ring: 0 0% 29%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 240 10% 8%;
+    --terminal: 200 12% 4%;
+    --terminal-foreground: 0 0% 90%;
+    --terminal-muted: 200 6% 55%;
+    --background: 200 10% 8%;
     --foreground: 0 0% 96%;
-    --card: 240 8% 11%;
+    --card: 200 8% 11%;
     --card-foreground: 0 0% 96%;
-    --popover: 240 8% 11%;
+    --popover: 200 8% 11%;
     --popover-foreground: 0 0% 96%;
-    --primary: 222 89% 65%;
-    --primary-foreground: 240 10% 8%;
-    --secondary: 240 6% 16%;
+    --primary: 0 0% 55%;
+    --primary-foreground: 200 10% 8%;
+    --secondary: 200 6% 16%;
     --secondary-foreground: 0 0% 96%;
-    --muted: 240 6% 16%;
-    --muted-foreground: 240 4% 64%;
-    --accent: 240 6% 20%;
+    --muted: 200 6% 16%;
+    --muted-foreground: 200 4% 64%;
+    --accent: 200 6% 20%;
     --accent-foreground: 0 0% 96%;
     --destructive: 0 63% 40%;
     --destructive-foreground: 0 0% 96%;
-    --border: 240 6% 20%;
-    --input: 240 6% 20%;
-    --ring: 222 89% 65%;
+    --border: 200 6% 20%;
+    --input: 200 6% 20%;
+    --ring: 0 0% 55%;
   }
 
   * {
@@ -114,11 +125,23 @@
 .markdown pre code {
   @apply bg-transparent p-0;
 }
+/* ハイライトしたコードブロックも、素のコードブロックと同じ地の色にする
+ * （shiki のテーマの背景色は使わない）。 */
+.markdown pre.shiki,
+.dark .markdown pre.shiki {
+  background-color: hsl(var(--muted)) !important;
+}
 .markdown blockquote {
   @apply border-l-2 border-border pl-3 text-muted-foreground;
 }
-.markdown a {
+.markdown a,
+.markdown .markdown-file-link {
   @apply text-primary underline;
+}
+/** 開けないリンク（file:// や絶対パスなど）。文字として見せ、点線だけで元がリンクだったことを示す。 */
+.markdown .markdown-dead-link {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
 }
 .markdown :where(h1, h2, h3, h4) {
   font-weight: 600;
@@ -138,6 +161,11 @@
 }
 .shiki-lines pre.shiki code {
   display: grid;
+}
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
 }
 .shiki-lines .line::before {
   counter-increment: line;

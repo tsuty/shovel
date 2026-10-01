@@ -70,6 +70,11 @@ export function commandHistory(projectId: string): string[] {
   return commandHistoryStore.get(projectId)
 }
 
+/** 履歴から1件消す（打ち間違いを残さないため。確認は取らない）。消した後の一覧を返す。 */
+export function removeCommandHistory(projectId: string, command: string): string[] {
+  return commandHistoryStore.remove(projectId, command)
+}
+
 function stripAnsi(text: string): string {
   return text.replace(ANSI_ESCAPE_RE, '')
 }

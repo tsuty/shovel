@@ -13,7 +13,13 @@
 
 import type { TranscriptAction, TranscriptEvent } from './types/transcript'
 import type { AgentEntry, Project, ProjectWithStatus } from './types/project'
-import type { SessionMeta, SessionSnapshot } from './types/session'
+import type {
+  HistoryListing,
+  LocalRecordSummary,
+  LocalSearchResult,
+  SessionMeta,
+  SessionSnapshot
+} from './types/session'
 import type { FileReadResult, FsEntry } from './types/filer'
 import type { CommandExit, CommandOutputChunk } from './types/command'
 import type { AppSettings } from './types/settings'
@@ -34,9 +40,11 @@ export const IpcChannel = {
   ProjectsDiagnostics: 'projects:diagnostics',
   ProjectsStop: 'projects:stop',
   ProjectsOpenTerminal: 'projects:openTerminal',
+  ProjectsOpenDataDir: 'projects:openDataDir',
   AppOpenProjectManager: 'app:openProjectManager',
   SettingsGet: 'settings:get',
   SettingsUpdate: 'settings:update',
+  SettingsChanged: 'settings:changed',
   SidebarGetWidths: 'sidebar:getWidths',
   SidebarSetWidth: 'sidebar:setWidth',
   AuthStatus: 'auth:status',
@@ -46,6 +54,7 @@ export const IpcChannel = {
 
   SessionOpenTab: 'session:openTab',
   SessionResumeTab: 'session:resumeTab',
+  SessionResumeAgentSession: 'session:resumeAgentSession',
   SessionCloseTab: 'session:closeTab',
   SessionRefresh: 'session:refresh',
   SessionPrompt: 'session:prompt',
@@ -56,6 +65,9 @@ export const IpcChannel = {
   SessionListHistory: 'session:listHistory',
   SessionRename: 'session:rename',
   SessionDeleteHistory: 'session:deleteHistory',
+  SessionListLocalRecords: 'session:listLocalRecords',
+  SessionReadLocalRecord: 'session:readLocalRecord',
+  SessionSearchLocal: 'session:searchLocal',
 
   FsList: 'fs:list',
   FsReadFile: 'fs:readFile',
@@ -67,18 +79,22 @@ export const IpcChannel = {
   FsOpenInOS: 'fs:openInOS',
   FsMkdir: 'fs:mkdir',
   FsCreateMarkdownFile: 'fs:createMarkdownFile',
+  FsReadClipboardFiles: 'fs:readClipboardFiles',
+  FsCopyExternal: 'fs:copyExternal',
 
   CommandRun: 'command:run',
   CommandSendInput: 'command:sendInput',
   CommandCancel: 'command:cancel',
   CommandHistory: 'command:history',
+  CommandRemoveHistory: 'command:removeHistory',
 
   // main -> renderer (send)
   TranscriptEvent: 'transcript:event',
   ProjectsProgress: 'projects:progress',
   SandboxStatusChanged: 'sandbox:statusChanged',
   CommandOutput: 'command:output',
-  CommandExit: 'command:exit'
+  CommandExit: 'command:exit',
+  SessionLocalRecordsChanged: 'session:localRecordsChanged'
 } as const
 
 export interface CreateNewDirRequest {
@@ -132,7 +148,13 @@ export interface ProjectDiagnostics {
    */
   acpTrafficLog: string | null
   stderrLog: string | null
+  /** ログ／セッションキャッシュ（スナップショット）の置き場。全プロジェクト共通の1ディレクトリ。 */
+  logsDir: string
+  snapshotsDir: string
 }
+
+/** プロジェクト詳細から OS のファイルマネージャーで開けるディレクトリ。 */
+export type DataDirKind = 'logs' | 'snapshots'
 
 export interface RendererApi {
   /** ui.md §3「切り替えショートカットを『修飾キー + 0〜9』に割り当てる」の
@@ -144,6 +166,8 @@ export interface RendererApi {
   settings: {
     get(): Promise<AppSettings>
     update(patch: Partial<AppSettings>): Promise<AppSettings>
+    /** どのウィンドウで変えても、開いている全ウィンドウに即座に反映する。 */
+    onChanged(cb: (settings: AppSettings) => void): () => void
   }
   sidebar: {
     /** ui.md §3「サイズは記憶される」。パネル id(tabs/filer) ごとの幅(px)。 */
@@ -169,29 +193,66 @@ export interface RendererApi {
     diagnostics(id: string): Promise<ProjectDiagnostics>
     stop(id: string): Promise<void>
     openTerminal(id: string): Promise<void>
+    /**
+     * ログ／セッションキャッシュのディレクトリを OS のファイルマネージャーで開く。
+     * ログは全プロジェクト共通のディレクトリなので、このプロジェクトの最新の
+     * ログファイルがあればそれを選択した状態で開く。
+     */
+    openDataDir(id: string, kind: DataDirKind): Promise<void>
     onProgress(cb: (p: ProjectProgress) => void): () => void
   }
   agents: {
     list(): Promise<AgentEntry[]>
   }
   session: {
-    openTab(projectId: string): Promise<{ sessionId: string; meta: SessionMeta }>
+    /**
+     * `sessionId` はタブ id、`snapshotId` はそのタブがいま書き込んでいる
+     * スナップショットの id（↻ で変わる。`OpenedSession.snapshotId` 参照）。
+     */
+    openTab(projectId: string): Promise<{ sessionId: string; snapshotId: string; meta: SessionMeta }>
     /** 過去のセッションを session/load か session/resume で本当に再開する。 */
-    resumeTab(projectId: string, snapshotSessionId: string): Promise<{ sessionId: string; meta: SessionMeta }>
+    resumeTab(
+      projectId: string,
+      snapshotSessionId: string
+    ): Promise<{ sessionId: string; snapshotId: string; meta: SessionMeta }>
+    /** 「エージェントのみ」の行（ローカル記録が無い）を再開する。decisions.md C-1/C-2 補遺。 */
+    resumeAgentSession(
+      projectId: string,
+      acpSessionId: string,
+      title?: string
+    ): Promise<{ sessionId: string; snapshotId: string; meta: SessionMeta }>
     closeTab(sessionId: string): Promise<void>
-    refresh(sessionId: string): Promise<void>
+    /** ↻。新しい会話のスナップショット id を返す。 */
+    refresh(sessionId: string): Promise<string>
     prompt(sessionId: string, text: string, attachmentRelPaths?: string[]): Promise<void>
     cancel(sessionId: string): Promise<void>
     setMode(sessionId: string, modeId: string): Promise<void>
     setConfigOption(sessionId: string, configId: string, value: string | boolean): Promise<void>
     dispatch(action: TranscriptAction): Promise<void>
     onEvent(cb: (envelope: SessionEnvelope) => void): () => void
-    listHistory(projectId: string): Promise<SessionSnapshot[]>
-    rename(sessionId: string, title: string): Promise<void>
-    deleteHistory(sessionId: string): Promise<void>
+    /** 履歴一覧（`session/list` とローカル記録の和集合）。decisions.md C-1/C-2 補遺。 */
+    listHistory(projectId: string): Promise<HistoryListing>
+    /** 引数はスナップショット id（開いているタブならその `snapshotId`）。 */
+    rename(projectId: string, snapshotId: string, title: string): Promise<void>
+    /** decisions.md C-5: ソフトデリート（`.deleted` へ退避。バックアップも一緒に）。 */
+    deleteHistory(projectId: string, target: { snapshotId?: string; acpSessionId?: string }): Promise<void>
+    /** 現在・バックアップ・削除済みを含む、このプロジェクトの全ローカル記録の要約。 */
+    listLocalRecords(projectId: string): Promise<LocalRecordSummary[]>
+    /** ファイル名で指定したローカル記録（バックアップ・削除済みを含む）を読む。 */
+    readLocalRecord(projectId: string, fileName: string): Promise<SessionSnapshot | null>
+    /**
+     * decisions.md C-6: ローカルセッション検索。新しい検索に追い越された
+     * ときは null（呼び出し側は結果を捨てる）。
+     */
+    searchLocal(projectId: string, query: string, includeDeleted: boolean): Promise<LocalSearchResult[] | null>
+    /**
+     * 履歴一覧を取り直すべきときの通知（引数は projectId）: バックアップが
+     * 作られた、ターンの記録が保存された。
+     */
+    onLocalRecordsChanged(cb: (projectId: string) => void): () => void
   }
   fs: {
-    list(projectId: string, relPath: string, showGit?: boolean): Promise<FsEntry[]>
+    list(projectId: string, relPath: string): Promise<FsEntry[]>
     readFile(projectId: string, relPath: string): Promise<FileReadResult>
     writeTextFile(projectId: string, relPath: string, content: string): Promise<void>
     rename(projectId: string, relPath: string, newName: string): Promise<void>
@@ -201,12 +262,19 @@ export interface RendererApi {
     openInOS(projectId: string, relPath: string): Promise<void>
     mkdir(projectId: string, parentRelPath: string): Promise<string>
     createMarkdownFile(projectId: string, parentRelPath: string): Promise<string>
+    /** OS のクリップボードにある「コピーされたファイル」の絶対パス（無ければ空）。 */
+    readClipboardFiles(): Promise<string[]>
+    /** アプリ外のファイル・フォルダをプロジェクト内へコピーする（移動はしない）。 */
+    copyExternal(projectId: string, absPaths: string[], destDirRelPath: string): Promise<string[]>
+    /** ドロップされた `File` のホスト上の絶対パス（Electron の `webUtils.getPathForFile`）。 */
+    pathForFile(file: File): string
   }
   command: {
     run(projectId: string, command: string): Promise<{ runId: string }>
     sendInput(runId: string, text: string): Promise<void>
     cancel(runId: string): Promise<void>
     history(projectId: string): Promise<string[]>
+    removeHistory(projectId: string, command: string): Promise<string[]>
     onOutput(cb: (chunk: CommandOutputChunk) => void): () => void
     onExit(cb: (exit: CommandExit) => void): () => void
   }

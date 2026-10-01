@@ -34,13 +34,25 @@ interface OpenBlock {
   buffer: string
 }
 
+interface OpenUserBlock extends OpenBlock {
+  /** replay で拾い直した添付チップ（`attachments` イベントは置き換えなので累積して送る）。 */
+  chips: AttachmentChip[]
+}
+
 export class SessionTranslator {
   private currentAgent: OpenBlock | null = null
   private currentThought: OpenBlock | null = null
-  private currentUser: OpenBlock | null = null
+  private currentUser: OpenUserBlock | null = null
   private openGroupId: string | null = null
   private replaying = false
-  private readonly toolCallGroups = new Map<string, string>()
+  /** これまでに描いたツールコール。`tool_call_update` を前回の値に重ねるのに使う。 */
+  private readonly toolCalls = new Map<string, ToolCallPayload>()
+
+  /**
+   * @param sandboxPath replay された添付の `file://` URI をプロジェクト相対パスの
+   *   チップへ戻すのに使う（`prompt()` が送る URI の逆変換）。
+   */
+  constructor(private readonly sandboxPath: string) {}
 
   /**
    * `session/load` は過去の会話を `session/update` として流し直す
@@ -120,7 +132,7 @@ export class SessionTranslator {
     this.currentThought = null
     this.currentUser = null
     this.openGroupId = null
-    this.toolCallGroups.clear()
+    this.toolCalls.clear()
     return []
   }
 
@@ -131,9 +143,17 @@ export class SessionTranslator {
    */
   private finalizeAgent(): TranscriptEvent[] {
     if (!this.currentAgent) return []
-    const { id, buffer } = this.currentAgent
+    const { id, buffer, messageId } = this.currentAgent
     this.currentAgent = null
-    return [{ type: 'blockMarkdown', id, markdown: buffer, choices: extractChoices(id, buffer) }]
+    return [
+      {
+        type: 'blockMarkdown',
+        id,
+        markdown: buffer,
+        choices: extractChoices(id, buffer),
+        messageId: messageId ?? undefined
+      }
+    ]
   }
 
   private finalizeThought(): TranscriptEvent[] {
@@ -150,18 +170,60 @@ export class SessionTranslator {
     return [{ type: 'blockMarkdown', id, markdown: buffer }]
   }
 
+  /**
+   * replay（session/load）中のユーザー発言。添付は `resource_link` のまま返って
+   * くるとは限らず、claude-agent-acp は `[@name](file://…)` という Markdown の
+   * メンションに変換したテキストとして流し直す。どちらもライブ送信時と同じ
+   * チップに戻し、本文からは取り除く（リンク文字列がそのまま USER ブロックに
+   * 出ないように）。プロジェクト外を指すものはチップにできないので本文に残す。
+   */
   private appendUserChunk(content: ContentBlock, messageId: string | null): TranscriptEvent[] {
-    const text = contentBlockToText(content)
+    const { text, chips } = this.extractUserAttachments(content)
     const events: TranscriptEvent[] = []
     if (!this.currentUser || messageId !== this.currentUser.messageId) {
       events.push(...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser())
       const id = randomUUID()
-      this.currentUser = { id, messageId, buffer: '' }
+      this.currentUser = { id, messageId, buffer: '', chips: [] }
       events.push({ type: 'block', id, role: 'USER', markdown: '', streaming: true })
     }
-    this.currentUser.buffer += text
-    events.push({ type: 'stream', id: this.currentUser.id, text })
+    const fresh = chips.filter((chip) => !this.currentUser!.chips.some((c) => c.key === chip.key))
+    if (fresh.length > 0) {
+      this.currentUser.chips = [...this.currentUser.chips, ...fresh]
+      events.push({ type: 'attachments', id: this.currentUser.id, chips: this.currentUser.chips })
+    }
+    if (text) {
+      this.currentUser.buffer += text
+      events.push({ type: 'stream', id: this.currentUser.id, text })
+    }
     return events
+  }
+
+  private extractUserAttachments(content: ContentBlock): { text: string; chips: AttachmentChip[] } {
+    if (content.type === 'resource_link' || content.type === 'resource') {
+      const uri = content.type === 'resource_link' ? content.uri : content.resource.uri
+      const chip = this.chipFromUri(uri)
+      return chip ? { text: '', chips: [chip] } : { text: contentBlockToText(content), chips: [] }
+    }
+    if (content.type !== 'text') return { text: contentBlockToText(content), chips: [] }
+    const chips: AttachmentChip[] = []
+    const text = content.text.replace(ATTACHMENT_MENTION, (mention, uri: string) => {
+      const chip = this.chipFromUri(uri)
+      if (!chip) return mention
+      chips.push(chip)
+      return ''
+    })
+    return { text, chips }
+  }
+
+  /** `prompt()` が組み立てる `file://{sandboxPath}/{relPath}` の逆変換。 */
+  private chipFromUri(uri: string): AttachmentChip | null {
+    if (!uri.startsWith('file://')) return null
+    const absPath = uri.slice('file://'.length)
+    const root = this.sandboxPath.endsWith('/') ? this.sandboxPath : `${this.sandboxPath}/`
+    if (!absPath.startsWith(root)) return null
+    const relPath = absPath.slice(root.length)
+    if (!relPath) return null
+    return { key: relPath, label: relPath.split('/').pop() ?? relPath, path: relPath }
   }
 
   private appendAgentChunk(content: ContentBlock, messageId: string | null): TranscriptEvent[] {
@@ -194,12 +256,17 @@ export class SessionTranslator {
 
   private upsertToolCall(payload: ToolCall | ToolCallUpdate): TranscriptEvent[] {
     const events: TranscriptEvent[] = []
-    if (this.openGroupId === null) {
+    const previous = this.toolCalls.get(payload.toolCallId)
+    // 既知のツールコールの更新は、元のグループのまま差し替える（グループが
+    // 閉じた後に届いた更新で、同じ行が新しいグループに重複して出ないように）。
+    if (!previous && this.openGroupId === null) {
       this.openGroupId = randomUUID()
       events.push({ type: 'group', id: this.openGroupId, timed: true, closed: false })
     }
-    this.toolCallGroups.set(payload.toolCallId, this.openGroupId)
-    events.push({ type: 'toolCall', toolCall: toolCallPayload(payload, this.openGroupId) })
+    const groupId = previous?.groupId ?? this.openGroupId!
+    const toolCall = previous ? mergeToolCallUpdate(previous, payload) : toolCallPayload(payload, groupId)
+    this.toolCalls.set(payload.toolCallId, toolCall)
+    events.push({ type: 'toolCall', toolCall })
     return events
   }
 
@@ -226,6 +293,9 @@ export class SessionTranslator {
     return [{ type: 'group', id, timed: true, closed: true }]
   }
 }
+
+/** claude-agent-acp が `resource_link` を変換したメンション（`[@foo.md](file:///…)`）。 */
+const ATTACHMENT_MENTION = /\[@[^\]]*\]\((file:\/\/[^)]*)\)/g
 
 const TASK_LIST_LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.+)$/
 
@@ -295,6 +365,25 @@ function toolCallPayload(payload: ToolCall | ToolCallUpdate, groupId: string): T
     diffs,
     rawInput: payload.rawInput,
     content
+  }
+}
+
+/**
+ * ACP の `tool_call_update` は「変わったフィールドだけ」を送ってくる。丸ごと
+ * 置き換えると、status だけの更新で kind が other に、タイトルが id に戻って
+ * しまうため、送られてきたフィールドだけを前回の値に重ねる。
+ */
+function mergeToolCallUpdate(previous: ToolCallPayload, payload: ToolCall | ToolCallUpdate): ToolCallPayload {
+  const fresh = toolCallPayload(payload, previous.groupId)
+  return {
+    ...previous,
+    kind: payload.kind ? fresh.kind : previous.kind,
+    title: 'title' in payload && payload.title ? fresh.title : previous.title,
+    status: payload.status ? fresh.status : previous.status,
+    locations: payload.locations ? fresh.locations : previous.locations,
+    diffs: payload.content ? fresh.diffs : previous.diffs,
+    content: payload.content ? fresh.content : previous.content,
+    rawInput: payload.rawInput !== undefined ? fresh.rawInput : previous.rawInput
   }
 }
 

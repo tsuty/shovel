@@ -1,9 +1,15 @@
-import { Plus, X } from 'lucide-react'
+import { Bot, Clock3, File, Plus, X } from 'lucide-react'
 import { cn } from '../../shared/lib/utils'
 
 export interface TabInfo {
   sessionId: string
   title: string
+  kind: 'session' | 'file' | 'history'
+  /**
+   * セッションタブがいま書き込んでいるスナップショットの id。↻ で新しい会話を
+   * 始めると変わる（タブ id の `sessionId` は変わらない）。
+   */
+  snapshotId?: string
   /**
    * ui.md §4「背景タブの通知」。`undefined` はセッション以外のタブ
    * （ファイル/履歴）で、通知の対象外。
@@ -48,10 +54,13 @@ export function TabBar({
               <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
             )}
             <button
-              className={cn('truncate', showPulse && 'animate-tab-pulse')}
+              className={cn('flex min-w-0 items-center gap-1.5 truncate', showPulse && 'animate-tab-pulse')}
               onClick={() => onSelect(tab.sessionId)}
             >
-              {tab.title}
+              {tab.kind === 'file' && <File size={12} className="shrink-0" />}
+              {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
+              {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
+              <span className="truncate">{tab.title}</span>
             </button>
             <button
               className="opacity-60 hover:opacity-100"

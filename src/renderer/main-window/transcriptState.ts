@@ -18,6 +18,8 @@ export interface RenderBlock {
   streaming: boolean
   chips?: AttachmentChip[]
   choices?: RenderChoice[]
+  /** SYSTEM ブロックのうち、`notice` イベント由来のもの。文言は i18n の `transcript.notice.{key}`。 */
+  noticeKey?: string
 }
 
 export interface RenderGroup {
@@ -74,7 +76,9 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
     case 'reset':
       return initialTranscriptState
     case 'block':
-      if (event.role === 'THOUGHT') {
+      // 専用エリアに出すのはストリーミング中の思考だけ。スナップショットから
+      // 戻した確定済みの思考は、最初から折り畳みブロックとして並べる。
+      if (event.role === 'THOUGHT' && event.streaming) {
         return { ...state, liveThought: { id: event.id, markdown: event.markdown } }
       }
       return {
@@ -82,7 +86,13 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
         order: [...state.order, { kind: 'block', id: event.id }],
         blocks: {
           ...state.blocks,
-          [event.id]: { id: event.id, role: event.role, markdown: event.markdown, streaming: event.streaming }
+          [event.id]: {
+            id: event.id,
+            role: event.role,
+            markdown: event.markdown,
+            streaming: event.streaming,
+            choices: event.choices
+          }
         }
       }
     case 'stream': {
@@ -166,6 +176,15 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
     }
     case 'toast':
       return { ...state, toast: event.text }
+    case 'notice':
+      return {
+        ...state,
+        order: [...state.order, { kind: 'block', id: event.id }],
+        blocks: {
+          ...state.blocks,
+          [event.id]: { id: event.id, role: 'SYSTEM', markdown: '', streaming: false, noticeKey: event.key }
+        }
+      }
     case 'attachments': {
       const block = state.blocks[event.id]
       if (!block) return state

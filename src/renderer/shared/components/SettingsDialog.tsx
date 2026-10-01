@@ -55,6 +55,18 @@ export function SettingsDialog({
             />
             <span className="ml-2 text-xs text-muted-foreground">{settings.transcriptFontSize}px</span>
           </Field>
+          <Field label={t('settings.sendKey')}>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+              value={settings.sendKey ?? 'enter'}
+              onChange={(e) => onUpdate({ sendKey: e.target.value as AppSettings['sendKey'] })}
+            >
+              <option value="enter">{t('settings.sendKeyEnter')}</option>
+              <option value="modEnter">
+                {t('settings.sendKeyModEnter', { mod: window.shovel.platform === 'darwin' ? '⌘' : 'Ctrl' })}
+              </option>
+            </select>
+          </Field>
           <label className="flex items-center gap-2">
             <Checkbox
               checked={settings.autoAttachActiveFile}

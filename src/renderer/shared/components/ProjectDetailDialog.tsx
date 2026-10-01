@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { ProjectDiagnostics } from '@shared/ipc'
+import type { DataDirKind, ProjectDiagnostics } from '@shared/ipc'
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle
-} from '../shared/components/ui/dialog'
-import { Button } from '../shared/components/ui/button'
+} from './ui/dialog'
+import { Button } from './ui/button'
 
 /**
  * ui.md §2「プロジェクトの詳細」。基本情報・操作（停止/OSターミナル）・
@@ -30,10 +30,12 @@ export function ProjectDetailDialog({
   const { t } = useTranslation()
   const [diagnostics, setDiagnostics] = useState<ProjectDiagnostics | null>(null)
   const [copied, setCopied] = useState(false)
+  const [openError, setOpenError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || !projectId) return
     setDiagnostics(null)
+    setOpenError(null)
     void window.shovel.projects.diagnostics(projectId).then(setDiagnostics)
   }, [open, projectId])
 
@@ -45,6 +47,8 @@ export function ProjectDetailDialog({
       `sandboxName: ${diagnostics.project.sandboxName}`,
       `sandboxId: ${diagnostics.project.sandboxId}`,
       `agentId: ${diagnostics.project.agentId}`,
+      `logsDir: ${diagnostics.logsDir}`,
+      `snapshotsDir: ${diagnostics.snapshotsDir}`,
       '',
       '## sbx diagnose',
       diagnostics.diagnoseOutput,
@@ -54,6 +58,16 @@ export function ProjectDetailDialog({
       '## sbx ls --json (this project)',
       JSON.stringify(diagnostics.sbxLsEntry, null, 2)
     ].join('\n')
+  }
+
+  async function openDataDir(kind: DataDirKind): Promise<void> {
+    if (!diagnostics) return
+    setOpenError(null)
+    try {
+      await window.shovel.projects.openDataDir(diagnostics.project.id, kind)
+    } catch (err) {
+      setOpenError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   async function copyAll(): Promise<void> {
@@ -80,7 +94,12 @@ export function ProjectDetailDialog({
               <dd className="truncate">{diagnostics.project.sandboxName}</dd>
               <dt className="text-muted-foreground">{t('detail.agent')}</dt>
               <dd>{diagnostics.project.agentId}</dd>
+              <dt className="text-muted-foreground">{t('detail.logsDir')}</dt>
+              <DataDirRow path={diagnostics.logsDir} onOpen={() => void openDataDir('logs')} />
+              <dt className="text-muted-foreground">{t('detail.snapshotsDir')}</dt>
+              <DataDirRow path={diagnostics.snapshotsDir} onOpen={() => void openDataDir('snapshots')} />
             </dl>
+            {openError && <p className="text-xs text-destructive">{openError}</p>}
 
             <div className="flex gap-2">
               <Button
@@ -115,5 +134,20 @@ export function ProjectDetailDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** 全プロジェクト共通のディレクトリなので、パスを見せたうえで OS のファイルマネージャーで開く導線を置く。 */
+function DataDirRow({ path, onOpen }: { path: string; onOpen: () => void }): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <dd className="flex min-w-0 items-center gap-2">
+      <span className="truncate" title={path}>
+        {path}
+      </span>
+      <button className="shrink-0 text-primary hover:underline" onClick={onOpen}>
+        {t('detail.openDir')}
+      </button>
+    </dd>
   )
 }

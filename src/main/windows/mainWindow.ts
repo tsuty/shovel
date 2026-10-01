@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { createSecureWindow } from './createSecureWindow'
-import { getProjectWindow, registerProjectWindow } from './registry'
+import { getProjectManagerWindow, getProjectWindow, registerProjectWindow } from './registry'
 import { closeAllTabsForWindow } from '../domain/sessionManager'
 
 /**
@@ -11,6 +11,7 @@ export function openProjectWindow(projectId: string): void {
   const existing = getProjectWindow(projectId)
   if (existing) {
     existing.focus()
+    closeProjectManager()
     return
   }
 
@@ -20,6 +21,10 @@ export function openProjectWindow(projectId: string): void {
   // 「Object has been destroyed」で例外になる。破棄前に参照だけ確保しておく。
   const webContents = win.webContents
   win.on('closed', () => closeAllTabsForWindow(webContents))
+  // プロジェクトのウィンドウが開いたら、プロジェクト一覧は閉じる（ヘッダーの
+  // メニューからいつでも開き直せる）。表示されてから閉じ、ウィンドウが1つも
+  // 無い瞬間を作らない。
+  win.once('ready-to-show', closeProjectManager)
 
   const rendererUrl = process.env.ELECTRON_RENDERER_URL
   const query = `projectId=${encodeURIComponent(projectId)}`
@@ -28,4 +33,8 @@ export function openProjectWindow(projectId: string): void {
   } else {
     void win.loadFile(path.join(__dirname, '../renderer/main-window.html'), { search: query })
   }
+}
+
+function closeProjectManager(): void {
+  getProjectManagerWindow()?.close()
 }

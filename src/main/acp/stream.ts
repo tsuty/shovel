@@ -53,6 +53,8 @@ export interface BuildAcpStreamOptions {
   logger: SessionLogger
   ndJsonStream: (output: WritableStream<Uint8Array>, input: ReadableStream<Uint8Array>) => Stream
   onStdoutActivity: () => void
+  /** 受信した JSON-RPC メッセージごとに、SDK に渡す前に呼ばれる。 */
+  onIncomingMessage?: (message: AnyMessage) => void
 }
 
 /**
@@ -63,7 +65,7 @@ export interface BuildAcpStreamOptions {
  * `SessionLogger.logRpc` に記録する（N-2-6 の診断情報の材料）。
  */
 export function buildAcpStream(opts: BuildAcpStreamOptions): Stream {
-  const { child, logger, ndJsonStream, onStdoutActivity } = opts
+  const { child, logger, ndJsonStream, onStdoutActivity, onIncomingMessage } = opts
 
   child.stderr.on('data', (d: Buffer) => logger.logStderr(d.toString('utf8')))
 
@@ -79,6 +81,7 @@ export function buildAcpStream(opts: BuildAcpStreamOptions): Stream {
     new TransformStream<AnyMessage, AnyMessage>({
       transform(message, controller) {
         logger.logRpc('IN', JSON.stringify(message))
+        onIncomingMessage?.(message)
         controller.enqueue(message)
       }
     })

@@ -16,6 +16,7 @@ export function useSettings(): {
 
   useEffect(() => {
     void window.shovel.settings.get().then(setSettings)
+    return window.shovel.settings.onChanged(setSettings)
   }, [])
 
   useEffect(() => {

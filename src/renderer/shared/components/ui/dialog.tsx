@@ -1,5 +1,6 @@
 import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { X } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 export const Dialog = DialogPrimitive.Root
@@ -21,6 +22,9 @@ export function DialogContent({
         {...props}
       >
         {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm text-muted-foreground hover:text-foreground">
+          <X size={16} />
+        </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   )

@@ -8,13 +8,14 @@ import type {
   CreateExistingDirRequest,
   CreateFromExistingRequest,
   CreateNewDirRequest,
+  DataDirKind,
   ImportableSandbox,
   ProjectDiagnostics,
   ProjectProgress
 } from '@shared/ipc'
 import { sbxCreate, sbxDiagnose, sbxLs, sbxMeasureSandboxPath, sbxRm, sbxStop } from '../sbx/cli'
 import { hostPathsEqual } from './pathTranslate'
-import { deleteSnapshot, listSnapshotsForProject } from '../persistence/snapshot'
+import { removeAllRecordsForProject, snapshotDir } from '../persistence/snapshot'
 import { projectsStore } from '../persistence/store'
 import { logsDir } from '../log'
 
@@ -185,8 +186,9 @@ export async function removeProject(id: string, trashHostDir: boolean): Promise<
     await shell.trashItem(project.hostPath)
   }
 
-  const snapshots = await listSnapshotsForProject(project.id)
-  for (const snapshot of snapshots) await deleteSnapshot(snapshot.sessionId)
+  // flows.md §9「Project とスナップショットを破棄」。バックアップ・削除済みも
+  // 含めて消す（プロジェクトごと消える以上、Read Only タブで開く入口も無くなる）。
+  await removeAllRecordsForProject(project.id)
 
   projectsStore.remove(id)
 }
@@ -204,11 +206,11 @@ export async function diagnose(): Promise<string> {
 /** ui.md §2「プロジェクトの詳細」の診断情報。N-2-6: まとめてコピーできる形にする。 */
 const RECENT_LOG_LINES = 500
 
-/** `src/main/log.ts` が書くファイル名 `{ms}_{projectId}_{sessionId}.log` から、このプロジェクトの最後のセッションのログを逆引きする。 */
+/** プロジェクトのログディレクトリ（`src/main/log.ts`、`{ms}_{sessionId}.log`）から最後のセッションのログを探す。 */
 async function findLatestLogFile(projectId: string): Promise<string | null> {
-  const dir = logsDir()
+  const dir = logsDir(projectId)
   const entries = await readdir(dir).catch(() => [])
-  const matches = entries.filter((f) => f.includes(`_${projectId}_`)).sort()
+  const matches = entries.filter((f) => f.endsWith('.log')).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
   const latest = matches[matches.length - 1]
   return latest ? path.join(dir, latest) : null
 }
@@ -244,7 +246,22 @@ export async function getProjectDiagnostics(id: string): Promise<ProjectDiagnost
     readSessionLogs(id)
   ])
   const sbxLsEntry = sandboxes.find((s) => s.id === project.sandboxId) ?? null
-  return { project, diagnoseOutput, sbxLsEntry, ...logs }
+  return { project, diagnoseOutput, sbxLsEntry, ...logs, logsDir: logsDir(id), snapshotsDir: snapshotDir(id) }
+}
+
+export async function openDataDir(id: string, kind: DataDirKind): Promise<void> {
+  if (kind === 'logs') {
+    const latest = await findLatestLogFile(id)
+    if (latest) {
+      shell.showItemInFolder(latest)
+      return
+    }
+  }
+  const dir = kind === 'logs' ? logsDir(id) : snapshotDir(id)
+  // まだ一度もセッションを開いていないとディレクトリ自体が無い。
+  await mkdir(dir, { recursive: true })
+  const error = await shell.openPath(dir)
+  if (error) throw new Error(error)
 }
 
 export async function stopProject(id: string): Promise<void> {

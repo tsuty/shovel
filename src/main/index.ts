@@ -1,5 +1,7 @@
 import { app, session } from 'electron'
 import { registerIpc } from './ipc/registerIpc'
+import { migrateFlatLogs } from './log'
+import { migrateFlatSnapshots } from './persistence/snapshot'
 import { openProjectManagerWindow } from './windows/projectManagerWindow'
 import { anyProjectWindowOpen, getProjectManagerWindow } from './windows/registry'
 
@@ -15,8 +17,13 @@ if (!gotLock) {
     else openProjectManagerWindow()
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     installContentSecurityPolicy()
+    // 以前の全プロジェクト共通の置き場から、プロジェクトごとのディレクトリへ
+    // 移す。履歴一覧が旧ファイルを見落とさないよう、ウィンドウを開く前に済ませる。
+    await Promise.all([migrateFlatSnapshots(), migrateFlatLogs()]).catch((err) =>
+      console.warn('[startup] migration of local records failed', err)
+    )
     registerIpc()
     openProjectManagerWindow()
   })
@@ -35,7 +42,11 @@ if (!gotLock) {
 
 function installContentSecurityPolicy(): void {
   const isDev = !app.isPackaged
-  const scriptSrc = isDev ? "'self' 'unsafe-inline' http://localhost:*" : "'self'"
+  // 'wasm-unsafe-eval': shiki（ファイルビューアのハイライト）が oniguruma の
+  // WASM をコンパイルするのに要る。JS の eval は許可しない。
+  const scriptSrc = isDev
+    ? "'self' 'unsafe-inline' 'wasm-unsafe-eval' http://localhost:*"
+    : "'self' 'wasm-unsafe-eval'"
   const connectSrc = isDev ? "'self' ws://localhost:* http://localhost:*" : "'self'"
   const csp = [
     "default-src 'self'",

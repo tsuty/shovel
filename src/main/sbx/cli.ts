@@ -48,12 +48,20 @@ export async function sbxLs(): Promise<SbxLsEntry[]> {
   return parsed.sandboxes ?? []
 }
 
+// eslint-disable-next-line no-control-regex
+const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
+
+/** `sbx diagnose` はカラー出力を含むため、表示・コピー用にANSIエスケープシーケンスを除く。 */
+function stripAnsi(text: string): string {
+  return text.replace(ANSI_ESCAPE_PATTERN, '')
+}
+
 export async function sbxDiagnose(): Promise<string> {
   // sbx diagnose は前提条件が欠けているとき非 0 で終了しうるが、その出力こそ
   // 利用者に見せたい内容なので、終了コードに関わらずテキストを返す。
   const result = await run(['diagnose'])
-  const parts = [result.stdout.trim()]
-  if (result.stderr.trim()) parts.push('--- stderr ---', result.stderr.trim())
+  const parts = [stripAnsi(result.stdout.trim())]
+  if (result.stderr.trim()) parts.push('--- stderr ---', stripAnsi(result.stderr.trim()))
   return parts.join('\n')
 }
 

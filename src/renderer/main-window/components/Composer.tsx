@@ -28,8 +28,11 @@ export function Composer({
   onSend,
   onStop,
   onSetMode,
-  onSetConfigOption
+  onSetConfigOption,
+  sendKey = 'enter'
 }: {
+  /** 送信キーの設定（ui.md §8）。`modEnter` は Cmd/Ctrl+Enter で送信し、Enter は改行。 */
+  sendKey?: 'enter' | 'modEnter'
   meta: SessionMeta
   sending: boolean
   attachments: AttachmentChip[]
@@ -151,17 +154,24 @@ export function Composer({
               }
             }
             // decisions.md G-1-5: IME 合成中の Enter で誤送信しない。
-            if (e.key === 'Enter' && !e.shiftKey && !composingRef.current && !e.nativeEvent.isComposing) {
+            if (e.key !== 'Enter' || composingRef.current || e.nativeEvent.isComposing) return
+            const modPressed = window.shovel.platform === 'darwin' ? e.metaKey : e.ctrlKey
+            const shouldSend = sendKey === 'enter' ? !e.shiftKey && !modPressed : modPressed
+            if (shouldSend) {
               e.preventDefault()
               submit()
             }
           }}
         />
       </div>
-      <div className="mt-2 flex items-center gap-2">
-        {meta.modes.length > 0 && (
+      {/* 幅が狭いとき（チャットの横に Markdown を添えたとき等）は折り返し、
+          長いラベルのセレクタは省略表示にして、チャット欄の外へはみ出さない。 */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {/* ACP: configOptions に category "mode" があれば、そちらがモードの正。
+            旧来の `modes` は互換用に並行して届くだけなので出さない（2つ並ぶため）。 */}
+        {meta.modes.length > 0 && !meta.configOptions.some((opt) => opt.category === 'mode') && (
           <select
-            className="h-8 rounded-md border border-input bg-transparent px-2 text-xs"
+            className="h-8 min-w-0 max-w-[12rem] truncate rounded-md border border-input bg-transparent px-2 text-xs"
             value={meta.currentModeId ?? ''}
             onChange={(e) => onSetMode(e.target.value)}
           >
@@ -176,7 +186,7 @@ export function Composer({
           opt.kind === 'select' ? (
             <select
               key={opt.configId}
-              className="h-8 rounded-md border border-input bg-transparent px-2 text-xs"
+              className="h-8 min-w-0 max-w-[12rem] truncate rounded-md border border-input bg-transparent px-2 text-xs"
               value={opt.currentValue}
               onChange={(e) => onSetConfigOption(opt.configId, e.target.value)}
               title={opt.label}
@@ -206,7 +216,17 @@ export function Composer({
             {formatUsage(meta.usage)}
           </span>
         )}
-        <div className="ml-auto">
+        {/* title はボタンではなく外側に付ける（無効化したボタンにはホバーが届かない）。 */}
+        <div
+          className="ml-auto"
+          title={
+            sending
+              ? undefined
+              : sendKey === 'enter'
+                ? t('composer.sendHintEnter')
+                : t('composer.sendHintModEnter', { mod: window.shovel.platform === 'darwin' ? '⌘' : 'Ctrl' })
+          }
+        >
           {sending ? (
             <Button variant="destructive" size="sm" onClick={onStop}>
               {t('composer.stop')}

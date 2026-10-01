@@ -2,11 +2,11 @@ import { useEffect, useReducer, useState } from 'react'
 import { RotateCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionMeta } from '@shared/types/session'
-import type { SessionEnvelope } from '@shared/ipc'
 import type { AttachmentChip } from '@shared/types/transcript'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
 import { flushAllEditors } from '../editorRegistry'
 import { registerAttachHandler } from '../attachmentRegistry'
+import { subscribeSessionEvents } from '../sessionEvents'
 import { LiveThoughtArea, Transcript } from './Transcript'
 import { Composer } from './Composer'
 
@@ -19,14 +19,19 @@ export function SessionView({
   initialMeta,
   initialAttachments = [],
   onOpenFile,
-  onStatusChange
+  onStatusChange,
+  onRefreshed,
+  sendKey
 }: {
+  sendKey?: 'enter' | 'modEnter'
   sessionId: string
   initialMeta: SessionMeta
   initialAttachments?: string[]
   onOpenFile: (relPath: string) => void
   /** ui.md §4「背景タブの通知」。TabBar が非アクティブなタブに反映する。 */
   onStatusChange?: (status: { sending: boolean; hasPendingPermission: boolean }) => void
+  /** ↻ の完了。新しい会話の書き込み先スナップショット id を渡す。 */
+  onRefreshed?: (snapshotId: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [state, dispatch] = useReducer(transcriptReducer, initialTranscriptState)
@@ -36,9 +41,7 @@ export function SessionView({
   const [attachments, setAttachments] = useState<AttachmentChip[]>(() => initialAttachments.map(chipFromRelPath))
 
   useEffect(() => {
-    return window.shovel.session.onEvent((envelope: SessionEnvelope) => {
-      if (envelope.sessionId !== sessionId) return
-      const event = envelope.event
+    return subscribeSessionEvents(sessionId, (event) => {
       if (event.type === 'sessionMeta') {
         const { modes, currentModeId, configOptions, usage, commands } = event
         setMeta((prev) => ({ ...prev, modes, currentModeId, configOptions, usage, commands }))
@@ -67,10 +70,11 @@ export function SessionView({
 
   async function send(text: string): Promise<void> {
     // flows.md §4: 送信時に未保存の Markdown 編集をディスクへフラッシュする
-    // （エージェントは IDE のバッファではなくディスクを読むため）。
-    flushAllEditors()
+    // （エージェントは IDE のバッファではなくディスクを読むため）。書き込みの
+    // 完了を待ってから送る。
     setSending(true)
     try {
+      await flushAllEditors()
       await window.shovel.session.prompt(
         sessionId,
         text,
@@ -89,7 +93,7 @@ export function SessionView({
   async function refresh(): Promise<void> {
     setRefreshing(true)
     try {
-      await window.shovel.session.refresh(sessionId)
+      onRefreshed?.(await window.shovel.session.refresh(sessionId))
     } finally {
       setRefreshing(false)
     }
@@ -117,6 +121,7 @@ export function SessionView({
       />
       {state.liveThought && <LiveThoughtArea markdown={state.liveThought.markdown} />}
       <Composer
+        sendKey={sendKey}
         meta={meta}
         sending={sending}
         attachments={attachments}

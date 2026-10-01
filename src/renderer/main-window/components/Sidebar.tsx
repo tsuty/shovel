@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FolderTree, MessageSquare, SquareTerminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { SessionSnapshot } from '@shared/types/session'
+import type { HistoryEntry, LocalRecordSummary } from '@shared/types/session'
 import { cn } from '../../shared/lib/utils'
 import type { TabInfo } from './TabBar'
 import { Filer } from './Filer'
@@ -31,9 +31,12 @@ export function Sidebar({
   onSelectTab,
   onOpenFile,
   onOpenHistory,
+  onOpenLocalRecord,
   onRenameTab,
   onCloseTab,
-  onAddToContext
+  onAddToContext,
+  onAttachMarkdown,
+  canAttachMarkdown
 }: {
   projectId: string
   openPanels: Set<SidebarPanel>
@@ -44,10 +47,13 @@ export function Sidebar({
   activeSessionId: string | null
   onSelectTab: (sessionId: string) => void
   onOpenFile: (relPath: string, isMarkdown: boolean) => void
-  onOpenHistory: (snapshot: SessionSnapshot) => void
+  onOpenHistory: (entry: HistoryEntry) => void
+  onOpenLocalRecord: (record: LocalRecordSummary) => void
   onRenameTab: (sessionId: string, title: string) => void
   onCloseTab: (sessionId: string) => void
   onAddToContext: (relPath: string) => void
+  onAttachMarkdown: (relPath: string) => void
+  canAttachMarkdown: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [widths, setWidths] = useState<Record<string, number>>({})
@@ -96,12 +102,19 @@ export function Sidebar({
               activeSessionId={activeSessionId}
               onSelectTab={onSelectTab}
               onOpenHistory={onOpenHistory}
+              onOpenLocalRecord={onOpenLocalRecord}
               onRenameTab={onRenameTab}
               onCloseTab={onCloseTab}
             />
           )}
           {panel === 'filer' && (
-            <Filer projectId={projectId} onOpenFile={onOpenFile} onAddToContext={onAddToContext} />
+            <Filer
+              projectId={projectId}
+              onOpenFile={onOpenFile}
+              onAddToContext={onAddToContext}
+              onAttachMarkdown={onAttachMarkdown}
+              canAttachMarkdown={canAttachMarkdown}
+            />
           )}
         </ResizablePanel>
       ))}

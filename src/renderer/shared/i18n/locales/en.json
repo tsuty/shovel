@@ -8,13 +8,17 @@
     "cancel": "Cancel",
     "dismiss": "Dismiss",
     "save": "Save",
-    "retry": "Retry"
+    "retry": "Retry",
+    "close": "Close"
   },
   "detail": {
     "title": "Details",
     "hostPath": "Host path",
     "sandboxName": "Sandbox name",
     "agent": "Agent",
+    "logsDir": "Logs",
+    "snapshotsDir": "Session cache",
+    "openDir": "Open",
     "openTerminal": "Open OS terminal",
     "stop": "Stop",
     "diagnostics": "Diagnostics",
@@ -31,6 +35,7 @@
     "recheck": "Check again"
   },
   "header": {
+    "projectDetails": "Project details…",
     "allProjects": "All projects…",
     "recentProjects": "Recent projects",
     "newProject": "New project…"
@@ -65,7 +70,7 @@
     "noImportable": "No sandboxes to import."
   },
   "sidebar": {
-    "tabs": "Tabs",
+    "tabs": "Chats",
     "filer": "Files",
     "commands": "Run command",
     "comingSoon": "Coming soon"
@@ -73,11 +78,36 @@
   "filer": {
     "copyPath": "Copy path",
     "addToContext": "Add to context",
+    "noPreview": "This file can't be previewed in the app.",
+    "openWithDefaultApp": "Open with default app",
+    "viewerError": "Couldn't display this file.",
     "fileDeleted": "This file has been deleted.",
     "newFolder": "New folder",
     "newMarkdownFile": "New markdown file",
     "copy": "Copy",
-    "paste": "Paste"
+    "paste": "Paste",
+    "unreadable": "This folder's contents can't be shown",
+    "refresh": "Refresh",
+    "openInFinder": "Open in Finder",
+    "openInExplorer": "Open in Explorer",
+    "openInFileManager": "Open in file manager",
+    "attachToChat": "Open beside chat"
+  },
+  "fileStatus": {
+    "encodingUnknown": "Unknown encoding",
+    "eolMixed": "Mixed line endings",
+    "eolNone": "No line breaks",
+    "readOnly": "Read-only: this encoding can't be edited"
+  },
+  "codeBlock": {
+    "expand_one": "Show all ({{count}} line)",
+    "expand_other": "Show all ({{count}} lines)",
+    "collapse": "Collapse"
+  },
+  "mermaid": {
+    "title": "Diagram (Mermaid)",
+    "show": "Show diagram",
+    "error": "Couldn't draw the diagram (the Mermaid source has an error)."
   },
   "editor": {
     "mode": {
@@ -85,7 +115,12 @@
       "source": "Source",
       "preview": "Preview"
     },
-    "conflict": "The agent changed this file, so your edits were saved to {{path}}."
+    "conflict": "The agent changed this file, so your edits were saved to {{path}}.",
+    "attachToChat": "Show beside chat",
+    "attachTarget": {
+      "title": "Which chat should it go beside?",
+      "description": "Choose the chat to show {{path}} beside."
+    }
   },
   "settings": {
     "title": "Settings",
@@ -95,7 +130,10 @@
     "light": "Light",
     "dark": "Dark",
     "transcriptFontSize": "Transcript font size",
-    "autoAttachActiveFile": "Automatically attach the active file"
+    "autoAttachActiveFile": "Automatically attach the active file",
+    "sendKey": "Send key",
+    "sendKeyEnter": "Enter to send (Shift+Enter for newline)",
+    "sendKeyModEnter": "{{mod}}+Enter to send (Enter for newline)"
   },
   "history": {
     "title": "History",
@@ -103,18 +141,36 @@
     "readOnlyNotice": "Read-only history. The agent no longer remembers this conversation.",
     "startNew": "Start new session",
     "empty": "Nothing was recorded for this session.",
-    "confirmDelete": "Delete this session's local history? This cannot be undone.",
+    "confirmDelete": "Delete this session? It will disappear from the history list, but the record can still be opened read-only via \"Show deleted\".",
     "resume": "Resume",
     "resuming": "Resuming…",
-    "resumeUnsupported": "This agent cannot resume past sessions. This history can only be viewed, not continued."
+    "resumeUnsupported": "This agent cannot resume past sessions. This history can only be viewed, not continued.",
+    "backupBar": "Backup · {{date}}",
+    "deletedBar": "Deleted · {{date}}",
+    "backups": "{{count}} backups",
+    "showDeleted": "Show deleted",
+    "deletedSection": "Deleted",
+    "confirmDeleteAgentOnly": "Delete this session on the agent side? This app has no record of it, so this cannot be undone.",
+    "agentOnlyNotice": "This app has no record of this session. The agent still remembers it.",
+    "agentOnlyEmpty": "Press \"Resume\" to load and show the conversation from the agent.",
+    "state": {
+      "localOnly": "The agent no longer remembers this conversation (view only)",
+      "agentOnly": "No record in this app (exists only on the agent side)"
+    }
   },
   "commands": {
+    "title": "Console",
+    "close": "Close console",
+    "removeHistory": "Remove from history",
     "hint": "Prompts like [Y/n] can be answered, but full-screen apps such as vim will not work.",
-    "placeholder": "Run a command…",
+    "placeholder": "Run a command… (↑↓ for history)",
     "run": "Run",
     "cancel": "Cancel",
     "stdinPlaceholder": "Send input…",
-    "sendInput": "Send"
+    "sendInput": "Send",
+    "history": "History",
+    "historyEmpty": "No history yet.",
+    "historyHint": "Click to insert (won't run yet)"
   },
   "transcript": {
     "you": "You",
@@ -122,16 +178,22 @@
     "plan": "Plan",
     "thinking": "Thinking",
     "working": "Working…",
-    "worked": "Worked",
+    "toolCallSummary_one": "{{count}} tool call ({{breakdown}})",
+    "toolCallSummary_other": "{{count}} tool calls ({{breakdown}})",
     "copy": "Copy",
     "viewDiff": "View diff",
     "sendChoices": "Send",
     "jumpToLatest": "Jump to latest",
-    "backToTurnStart": "↑ Back to turn start"
+    "backToTurnStart": "↑ Back to turn start",
+    "notice": {
+      "replayAdopted": "The agent's record of this session has changed, so the previous contents were saved as a backup."
+    }
   },
   "composer": {
     "placeholder": "Message the agent…",
     "send": "Send",
+    "sendHintEnter": "Send: Enter / New line: Shift+Enter",
+    "sendHintModEnter": "Send: {{mod}}+Enter / New line: Enter",
     "stop": "Stop",
     "removeAttachment": "Remove attachment",
     "usageTitle": "{{used}} / {{size}} tokens used in this session's context"
@@ -142,10 +204,23 @@
   "mainWindow": {
     "noProject": "No project was specified.",
     "connecting": "Connecting…",
-    "refreshTab": "Start a new session on this tab (reuses the current connection)"
+    "refreshTab": "Start a new session on this chat (reuses the current connection)",
+    "newChatTitle": "Chat {{count}}",
+    "tabLimitReached": "You can have up to 10 tabs. Close a tab and try again."
   },
   "diff": {
     "empty": "No diff to show.",
     "hiddenLines": "… {{count}} lines"
+  },
+  "search": {
+    "title": "Search sessions",
+    "open": "Search sessions",
+    "placeholder": "Search keywords",
+    "clear": "Clear",
+    "includeDeleted": "Include deleted",
+    "results": "Results",
+    "noResults": "No matching sessions.",
+    "backupDate": "Backup · {{date}}",
+    "deletedDate": "Deleted · {{date}}"
   }
 }

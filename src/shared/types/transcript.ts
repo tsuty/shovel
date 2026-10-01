@@ -75,7 +75,18 @@ export type TranscriptEvent =
       choices?: { id: string; label: string }[]
     }
   | { type: 'stream'; id: string; text: string }
-  | { type: 'blockMarkdown'; id: string; markdown: string; choices?: { id: string; label: string }[] }
+  | {
+      type: 'blockMarkdown'
+      id: string
+      markdown: string
+      choices?: { id: string; label: string }[]
+      /**
+       * AGENT ブロックのときだけ、ACP の `messageId`（あれば）を運ぶ。renderer は
+       * 使わない。main 側のスナップショット蓄積が `SnapshotEntry.messageId` と
+       * して保存するためのもの（decisions.md C-4 の比較に使う）。
+       */
+      messageId?: string
+    }
   | { type: 'attachments'; id: string; chips: AttachmentChip[] }
   | { type: 'group'; id: string; timed: boolean; closed: boolean; elapsedMs?: number }
   | { type: 'toolCall'; toolCall: ToolCallPayload }
@@ -91,6 +102,15 @@ export type TranscriptEvent =
   | { type: 'permissionResolved'; id: string; status: PermissionResolution; optionId?: string }
   | { type: 'turnEnd'; id: string; targetId: string }
   | { type: 'toast'; text: string }
+  /**
+   * トランスクリプトに差し込む控えめな地の文（SYSTEM ブロックと同じ見た目）。
+   * 文言は renderer 側の i18n で `transcript.notice.{key}` から引く
+   * （main はロケールを知らないため、キーだけを運ぶ）。
+   *   - `replayAdopted`: decisions.md C-4。`session/load` の replay とローカル
+   *     記録が食い違ったため、ローカルをバックアップへ退避して表示を
+   *     エージェント側の記録に置き換えた。
+   */
+  | { type: 'notice'; id: string; key: 'replayAdopted' }
   /**
    * ui.md §8「Mode / Model は session/new が返す modes / configOptions から
    * 構成する」の実装: `current_mode_update` / `config_option_update` を

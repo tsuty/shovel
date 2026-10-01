@@ -12,6 +12,8 @@
  * 形に合わせて Model も configOptions 経由に統一する。
  */
 
+import type { AttachmentChip, ToolCallPayload } from './transcript'
+
 export interface SessionMode {
   id: string
   name: string
@@ -94,9 +96,99 @@ export interface SessionSnapshot {
 }
 
 export interface SnapshotEntry {
+  /** ブロックの id。`TOOL_GROUP` のときはツールコールのグループ id。 */
   id: string
-  role: 'USER' | 'AGENT' | 'THOUGHT' | 'PLAN' | 'SYSTEM' | 'COMPLETION' | 'ERROR'
+  /**
+   * `TOOL_GROUP` は連続するツールコールのまとまり（`markdown` は空、中身は
+   * `toolCalls`）。比較（C-4）には使わないが、表示に要るものは比較対象で
+   * なくても保持する。
+   */
+  role: 'USER' | 'AGENT' | 'THOUGHT' | 'PLAN' | 'SYSTEM' | 'COMPLETION' | 'ERROR' | 'TOOL_GROUP'
   markdown: string
+  /** `TOOL_GROUP` のツールコール（`rawInput` は表示に使わず、diff と中身が重複するので落とす）。 */
+  toolCalls?: ToolCallPayload[]
+  /** USER ブロックに付けた添付（コンテキスト）チップ。 */
+  chips?: AttachmentChip[]
+  /** AGENT ブロックから抜き出した GFM タスクリストの選択肢。 */
+  choices?: { id: string; label: string }[]
+  /**
+   * AGENT エントリだけが持つ、ACP `agent_message_chunk` の `messageId`
+   * （任意フィールド。エージェントが送ってこなければ undefined）。
+   * decisions.md C-4: ローカル記録と `session/load` の replay が食い違って
+   * いるかは、テキストではなくこの id の並びだけで判定する。
+   */
+  messageId?: string
+}
+
+/**
+ * ローカルスナップショットのファイル種別。decisions.md C-4 / C-5、
+ * data-model.md §4:
+ *   - `current`: `{sessionId}.json`（現行の記録）
+ *   - `backup`:  `{sessionId}.json.{epochMillis}.backup`（食い違い検出時の退避）
+ *   - `deleted`: `{sessionId}.json.{epochMillis}.deleted`（ソフトデリート）
+ */
+export type LocalRecordKind = 'current' | 'backup' | 'deleted'
+
+/**
+ * チャット履歴パネル・ローカル検索が扱う、スナップショットファイル1つ分の
+ * 要約（本文 `entries` は含まない）。`fileName` がファイルの識別子で、
+ * 中身は `session.readLocalRecord(fileName)` で取り出す。
+ */
+export interface LocalRecordSummary {
+  fileName: string
+  kind: LocalRecordKind
+  sessionId: string
+  title: string
+  /**
+   * `current` はスナップショットの `savedAt`、`backup` / `deleted` は
+   * ファイル名の `{epochMillis}`（退避・削除した時刻）。
+   */
+  timestamp: number
+  sizeBytes: number
+}
+
+/**
+ * decisions.md C-1/C-2 補遺: 履歴一覧の1行が「どちら側に存在するか」。
+ *   - `both`: `session/list` にあり、ローカル記録もある
+ *   - `localOnly`: `session/list` を取得できたが、そこに無い
+ *   - `agentOnly`: `session/list` にあるが、ローカル記録が無い
+ *   - `unknown`: `session/list` を取得できていない（接続が無い・非対応・失敗）。
+ *     確かめていないので「ローカルのみ」とは表示しない
+ */
+export type HistoryEntryState = 'both' | 'localOnly' | 'agentOnly' | 'unknown'
+
+/** 履歴一覧の1行（`session/list` とローカル記録の和集合）。 */
+export interface HistoryEntry {
+  /** 行の識別子。ローカル記録があればその id、無ければ `acp:{acpSessionId}`。 */
+  key: string
+  /** ローカル記録（`{snapshotId}.json`）があればその id。 */
+  snapshotId?: string
+  /** エージェント側のセッション id（分かっていれば）。 */
+  acpSessionId?: string
+  title: string
+  /** ローカルの `savedAt` とエージェントの `updatedAt` の新しい方。 */
+  updatedAt: number
+  state: HistoryEntryState
+}
+
+export interface HistoryListing {
+  entries: HistoryEntry[]
+  /**
+   * いま `session/delete` を送れるか（同じウィンドウにライブタブがあり、
+   * エージェントが `delete` に対応している）。「エージェントのみ」の行は
+   * これが false のとき削除できない（decisions.md C-5 追記）。
+   */
+  canDeleteAgentSessions: boolean
+}
+
+/** decisions.md C-6: ローカルセッション検索の結果1行。 */
+export interface LocalSearchResult {
+  record: LocalRecordSummary
+  /**
+   * マッチ箇所を含む一文（Markdown 記法を落とした平文）。`match` を太字に
+   * する。タイトルにだけ一致した場合は undefined。
+   */
+  snippet?: { before: string; match: string; after: string }
 }
 
 /**

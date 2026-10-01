@@ -1,6 +1,25 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDown, Check, ChevronDown, ChevronRight, Copy } from 'lucide-react'
+import {
+  ArrowDown,
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Eye,
+  FileInput,
+  FilePenLine,
+  Globe,
+  Info,
+  Lightbulb,
+  Search,
+  SquareTerminal,
+  ToggleRight,
+  Trash2,
+  User,
+  type LucideIcon
+} from 'lucide-react'
 import type { ToolCallPayload } from '@shared/types/transcript'
 import type { RenderBlock, RenderChoice, RenderPermission, TranscriptState } from '../transcriptState'
 import { cn } from '../../shared/lib/utils'
@@ -48,35 +67,59 @@ export function Transcript({
   onSubmitChoices: (markdown: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  /**
+   * decisions.md N-1: 追記時のスクロール追従は「すでに最下部にいたときだけ」
+   * （閾値 24px）。判定は追記の「前」の位置で行う必要がある。追記後に測ると、
+   * 24px を超える追記が1回来ただけで「最下部ではない」と見なされ追従が
+   * 止まってしまうため、ユーザーのスクロールのたびにここへ記録しておく。
+   */
+  const stickToBottomRef = useRef(true)
   const [diffToolCall, setDiffToolCall] = useState<ToolCallPayload | null>(null)
   // ui.md §5「最下部より下に何かある間は、右下に『最新へ』ボタンを浮かせる」。
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
 
-  function updateJumpVisibility(): void {
+  function scrollToLatest(): void {
     const container = containerRef.current
     if (!container) return
-    const distance = container.scrollHeight - container.scrollTop - container.clientHeight
-    setShowJumpToLatest(distance > 24)
+    stickToBottomRef.current = true
+    container.scrollTop = container.scrollHeight
   }
 
-  useEffect(() => {
+  // 追記は描画の確定と同じタイミングで追従させる（ResizeObserver だけだと、
+  // DOM 更新から通知までの間に一瞬だけ最下部からずれた状態が挟まる）。
+  useLayoutEffect(() => {
     const container = containerRef.current
-    if (!container) return
-    // decisions.md N-1: 追記時のスクロール追従は「すでに最下部にいたときだけ」（閾値 24px）。
-    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 24
-    if (nearBottom) bottomRef.current?.scrollIntoView({ block: 'end' })
-    updateJumpVisibility()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (container && container.clientHeight > 0 && stickToBottomRef.current) {
+      container.scrollTop = container.scrollHeight
+    }
   }, [state])
 
   useEffect(() => {
     const container = containerRef.current
-    if (!container) return
-    container.addEventListener('scroll', updateJumpVisibility)
-    return () => container.removeEventListener('scroll', updateJumpVisibility)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const content = contentRef.current
+    if (!container || !content) return
+    function onScroll(): void {
+      const distance = container!.scrollHeight - container!.scrollTop - container!.clientHeight
+      stickToBottomRef.current = distance < 24
+      setShowJumpToLatest(distance > 24)
+    }
+    // 高さの変化は state の更新に限らない（ツール行の折り畳み、Markdown の
+    // 描画確定など）ので、中身の大きさそのものを見て追従する。
+    const observer = new ResizeObserver(() => {
+      // 非表示タブ（display: none）では寸法が 0 になる。ここで判定し直すと
+      // 「最下部にいる」扱いに化けるので、見えていない間は何もしない。
+      if (container.clientHeight === 0) return
+      if (stickToBottomRef.current) container.scrollTop = container.scrollHeight
+      else onScroll()
+    })
+    observer.observe(content)
+    container.addEventListener('scroll', onScroll)
+    return () => {
+      observer.disconnect()
+      container.removeEventListener('scroll', onScroll)
+    }
   }, [])
 
   function jumpToTurnStart(userBlockId: string): void {
@@ -88,7 +131,7 @@ export function Transcript({
   return (
     <div className="relative flex-1 overflow-hidden">
       <div ref={containerRef} className="h-full overflow-y-auto px-4 py-3">
-        <div className="flex flex-col gap-3">
+        <div ref={contentRef} className="flex flex-col gap-3">
           {turns.map((turn, turnIndex) => (
             <div key={turn.userBlockId ?? `turn-${turnIndex}`} className="flex flex-col gap-3">
               {turn.entries.map((entry) =>
@@ -115,7 +158,7 @@ export function Transcript({
               )}
               {turn.userBlockId && (
                 <button
-                  className="self-start text-xs text-muted-foreground hover:text-foreground hover:underline"
+                  className="self-start text-transcript-sm text-muted-foreground hover:text-foreground hover:underline"
                   onClick={() => jumpToTurnStart(turn.userBlockId!)}
                 >
                   {t('transcript.backToTurnStart')}
@@ -124,12 +167,11 @@ export function Transcript({
             </div>
           ))}
         </div>
-        <div ref={bottomRef} />
       </div>
       {showJumpToLatest && (
         <button
           className="absolute bottom-4 right-4 flex items-center gap-1 rounded-full border border-border bg-background px-3 py-1.5 text-xs shadow-md hover:bg-accent"
-          onClick={() => bottomRef.current?.scrollIntoView({ block: 'end' })}
+          onClick={scrollToLatest}
         >
           <ArrowDown size={12} />
           {t('transcript.jumpToLatest')}
@@ -180,24 +222,29 @@ function BlockView({
 
   if (block.role === 'THOUGHT') {
     return (
-      <details className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+      <details className="rounded-md border border-border bg-muted/30 px-3 py-2 text-transcript text-muted-foreground">
         <summary className="cursor-pointer select-none">{t('transcript.thinking')}</summary>
         <div className="mt-2 whitespace-pre-wrap">{block.markdown}</div>
       </details>
     )
   }
   if (block.role === 'SYSTEM' || block.role === 'COMPLETION') {
-    return <div className="text-center text-xs text-muted-foreground">{block.markdown}</div>
+    return (
+      <div className="text-center text-transcript-sm text-muted-foreground">
+        {block.noticeKey ? t(`transcript.notice.${block.noticeKey}`) : block.markdown}
+      </div>
+    )
   }
   if (block.role === 'ERROR') {
     return (
-      <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-transcript text-destructive">
         {block.markdown}
       </div>
     )
   }
 
   const label = block.role === 'USER' ? t('transcript.you') : block.role === 'PLAN' ? t('transcript.plan') : t('transcript.agent')
+  const LabelIcon = block.role === 'USER' ? User : block.role === 'AGENT' ? Bot : null
 
   return (
     <div
@@ -205,12 +252,18 @@ function BlockView({
         // 名前付き group: ネストした Markdown 内のコードブロックにも独自の
         // group/code があるため、無名の group だと外側を hover しただけで
         // 内側のコピー ボタンまで出てしまう（実機テストで確認済みの不具合）。
-        'group/message rounded-md border px-3 py-2',
-        block.role === 'PLAN' ? 'border-border bg-muted/20 text-sm' : 'border-border'
+        'group/message rounded-md border border-border px-3 py-2',
+        // 自分の発言はアイコンだけでは見分けにくいので、背景色を背景よりわずかに
+        // 変える（ライトはごく薄いグレー、ダークは黒よりわずかに明るいグレー）。
+        block.role === 'PLAN' && 'bg-muted/20',
+        block.role === 'USER' && 'bg-muted/50'
       )}
     >
-      <div className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
-        <span>{label}</span>
+      <div className="mb-1 flex items-center justify-between text-transcript-sm font-medium text-muted-foreground">
+        <span className="flex items-center gap-1">
+          {LabelIcon && <LabelIcon size={12} />}
+          {label}
+        </span>
         {!block.streaming && (
           <button
             className="opacity-0 transition-opacity hover:text-foreground group-hover/message:opacity-100"
@@ -226,7 +279,7 @@ function BlockView({
           {block.chips.map((chip) => (
             <button
               key={chip.key}
-              className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="rounded-full border border-border bg-muted px-2 py-0.5 text-transcript-sm text-muted-foreground hover:bg-accent hover:text-foreground"
               title={chip.path}
               onClick={() => onOpenFile(chip.path)}
             >
@@ -236,9 +289,14 @@ function BlockView({
         </div>
       )}
       {block.streaming ? (
-        <div className="whitespace-pre-wrap text-sm">{block.markdown}</div>
+        <div className="whitespace-pre-wrap text-transcript">{block.markdown}</div>
       ) : (
-        <Markdown text={block.choices ? stripChoiceLines(block.markdown) : block.markdown} />
+        <Markdown
+          className="text-transcript"
+          text={block.choices ? stripChoiceLines(block.markdown) : block.markdown}
+          onOpenFileLink={onOpenFile}
+          collapseCodeBlocks
+        />
       )}
       {block.choices && block.choices.length > 0 && (
         <ChoicesView choices={block.choices} onSubmit={onSubmitChoices} />
@@ -276,7 +334,7 @@ function ChoicesView({
   return (
     <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
       {choices.map((c) => (
-        <label key={c.id} className="flex items-center gap-2 text-sm">
+        <label key={c.id} className="flex items-center gap-2 text-transcript">
           <input type="checkbox" disabled={submitted} checked={checked.has(c.id)} onChange={() => toggle(c.id)} />
           {c.label}
         </label>
@@ -301,6 +359,33 @@ const KIND_VERBS: Record<string, string> = {
   switch_mode: 'Switch mode',
   think: 'Think',
   other: 'Tool'
+}
+
+/**
+ * ツールコールの種類ごとのアイコン。SAC の対応表（docs/reference/ICONS.md
+ * §3.1）の絵柄に、lucide の近いものを当てている。知らない種類は other。
+ */
+const KIND_ICONS: Record<string, LucideIcon> = {
+  read: Eye,
+  edit: FilePenLine,
+  delete: Trash2,
+  move: FileInput,
+  search: Search,
+  execute: SquareTerminal,
+  think: Lightbulb,
+  fetch: Globe,
+  switch_mode: ToggleRight,
+  other: Info
+}
+
+/** 折り畳んだグループの要約に使う内訳（「Read ×3, Edit ×2」）。並びは初出順。 */
+function kindBreakdown(toolCalls: ToolCallPayload[]): string {
+  const counts = new Map<string, number>()
+  for (const tc of toolCalls) {
+    const verb = KIND_VERBS[tc.kind] ?? 'Tool'
+    counts.set(verb, (counts.get(verb) ?? 0) + 1)
+  }
+  return [...counts].map(([verb, n]) => `${verb} ×${n}`).join(', ')
 }
 
 function toolCallLine(tc: ToolCallPayload): string {
@@ -336,6 +421,11 @@ function GroupView({
     if (p.status === 'pending') pendingByToolCall.set(p.toolCallId, p)
   }
 
+  // 連続するツールコールはグループ単位でも畳める。作業中は開いておき、
+  // グループが閉じた（=完了した）ら畳む。ユーザーが自分で開閉したら
+  // それを優先するが、許可待ちのカードがある間は隠さない。
+  const [groupOpenOverride, setGroupOpenOverride] = useState<boolean | null>(null)
+  const groupOpen = pendingByToolCall.size > 0 || (groupOpenOverride ?? !closed)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const rowRefs = useRef(new Map<string, HTMLElement>())
   // ui.md §5「折り畳み時はクリックした行を画面上の位置に保つ」。トグル直前の
@@ -365,15 +455,23 @@ function GroupView({
   }, [expanded, scrollContainerRef])
 
   return (
-    <div className="rounded-md border border-border">
-      <div className="border-b border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
-        {closed ? t('transcript.worked') : t('transcript.working')}
-      </div>
-      <ul className="divide-y divide-border">
+    <div className="text-transcript-sm">
+      <button
+        className="flex max-w-full items-center gap-1 text-muted-foreground hover:text-foreground"
+        onClick={() => setGroupOpenOverride(!groupOpen)}
+      >
+        {groupOpen ? <ChevronDown size={12} className="shrink-0" /> : <ChevronRight size={12} className="shrink-0" />}
+        <span className="truncate">
+          {!closed && `${t('transcript.working')} `}
+          {t('transcript.toolCallSummary', { count: toolCalls.length, breakdown: kindBreakdown(toolCalls) })}
+        </span>
+      </button>
+      <ul className={cn('mt-1 flex flex-col gap-1 pl-4', !groupOpen && 'hidden')}>
         {toolCalls.map((tc) => {
           const permission = pendingByToolCall.get(tc.id)
           const canExpand = !NON_EXPANDABLE_KINDS.has(tc.kind) && !!tc.content
           const isExpanded = expanded.has(tc.id)
+          const KindIcon = KIND_ICONS[tc.kind] ?? Info
           return (
             <li
               key={tc.id}
@@ -381,32 +479,41 @@ function GroupView({
                 if (el) rowRefs.current.set(tc.id, el)
                 else rowRefs.current.delete(tc.id)
               }}
-              className="px-3 py-1.5"
             >
               <div className="flex items-center gap-1">
-                {canExpand && (
+                {/* 展開できない行にも同じ幅を空けて、アイコンの縦位置を揃える。 */}
+                {canExpand ? (
                   <button
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    className="w-3 shrink-0 text-muted-foreground hover:text-foreground"
                     onClick={() => toggleExpand(tc.id)}
                   >
                     {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   </button>
+                ) : (
+                  <span className="w-3 shrink-0" />
                 )}
-                <div className="truncate text-sm" title={toolCallLine(tc)}>
+                <KindIcon
+                  className={cn(
+                    'h-[1.15em] w-[1.15em] shrink-0',
+                    tc.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'
+                  )}
+                  aria-hidden
+                />
+                <div className="truncate" title={toolCallLine(tc)}>
                   {toolCallLine(tc)}
                   {tc.diffs.length > 0 && (
-                    <span className="ml-2 text-xs text-muted-foreground">
+                    <span className="ml-2 text-muted-foreground">
                       +{tc.diffs.reduce((s, d) => s + d.added, 0)} -{tc.diffs.reduce((s, d) => s + d.removed, 0)}
                     </span>
                   )}
                 </div>
               </div>
               {(tc.locations.length > 0 || tc.diffs.length > 0) && (
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                <div className="ml-[calc(1.25rem+1.15em)] mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-transcript-xs">
                   {tc.locations.map((loc, i) => (
                     <button
                       key={i}
-                      className="truncate text-xs text-primary hover:underline"
+                      className="truncate text-primary hover:underline"
                       onClick={() => onOpenFile(loc.path)}
                     >
                       {loc.path}
@@ -414,14 +521,14 @@ function GroupView({
                     </button>
                   ))}
                   {tc.diffs.length > 0 && (
-                    <button className="text-xs text-primary hover:underline" onClick={() => onOpenDiff(tc)}>
+                    <button className="text-primary hover:underline" onClick={() => onOpenDiff(tc)}>
                       {t('transcript.viewDiff')}
                     </button>
                   )}
                 </div>
               )}
               {canExpand && isExpanded && (
-                <div className="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                <div className="ml-[calc(1.25rem+1.15em)] mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-muted/40 px-2 py-1 text-transcript-xs text-muted-foreground">
                   {tc.content}
                 </div>
               )}
@@ -443,14 +550,14 @@ function PermissionCard({
 }): React.JSX.Element {
   return (
     <div className="mt-2 rounded-md border border-primary/40 bg-primary/5 p-2">
-      <div className="mb-1 text-sm font-medium">{permission.headline}</div>
-      {permission.bodyMarkdown && <Markdown text={permission.bodyMarkdown} />}
+      <div className="mb-1 text-transcript font-medium">{permission.headline}</div>
+      {permission.bodyMarkdown && <Markdown className="text-transcript" text={permission.bodyMarkdown} />}
       <div className="mt-2 flex flex-wrap gap-2">
         {permission.options.map((opt) => (
           <button
             key={opt.optionId}
             className={cn(
-              'rounded-md border px-2 py-1 text-xs',
+              'rounded-md border px-2 py-1 text-transcript-sm',
               opt.kind.startsWith('allow')
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-input bg-transparent'
@@ -523,7 +630,7 @@ export function LiveThoughtArea({ markdown }: { markdown: string }): React.JSX.E
   }, [markdown])
 
   return (
-    <div className="border-t border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+    <div className="border-t border-border bg-muted/30 px-3 py-1.5 text-transcript-sm text-muted-foreground">
       <div className="mb-1 font-medium">{t('transcript.thinking')}</div>
       <div ref={scrollRef} className="max-h-16 overflow-y-auto whitespace-pre-wrap">
         {markdown}

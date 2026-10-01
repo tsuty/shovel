@@ -1,4 +1,4 @@
-import { ChevronDown, FolderPlus, LayoutGrid, Settings } from 'lucide-react'
+import { ChevronDown, FolderPlus, Info, LayoutGrid, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ProjectWithStatus, SandboxStatus } from '@shared/types/project'
 import { AppLogo } from '../../shared/components/AppLogo'
@@ -26,13 +26,15 @@ export function Header({
   status,
   currentProjectId,
   recentProjects,
-  onOpenSettings
+  onOpenSettings,
+  onOpenDetails
 }: {
   displayName: string
   status: SandboxStatus | null
   currentProjectId: string | null
   recentProjects: ProjectWithStatus[]
   onOpenSettings: () => void
+  onOpenDetails: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const recent = recentProjects
@@ -43,7 +45,7 @@ export function Header({
   return (
     <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-3">
       <div className="flex min-w-0 items-center gap-2">
-        <AppLogo size={20} />
+        <AppLogo />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex min-w-0 items-center gap-1 rounded px-1.5 py-1 text-sm font-medium hover:bg-accent">
@@ -52,6 +54,11 @@ export function Header({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-64">
+            <DropdownMenuItem onClick={onOpenDetails}>
+              <Info size={14} className="mr-2 shrink-0" />
+              {t('header.projectDetails')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             {recent.length > 0 && (
               <>
                 <DropdownMenuLabel>{t('header.recentProjects')}</DropdownMenuLabel>

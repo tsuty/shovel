@@ -1,8 +1,12 @@
-import { Shovel } from 'lucide-react'
+import { ShovelIcon } from './icons/ShovelIcon'
 import { cn } from '../lib/utils'
 
-/** ui.md §3 Header「アプリアイコン」。シャベル(shovel)そのものを意匠にする。 */
-export function AppLogo({ size = 22, className }: { size?: number; className?: string }): React.JSX.Element {
+/**
+ * ui.md §3 Header「アプリアイコン」。resources/icon.png（アプリアイコン）と同じ意匠だが、
+ * アプリ内で使う分にはラスター画像より SVG（ShovelIcon）の方が任意サイズで綺麗に出せる
+ * ので、そちらを bg-primary の色付きボックスに乗せて表示する。
+ */
+export function AppLogo({ size = 32, className }: { size?: number; className?: string }): React.JSX.Element {
   return (
     <div
       className={cn(
@@ -11,7 +15,7 @@ export function AppLogo({ size = 22, className }: { size?: number; className?: s
       )}
       style={{ width: size, height: size }}
     >
-      <Shovel size={Math.round(size * 0.62)} strokeWidth={2.25} />
+      <ShovelIcon size={Math.round(size * 0.85)} />
     </div>
   )
 }

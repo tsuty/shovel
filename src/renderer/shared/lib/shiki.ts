@@ -93,13 +93,29 @@ const EXT_TO_LANG: Record<string, string> = {
   dockerfile: 'docker'
 }
 
+/** Markdown のフェンスの言語名（`ts` / `typescript` / `sh` など）を shiki の言語名にする。 */
+export function langFromFence(lang: string): string {
+  const lower = lang.toLowerCase()
+  if ((LANGS as readonly string[]).includes(lower)) return lower
+  const aliases: Record<string, string> = { shell: 'bash', console: 'bash', text: 'plaintext', txt: 'plaintext', dockerfile: 'docker' }
+  return aliases[lower] ?? langFromFilename(`x.${lower}`)
+}
+
 export function langFromFilename(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
   return EXT_TO_LANG[ext] ?? 'plaintext'
 }
 
-export async function highlightToHtml(code: string, lang: string, dark: boolean): Promise<string> {
+/**
+ * ライト／ダーク両方の配色を1回で出力する（ダーク側は `--shiki-dark*` の CSS
+ * 変数に入り、globals.css が `.dark` のときに切り替える）。表示中にテーマを
+ * 変えても再ハイライトは要らない。
+ */
+export async function highlightToHtml(code: string, lang: string): Promise<string> {
   const highlighter = await getHighlighter()
   const effectiveLang = highlighter.getLoadedLanguages().includes(lang) ? lang : 'plaintext'
-  return highlighter.codeToHtml(code, { lang: effectiveLang, theme: dark ? 'github-dark' : 'github-light' })
+  return highlighter.codeToHtml(code, {
+    lang: effectiveLang,
+    themes: { light: 'github-light', dark: 'github-dark' }
+  })
 }

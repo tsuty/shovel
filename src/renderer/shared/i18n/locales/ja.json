@@ -8,13 +8,17 @@
     "cancel": "キャンセル",
     "dismiss": "閉じる",
     "save": "保存",
-    "retry": "再試行"
+    "retry": "再試行",
+    "close": "閉じる"
   },
   "detail": {
     "title": "詳細",
     "hostPath": "ホストのパス",
     "sandboxName": "サンドボックス名",
     "agent": "エージェント",
+    "logsDir": "ログ",
+    "snapshotsDir": "セッションキャッシュ",
+    "openDir": "開く",
     "openTerminal": "OS のターミナルを開く",
     "stop": "停止",
     "diagnostics": "診断情報",
@@ -31,6 +35,7 @@
     "recheck": "確認"
   },
   "header": {
+    "projectDetails": "プロジェクトの詳細…",
     "allProjects": "すべてのプロジェクト…",
     "recentProjects": "最近のプロジェクト",
     "newProject": "新しいプロジェクト…"
@@ -65,7 +70,7 @@
     "noImportable": "取り込めるサンドボックスはありません。"
   },
   "sidebar": {
-    "tabs": "タブ",
+    "tabs": "チャット",
     "filer": "ファイル",
     "commands": "コマンド実行",
     "comingSoon": "近日対応"
@@ -73,11 +78,35 @@
   "filer": {
     "copyPath": "パスをコピー",
     "addToContext": "コンテキストに追加",
+    "noPreview": "このファイルはアプリ内でプレビューできません。",
+    "openWithDefaultApp": "既定のアプリで開く",
+    "viewerError": "このファイルを表示できませんでした。",
     "fileDeleted": "このファイルは削除されました。",
     "newFolder": "新規フォルダ",
     "newMarkdownFile": "新規Markdownファイル",
     "copy": "コピー",
-    "paste": "貼り付け"
+    "paste": "貼り付け",
+    "unreadable": "このフォルダの中身は表示できません",
+    "refresh": "更新",
+    "openInFinder": "Finder で開く",
+    "openInExplorer": "エクスプローラーで開く",
+    "openInFileManager": "ファイルマネージャーで開く",
+    "attachToChat": "チャットの横で開く"
+  },
+  "fileStatus": {
+    "encodingUnknown": "文字コード不明",
+    "eolMixed": "改行混在",
+    "eolNone": "改行なし",
+    "readOnly": "この文字コードは編集できません（表示のみ）"
+  },
+  "codeBlock": {
+    "expand": "すべて表示（{{count}}行）",
+    "collapse": "折りたたむ"
+  },
+  "mermaid": {
+    "title": "図（Mermaid）",
+    "show": "図を表示",
+    "error": "図を描けませんでした（Mermaid の書き方に誤りがあります）。"
   },
   "editor": {
     "mode": {
@@ -85,7 +114,12 @@
       "source": "ソース",
       "preview": "プレビュー"
     },
-    "conflict": "AI がこのファイルを変更したため、あなたの編集を {{path}} に保存しました。"
+    "conflict": "AI がこのファイルを変更したため、あなたの編集を {{path}} に保存しました。",
+    "attachToChat": "チャットの横に表示",
+    "attachTarget": {
+      "title": "どのチャットの横に表示しますか？",
+      "description": "{{path}} を横に表示するチャットを選んでください。"
+    }
   },
   "settings": {
     "title": "設定",
@@ -95,7 +129,10 @@
     "light": "ライト",
     "dark": "ダーク",
     "transcriptFontSize": "トランスクリプトの文字サイズ",
-    "autoAttachActiveFile": "開いているファイルを自動的に添付する"
+    "autoAttachActiveFile": "開いているファイルを自動的に添付する",
+    "sendKey": "送信キー",
+    "sendKeyEnter": "Enter で送信（Shift+Enter で改行）",
+    "sendKeyModEnter": "{{mod}}+Enter で送信（Enter で改行）"
   },
   "history": {
     "title": "履歴",
@@ -103,18 +140,36 @@
     "readOnlyNotice": "読み取り専用の履歴です。エージェントはこの会話を覚えていません。",
     "startNew": "新しいセッションとして始める",
     "empty": "このセッションには記録がありません。",
-    "confirmDelete": "このセッションのローカル履歴を削除しますか？元に戻せません。",
+    "confirmDelete": "このセッションを削除しますか？履歴の一覧からは消えますが、記録は「削除済みを表示」から読み取り専用で開けます。",
     "resume": "この続きから再開",
     "resuming": "再開しています…",
-    "resumeUnsupported": "このエージェントは過去のセッションの再開に対応していません。読み取り専用の履歴としてのみ表示できます。"
+    "resumeUnsupported": "このエージェントは過去のセッションの再開に対応していません。読み取り専用の履歴としてのみ表示できます。",
+    "backupBar": "バックアップ · {{date}}",
+    "deletedBar": "削除済み · {{date}}",
+    "backups": "バックアップ {{count}} 件",
+    "showDeleted": "削除済みを表示",
+    "deletedSection": "削除済み",
+    "confirmDeleteAgentOnly": "このセッションをエージェント側から削除しますか？このアプリにはこのセッションの記録が無いため、元に戻せません。",
+    "agentOnlyNotice": "このアプリにはこのセッションの記録がありません。エージェントは覚えています。",
+    "agentOnlyEmpty": "「この続きから再開」を押すと、エージェントからこれまでの会話を読み込んで表示します。",
+    "state": {
+      "localOnly": "エージェントはこの会話を覚えていません（記録の閲覧のみ）",
+      "agentOnly": "このアプリに記録がありません（エージェント側にのみ存在）"
+    }
   },
   "commands": {
+    "title": "コンソール",
+    "close": "コンソールを閉じる",
+    "removeHistory": "履歴から削除",
     "hint": "[Y/n] のような入力には応答できますが、vim などの全画面アプリは動きません。",
-    "placeholder": "コマンドを実行…",
+    "placeholder": "コマンドを実行…（↑↓ で履歴）",
     "run": "実行",
     "cancel": "中断",
     "stdinPlaceholder": "入力を送る…",
-    "sendInput": "送信"
+    "sendInput": "送信",
+    "history": "履歴",
+    "historyEmpty": "まだ履歴はありません。",
+    "historyHint": "クリックで入力欄へ（すぐには実行しません）"
   },
   "transcript": {
     "you": "あなた",
@@ -122,16 +177,21 @@
     "plan": "プラン",
     "thinking": "思考中",
     "working": "作業中…",
-    "worked": "完了",
+    "toolCallSummary": "ツール実行 {{count}}件（{{breakdown}}）",
     "copy": "コピー",
     "viewDiff": "差分を表示",
     "sendChoices": "送信",
     "jumpToLatest": "最新へ",
-    "backToTurnStart": "↑ ターンの先頭へ戻る"
+    "backToTurnStart": "↑ ターンの先頭へ戻る",
+    "notice": {
+      "replayAdopted": "エージェント側の記録が更新されたため、以前の内容をバックアップとして保存しました。"
+    }
   },
   "composer": {
     "placeholder": "エージェントへメッセージを送る…",
     "send": "送信",
+    "sendHintEnter": "送信: Enter ／ 改行: Shift+Enter",
+    "sendHintModEnter": "送信: {{mod}}+Enter ／ 改行: Enter",
     "stop": "停止",
     "removeAttachment": "添付を外す",
     "usageTitle": "このセッションのコンテキストで {{used}} / {{size}} トークンを使用"
@@ -142,10 +202,23 @@
   "mainWindow": {
     "noProject": "プロジェクトが指定されていません。",
     "connecting": "接続しています…",
-    "refreshTab": "このタブで新しいセッションを始める（今の接続を再利用）"
+    "refreshTab": "このチャットで新しいセッションを始める（今の接続を再利用）",
+    "newChatTitle": "チャット {{count}}",
+    "tabLimitReached": "タブは最大10個までです。いずれかのタブを閉じてから開いてください。"
   },
   "diff": {
     "empty": "表示する差分がありません。",
     "hiddenLines": "… {{count}} 行"
+  },
+  "search": {
+    "title": "セッションを検索",
+    "open": "セッションを検索",
+    "placeholder": "検索キーワード",
+    "clear": "クリア",
+    "includeDeleted": "削除済みも含める",
+    "results": "結果",
+    "noResults": "一致するセッションはありません。",
+    "backupDate": "バックアップ・{{date}}",
+    "deletedDate": "削除済み・{{date}}"
   }
 }

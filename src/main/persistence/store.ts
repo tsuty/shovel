@@ -23,7 +23,8 @@ const defaults: StoreSchema = {
     locale: null,
     theme: 'system',
     autoAttachActiveFile: false,
-    transcriptFontSize: 14
+    transcriptFontSize: 14,
+    sendKey: 'enter'
   },
   sessionTitleOverrides: {},
   commandHistory: {},
@@ -59,11 +60,13 @@ export const projectsStore = {
 }
 
 export const settingsStore = {
+  // electron-store の既定値はトップレベルのキーにしか効かないので、後から
+  // 足した設定項目（sendKey 等）は読み出し時に既定値で埋める。
   get(): AppSettings {
-    return store.get('settings')
+    return { ...defaults.settings, ...store.get('settings') }
   },
   set(patch: Partial<AppSettings>): AppSettings {
-    const next = { ...store.get('settings'), ...patch }
+    const next = { ...defaults.settings, ...store.get('settings'), ...patch }
     store.set('settings', next)
     return next
   }
@@ -85,16 +88,29 @@ export const sessionTitleStore = {
   }
 }
 
+/**
+ * decisions.md N-4「履歴の持ち方」: プロジェクト単位・コマンド文字列のみ
+ * （出力・終了コード・実行時刻は保存しない。出力にシークレットが混ざりうる
+ * ため）・MRU（同じコマンドは古い方を消して先頭へ積み直す）・最新20件。
+ */
+export const COMMAND_HISTORY_LIMIT = 20
+
 export const commandHistoryStore = {
   get(projectId: string): string[] {
-    return store.get('commandHistory')[projectId] ?? []
+    return (store.get('commandHistory')[projectId] ?? []).slice(0, COMMAND_HISTORY_LIMIT)
   },
   push(projectId: string, command: string): void {
     const map = store.get('commandHistory')
     const list = map[projectId] ?? []
-    const next = [command, ...list.filter((c) => c !== command)].slice(0, 100)
+    const next = [command, ...list.filter((c) => c !== command)].slice(0, COMMAND_HISTORY_LIMIT)
     map[projectId] = next
     store.set('commandHistory', map)
+  },
+  remove(projectId: string, command: string): string[] {
+    const map = store.get('commandHistory')
+    map[projectId] = (map[projectId] ?? []).filter((c) => c !== command)
+    store.set('commandHistory', map)
+    return map[projectId].slice(0, COMMAND_HISTORY_LIMIT)
   }
 }
 

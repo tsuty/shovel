@@ -4,14 +4,19 @@
  * フラッシュする。エージェントは IDE のバッファではなくディスクを読むため。
  * ウィンドウ内に複数のエディタタブが同時に存在しうるので、モジュール単位の
  * 簡易 pub-sub で束ねる。
+ *
+ * 送信側は書き込みの完了を待ってからプロンプトを送る。添付は `resource_link`
+ * （パスのみ）で、エージェントはサンドボックス内でディスク上のファイルを読む
+ * ので、書き込み前に送ると編集前の内容を読まれうる。
  */
-const flushers = new Set<() => void>()
+const flushers = new Set<() => Promise<void>>()
 
-export function registerFlush(fn: () => void): () => void {
+export function registerFlush(fn: () => Promise<void>): () => void {
   flushers.add(fn)
   return () => flushers.delete(fn)
 }
 
-export function flushAllEditors(): void {
-  for (const fn of flushers) fn()
+/** 書き込みに失敗しても送信は止めない（エディタ側の autosave と同じ扱い）。 */
+export async function flushAllEditors(): Promise<void> {
+  await Promise.allSettled([...flushers].map((fn) => fn()))
 }

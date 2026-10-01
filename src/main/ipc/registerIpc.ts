@@ -1,5 +1,11 @@
-import { ipcMain } from 'electron'
-import { IpcChannel, type CreateExistingDirRequest, type CreateFromExistingRequest, type CreateNewDirRequest } from '@shared/ipc'
+import { BrowserWindow, ipcMain } from 'electron'
+import {
+  IpcChannel,
+  type CreateExistingDirRequest,
+  type CreateFromExistingRequest,
+  type CreateNewDirRequest,
+  type DataDirKind
+} from '@shared/ipc'
 import type { TranscriptAction } from '@shared/types/transcript'
 import type { AppSettings } from '@shared/types/settings'
 import { AGENT_TABLE } from '@shared/agentTable'
@@ -9,6 +15,7 @@ import {
   createFromNewDirectory,
   diagnose,
   getProjectDiagnostics,
+  openDataDir,
   listImportableSandboxes,
   listProjectsWithStatus,
   pickDirectory,
@@ -26,7 +33,9 @@ import {
   closeTab,
   deleteHistorySession,
   dispatchTranscriptAction,
+  listHistory,
   openTab,
+  resumeAgentSession,
   resumeTab,
   promptSession,
   refreshTab,
@@ -36,23 +45,32 @@ import {
 } from '../domain/sessionManager'
 import {
   copyEntry,
+  copyExternalEntries,
   createDirectory,
   createMarkdownFile,
   deleteEntry,
   listDir,
   moveEntry,
   openInOS,
+  readClipboardFilePaths,
   readFileForViewer,
   renameEntry,
   writeTextFile
 } from '../domain/filerService'
-import { cancelRun, commandHistory, runCommand, sendInput } from '../domain/commandService'
-import { listSnapshotsForProject } from '../persistence/snapshot'
+import { cancelRun, commandHistory, removeCommandHistory, runCommand, sendInput } from '../domain/commandService'
+import { listLocalRecords, readLocalRecord } from '../persistence/snapshot'
+import { searchLocalRecords } from '../domain/localSearch'
 
 export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AppOpenProjectManager, () => openProjectManagerWindow())
   ipcMain.handle(IpcChannel.SettingsGet, () => settingsStore.get())
-  ipcMain.handle(IpcChannel.SettingsUpdate, (_event, patch: Partial<AppSettings>) => settingsStore.set(patch))
+  ipcMain.handle(IpcChannel.SettingsUpdate, (_event, patch: Partial<AppSettings>) => {
+    const next = settingsStore.set(patch)
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.webContents.isDestroyed()) win.webContents.send(IpcChannel.SettingsChanged, next)
+    }
+    return next
+  })
   ipcMain.handle(IpcChannel.SidebarGetWidths, () => sidebarStore.getWidths())
   ipcMain.handle(IpcChannel.SidebarSetWidth, (_event, panel: string, width: number) =>
     sidebarStore.setWidth(panel, width)
@@ -94,6 +112,7 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.ProjectsDiagnose, () => diagnose())
   ipcMain.handle(IpcChannel.ProjectsDiagnostics, (_event, id: string) => getProjectDiagnostics(id))
   ipcMain.handle(IpcChannel.ProjectsStop, (_event, id: string) => stopProject(id))
+  ipcMain.handle(IpcChannel.ProjectsOpenDataDir, (_event, id: string, kind: DataDirKind) => openDataDir(id, kind))
   ipcMain.handle(IpcChannel.ProjectsOpenTerminal, (_event, id: string) => {
     const project = projectsStore.list().find((p) => p.id === id)
     if (!project) throw new Error(`project not found: ${id}`)
@@ -125,18 +144,36 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.SessionAction, (_event, action: TranscriptAction) =>
     dispatchTranscriptAction(action)
   )
-  ipcMain.handle(IpcChannel.SessionListHistory, (_event, projectId: string) =>
-    listSnapshotsForProject(projectId)
+  ipcMain.handle(IpcChannel.SessionListHistory, (_event, projectId: string) => listHistory(projectId))
+  ipcMain.handle(
+    IpcChannel.SessionResumeAgentSession,
+    (event, projectId: string, acpSessionId: string, title?: string) =>
+      resumeAgentSession(projectId, acpSessionId, title, event.sender)
   )
-  ipcMain.handle(IpcChannel.SessionRename, (_event, sessionId: string, title: string) =>
-    renameSession(sessionId, title)
+  ipcMain.handle(IpcChannel.SessionRename, (_event, projectId: string, sessionId: string, title: string) =>
+    renameSession(projectId, sessionId, title)
   )
-  ipcMain.handle(IpcChannel.SessionDeleteHistory, (_event, sessionId: string) =>
-    deleteHistorySession(sessionId)
+  ipcMain.handle(
+    IpcChannel.SessionDeleteHistory,
+    (_event, projectId: string, target: { snapshotId?: string; acpSessionId?: string }) =>
+      deleteHistorySession(projectId, target)
+  )
+  ipcMain.handle(IpcChannel.SessionListLocalRecords, (_event, projectId: string) => listLocalRecords(projectId))
+  ipcMain.handle(IpcChannel.SessionReadLocalRecord, (_event, projectId: string, fileName: string) =>
+    readLocalRecord(projectId, fileName)
+  )
+  ipcMain.handle(
+    IpcChannel.SessionSearchLocal,
+    (event, projectId: string, query: string, includeDeleted: boolean) =>
+      searchLocalRecords(event.sender.id, projectId, query, includeDeleted)
   )
 
-  ipcMain.handle(IpcChannel.FsList, (_event, projectId: string, relPath: string, showGit?: boolean) =>
-    listDir(projectId, relPath, showGit ?? false)
+  ipcMain.handle(IpcChannel.FsList, (_event, projectId: string, relPath: string) => listDir(projectId, relPath))
+  ipcMain.handle(IpcChannel.FsReadClipboardFiles, () => readClipboardFilePaths())
+  ipcMain.handle(
+    IpcChannel.FsCopyExternal,
+    (_event, projectId: string, absPaths: string[], destDirRelPath: string) =>
+      copyExternalEntries(projectId, absPaths, destDirRelPath)
   )
   ipcMain.handle(IpcChannel.FsReadFile, (_event, projectId: string, relPath: string) =>
     readFileForViewer(projectId, relPath)
@@ -188,4 +225,7 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.CommandSendInput, (_event, runId: string, text: string) => sendInput(runId, text))
   ipcMain.handle(IpcChannel.CommandCancel, (_event, runId: string) => cancelRun(runId))
   ipcMain.handle(IpcChannel.CommandHistory, (_event, projectId: string) => commandHistory(projectId))
+  ipcMain.handle(IpcChannel.CommandRemoveHistory, (_event, projectId: string, command: string) =>
+    removeCommandHistory(projectId, command)
+  )
 }

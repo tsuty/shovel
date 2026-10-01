@@ -1,6 +1,7 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IpcChannel, type ProjectProgress, type RendererApi, type SessionEnvelope } from '@shared/ipc'
 import type { CommandExit, CommandOutputChunk } from '@shared/types/command'
+import type { AppSettings } from '@shared/types/settings'
 
 /**
  * `contextBridge` で型付き API のみを renderer に公開する。Node の API を
@@ -13,7 +14,12 @@ const api: RendererApi = {
   },
   settings: {
     get: () => ipcRenderer.invoke(IpcChannel.SettingsGet),
-    update: (patch) => ipcRenderer.invoke(IpcChannel.SettingsUpdate, patch)
+    update: (patch) => ipcRenderer.invoke(IpcChannel.SettingsUpdate, patch),
+    onChanged: (cb) => {
+      const listener = (_event: unknown, settings: AppSettings): void => cb(settings)
+      ipcRenderer.on(IpcChannel.SettingsChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.SettingsChanged, listener)
+    }
   },
   sidebar: {
     getWidths: () => ipcRenderer.invoke(IpcChannel.SidebarGetWidths),
@@ -38,6 +44,7 @@ const api: RendererApi = {
     diagnostics: (id) => ipcRenderer.invoke(IpcChannel.ProjectsDiagnostics, id),
     stop: (id) => ipcRenderer.invoke(IpcChannel.ProjectsStop, id),
     openTerminal: (id) => ipcRenderer.invoke(IpcChannel.ProjectsOpenTerminal, id),
+    openDataDir: (id, kind) => ipcRenderer.invoke(IpcChannel.ProjectsOpenDataDir, id, kind),
     onProgress: (cb) => {
       const listener = (_event: unknown, payload: ProjectProgress): void => cb(payload)
       ipcRenderer.on(IpcChannel.ProjectsProgress, listener)
@@ -51,6 +58,8 @@ const api: RendererApi = {
     openTab: (projectId) => ipcRenderer.invoke(IpcChannel.SessionOpenTab, projectId),
     resumeTab: (projectId, snapshotSessionId) =>
       ipcRenderer.invoke(IpcChannel.SessionResumeTab, projectId, snapshotSessionId),
+    resumeAgentSession: (projectId, acpSessionId, title) =>
+      ipcRenderer.invoke(IpcChannel.SessionResumeAgentSession, projectId, acpSessionId, title),
     closeTab: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionCloseTab, sessionId),
     refresh: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionRefresh, sessionId),
     prompt: (sessionId, text, attachmentRelPaths) =>
@@ -66,11 +75,20 @@ const api: RendererApi = {
       return () => ipcRenderer.removeListener(IpcChannel.TranscriptEvent, listener)
     },
     listHistory: (projectId) => ipcRenderer.invoke(IpcChannel.SessionListHistory, projectId),
-    rename: (sessionId, title) => ipcRenderer.invoke(IpcChannel.SessionRename, sessionId, title),
-    deleteHistory: (sessionId) => ipcRenderer.invoke(IpcChannel.SessionDeleteHistory, sessionId)
+    rename: (projectId, sessionId, title) => ipcRenderer.invoke(IpcChannel.SessionRename, projectId, sessionId, title),
+    deleteHistory: (projectId, target) => ipcRenderer.invoke(IpcChannel.SessionDeleteHistory, projectId, target),
+    listLocalRecords: (projectId) => ipcRenderer.invoke(IpcChannel.SessionListLocalRecords, projectId),
+    readLocalRecord: (projectId, fileName) => ipcRenderer.invoke(IpcChannel.SessionReadLocalRecord, projectId, fileName),
+    searchLocal: (projectId, query, includeDeleted) =>
+      ipcRenderer.invoke(IpcChannel.SessionSearchLocal, projectId, query, includeDeleted),
+    onLocalRecordsChanged: (cb) => {
+      const listener = (_event: unknown, projectId: string): void => cb(projectId)
+      ipcRenderer.on(IpcChannel.SessionLocalRecordsChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.SessionLocalRecordsChanged, listener)
+    }
   },
   fs: {
-    list: (projectId, relPath, showGit) => ipcRenderer.invoke(IpcChannel.FsList, projectId, relPath, showGit),
+    list: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.FsList, projectId, relPath),
     readFile: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.FsReadFile, projectId, relPath),
     writeTextFile: (projectId, relPath, content) =>
       ipcRenderer.invoke(IpcChannel.FsWriteTextFile, projectId, relPath, content),
@@ -84,13 +102,18 @@ const api: RendererApi = {
     openInOS: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.FsOpenInOS, projectId, relPath),
     mkdir: (projectId, parentRelPath) => ipcRenderer.invoke(IpcChannel.FsMkdir, projectId, parentRelPath),
     createMarkdownFile: (projectId, parentRelPath) =>
-      ipcRenderer.invoke(IpcChannel.FsCreateMarkdownFile, projectId, parentRelPath)
+      ipcRenderer.invoke(IpcChannel.FsCreateMarkdownFile, projectId, parentRelPath),
+    readClipboardFiles: () => ipcRenderer.invoke(IpcChannel.FsReadClipboardFiles),
+    copyExternal: (projectId, absPaths, destDirRelPath) =>
+      ipcRenderer.invoke(IpcChannel.FsCopyExternal, projectId, absPaths, destDirRelPath),
+    pathForFile: (file) => webUtils.getPathForFile(file)
   },
   command: {
     run: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandRun, projectId, command),
     sendInput: (runId, text) => ipcRenderer.invoke(IpcChannel.CommandSendInput, runId, text),
     cancel: (runId) => ipcRenderer.invoke(IpcChannel.CommandCancel, runId),
     history: (projectId) => ipcRenderer.invoke(IpcChannel.CommandHistory, projectId),
+    removeHistory: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandRemoveHistory, projectId, command),
     onOutput: (cb) => {
       const listener = (_event: unknown, payload: CommandOutputChunk): void => cb(payload)
       ipcRenderer.on(IpcChannel.CommandOutput, listener)
