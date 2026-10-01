@@ -202,11 +202,14 @@ export async function copyExternalEntries(
   return copied
 }
 
+const GNOME_COPIED_FILES = 'electron application/osclipboard;format="x-special/gnome-copied-files"'
+
 /**
  * OS のクリップボードにある「コピーされたファイル」の絶対パスを読む。
- *   - macOS: `NSFilenamesPboardType`（plist）、無ければ `public.file-url`
- *   - Windows: `FileNameW`（UTF-16LE。先頭の1件のみ取れる）
- *   - Linux: `x-special/gnome-copied-files` / `text/uri-list`
+ * Electron の `text/uri-list` は各 OS のファイル参照形式（Windows: `CF_HDROP`、
+ * macOS: `NSFilenamesPboardType`、Linux: `text/uri-list`）に対応付けられているので、
+ * OS ごとの読み分けは要らない。Linux で `text/uri-list` を出さないファイルマネージャー
+ * 向けに `x-special/gnome-copied-files` も見る。
  * 実在しないパスは除く。ファイルが無ければ空配列。
  */
 export async function readClipboardFilePaths(): Promise<string[]> {
@@ -221,16 +224,14 @@ export async function readClipboardFilePaths(): Promise<string[]> {
       }
     }
   }
-  if (process.platform === 'darwin') {
-    const plist = clipboard.read('NSFilenamesPboardType')
-    for (const m of plist.matchAll(/<string>([^<]*)<\/string>/g)) candidates.push(unescapeXml(m[1]!))
-    if (candidates.length === 0) fromUris(clipboard.read('public.file-url'))
-  } else if (process.platform === 'win32') {
-    const raw = clipboard.readBuffer('FileNameW').toString('utf16le').replace(/\0+$/, '')
-    if (raw) candidates.push(raw)
-  } else {
-    fromUris(clipboard.read('x-special/gnome-copied-files'))
-    if (candidates.length === 0) fromUris(clipboard.read('text/uri-list'))
+  const mimeTypes: Array<'text/uri-list' | typeof GNOME_COPIED_FILES> = ['text/uri-list']
+  if (process.platform === 'linux') mimeTypes.push(GNOME_COPIED_FILES)
+  for (const item of await clipboard.read()) {
+    for (const mimeType of mimeTypes) {
+      if (candidates.length > 0) break
+      if (!item.types.includes(mimeType)) continue
+      fromUris(await (await item.getType(mimeType)).text())
+    }
   }
   const existing: string[] = []
   for (const candidate of candidates) {
@@ -242,15 +243,6 @@ export async function readClipboardFilePaths(): Promise<string[]> {
     }
   }
   return existing
-}
-
-function unescapeXml(text: string): string {
-  return text
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&')
 }
 
 export async function openInOS(projectId: string, relPath: string): Promise<void> {

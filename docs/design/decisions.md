@@ -543,11 +543,13 @@ ProseMirror ベースの実装が必要になり、実装量が跳ね上がる�
   「取り返しをつける」原則に合う）。同名は `findAvailableName` の「name 2」採番。
   **進捗表示は出さない**: エージェントに読ませる資料をプロジェクトへ入れる用途を
   想定し、巨大・大量のコピーは想定しない。
-  - OS のクリップボードのファイル一覧を読む API は Electron に OS 共通のものが
-    無いため、OS ごとの形式を読み分ける（macOS: `NSFilenamesPboardType` /
-    `public.file-url`、Windows: `FileNameW`（先頭の1件のみ）、Linux:
-    `x-special/gnome-copied-files` / `text/uri-list`）。ネイティブモジュールは
-    使わない（F-2b）。
+  - OS のクリップボードのファイル一覧は、Electron 44 で作り直された
+    `clipboard.read()` の `text/uri-list` で読む。これは各 OS のファイル参照形式
+    （Windows: `CF_HDROP`、macOS: `NSFilenamesPboardType`、Linux: `text/uri-list`）に
+    対応付けられており、OS ごとの読み分けは要らない（Electron 43 までは OS ごとの
+    形式を直接読んでいて、Windows は先頭の1件しか取れなかった）。Linux では
+    `text/uri-list` を出さないファイルマネージャー向けに `x-special/gnome-copied-files`
+    も見る。ネイティブモジュールは使わない（F-2b）。
   - アプリ内の「コピー」と OS のクリップボードの両方があるときは、アプリ内で
     コピーした後に OS 側の中身が変わっていれば、OS 側（アプリ外のファイル）を
     貼り付ける。

@@ -17,6 +17,8 @@ Windows で開発する場合は、以下の手順を参考に各自で読み替
 > （要求仕様の「サポート OS」＝ Windows / macOS）とは別の話。
 > Windows 向けのパス変換など、アプリ自体の Windows 対応は
 > [docs/design/architecture.md](./design/architecture.md) §4 を参照。
+> なお Electron 44 以降は macOS 13 以上・64bit（x64 / arm64）のみが対象で、
+> Windows 32bit（ia32）と macOS 12 以前では動かない。
 
 ## 前提ツール
 
@@ -135,6 +137,11 @@ sbx diagnose
   pnpm pack        # ビルド後、署名なしでアンパック済みアプリを release/ に出力（動作確認用）
   pnpm dist        # electron-builder でインストーラを生成（証明書は未設定。decisions.md F-3）
   ```
+
+  `pnpm dev` / `pnpm start` は先に `install-electron` を実行する。Electron 42 以降は
+  `pnpm install` 時に Electron 本体をダウンロードしなくなったが、electron-vite 5 は
+  ダウンロード済みの本体（`node_modules/electron/path.txt`）を前提にしているため。
+  本体があれば `install-electron` は何もしない。
 
   単体テストは `test/` 配下に置き、Electron や `sbx` に依存しない純粋なロジック
   （ACP イベントの翻訳、スナップショットの蓄積と比較、差分計算、文字コード・改行の扱い、

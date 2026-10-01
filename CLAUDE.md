@@ -35,7 +35,7 @@ link, not a duplicate affordance on the card), Mode/Model selectors plus a token
 folder/Markdown file, rename, delete, move via drag & drop, and clipboard copy/paste, all from the
 right-click menu — including on empty space for root-level creation/paste — plus copy-in from the
 OS file manager by paste or drop (always a copy, never a move; `readClipboardFilePaths` reads
-per-OS clipboard formats, drops use `webUtils.getPathForFile`), a manual refresh button, and
+Electron 44's `text/uri-list` clipboard format (+ `x-special/gnome-copied-files` on Linux), drops use `webUtils.getPathForFile`), a manual refresh button, and
 "Open in Finder/Explorer" for folders; `.git` is always hidden, the old toggle is gone) with a
 read-only syntax-highlighted viewer (images previewed in-app; other binaries show an
 "open with default app" button rather than opening automatically; text views and the Markdown

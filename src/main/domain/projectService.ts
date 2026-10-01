@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readdir, readFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { dialog, shell } from 'electron'
 import { getAgentEntry } from '@shared/agentTable'
@@ -16,7 +16,7 @@ import type {
 import { sbxCreate, sbxDiagnose, sbxLs, sbxMeasureSandboxPath, sbxRm, sbxStop } from '../sbx/cli'
 import { hostPathsEqual } from './pathTranslate'
 import { removeAllRecordsForProject, snapshotDir } from '../persistence/snapshot'
-import { projectsStore } from '../persistence/store'
+import { pickDirectoryStore, projectsStore } from '../persistence/store'
 import { logsDir } from '../log'
 
 const SANDBOX_NAME_ALLOWED = /[^a-zA-Z0-9.+-]+/g
@@ -193,9 +193,14 @@ export async function removeProject(id: string, trashHostDir: boolean): Promise<
 }
 
 export async function pickDirectory(): Promise<string | null> {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
-  if (result.canceled || result.filePaths.length === 0) return null
-  return result.filePaths[0] ?? null
+  // 前回選んだフォルダの親から開く。消えていれば Electron の既定（ダウンロード）に任せる。
+  const lastDir = pickDirectoryStore.get()
+  const defaultPath = lastDir && (await stat(lastDir).catch(() => null))?.isDirectory() ? lastDir : undefined
+  const result = await dialog.showOpenDialog({ defaultPath, properties: ['openDirectory', 'createDirectory'] })
+  const picked = result.canceled ? undefined : result.filePaths[0]
+  if (!picked) return null
+  pickDirectoryStore.set(path.dirname(picked))
+  return picked
 }
 
 export async function diagnose(): Promise<string> {

@@ -11,6 +11,7 @@ interface StoreSchema {
   sessionTitleOverrides: Record<string, string>
   commandHistory: Record<string, string[]>
   sidebar: { widths: Record<string, number> }
+  lastPickedDirectory: string | null
 }
 
 const defaults: StoreSchema = {
@@ -24,7 +25,8 @@ const defaults: StoreSchema = {
   },
   sessionTitleOverrides: {},
   commandHistory: {},
-  sidebar: { widths: {} }
+  sidebar: { widths: {} },
+  lastPickedDirectory: null
 }
 
 // electron-store の型定義は CommonJS デフォルトエクスポートと相性が悪いため any 経由にする。
@@ -114,5 +116,18 @@ export const sidebarStore = {
     const sidebar = store.get('sidebar')
     sidebar.widths[panel] = width
     store.set('sidebar', sidebar)
+  }
+}
+
+/**
+ * フォルダ選択ダイアログで前回開いていた場所。Electron 43 以降は `defaultPath` を
+ * 渡さないと毎回ダウンロードフォルダから開くため、自前で覚えておく。
+ */
+export const pickDirectoryStore = {
+  get(): string | null {
+    return store.get('lastPickedDirectory')
+  },
+  set(dir: string): void {
+    store.set('lastPickedDirectory', dir)
   }
 }
