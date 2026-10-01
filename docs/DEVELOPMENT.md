@@ -144,6 +144,13 @@ sbx diagnose
   ダウンロード済みの本体（`node_modules/electron/path.txt`）を前提にしているため。
   本体があれば `install-electron` は何もしない。
 
+  TypeScript は 6.0 に留めている。7.0（Go 製のネイティブ版）は従来の JavaScript API を
+  持たず、型情報を使う lint（typescript-eslint、対応は `<6.1`）が動かないため。tsconfig は
+  7.0 で削除された設定（`baseUrl`、`moduleResolution: "Node"`）を使わない形にしてあるので、
+  typescript-eslint が 7.0 に対応したら `typescript` を差し替えるだけで移行できる。
+  同様に、vite は electron-vite 5（安定版）が対応する 7 系に留めている（vite 8 対応の
+  electron-vite 6 はベータ版のため）。
+
   単体テストは `test/` 配下に置き、Electron や `sbx` に依存しない純粋なロジック
   （ACP イベントの翻訳、スナップショットの蓄積と比較、差分計算、文字コード・改行の扱い、
   パス変換など）を対象にする。`electron` を読み込むモジュールは `vi.mock('electron')` で

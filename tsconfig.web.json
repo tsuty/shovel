@@ -16,10 +16,10 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "baseUrl": ".",
+    "types": ["node", "vite/client"],
     "paths": {
-      "@shared/*": ["src/shared/*"],
-      "@renderer/*": ["src/renderer/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@renderer/*": ["./src/renderer/*"]
     }
   },
   "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "src/shared/**/*.ts"]

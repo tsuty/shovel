@@ -17,11 +17,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "types": ["node", "vitest/globals"],
-    "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"],
-      "@main/*": ["src/main/*"],
-      "@renderer/*": ["src/renderer/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@main/*": ["./src/main/*"],
+      "@renderer/*": ["./src/renderer/*"]
     }
   },
   "include": ["test/**/*.ts"]
