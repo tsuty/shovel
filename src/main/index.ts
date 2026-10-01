@@ -3,12 +3,15 @@ import { registerIpc } from './ipc/registerIpc'
 import { migrateFlatLogs } from './log'
 import { migrateFlatSnapshots } from './persistence/snapshot'
 import { openProjectManagerWindow } from './windows/projectManagerWindow'
+import { installRendererProtocol, registerRendererScheme } from './windows/rendererProtocol'
 import { anyProjectWindowOpen, getProjectManagerWindow } from './windows/registry'
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
+  registerRendererScheme()
+
   app.on('second-instance', () => {
     // 単一インスタンス。2 回目の起動要求ではプロジェクトマネージャを前面に出す。
     const existing = getProjectManagerWindow()
@@ -18,6 +21,7 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     installContentSecurityPolicy()
+    installRendererProtocol()
     // 旧形式のログをプロジェクトごとのディレクトリへ移す。
     await Promise.all([migrateFlatSnapshots(), migrateFlatLogs()]).catch((err) =>
       console.warn('[startup] migration of local records failed', err)

@@ -1,6 +1,6 @@
 import type { Highlighter } from 'shiki'
 
-/** 実際に使う言語だけを指定した shiki の highlighter をシングルトンで生成する。 */
+/** ハイライトに対応する言語。各言語は初めて使うときに読み込む（`ensureLang`）。 */
 const LANGS = [
   'javascript',
   'jsx',
@@ -31,15 +31,39 @@ const LANGS = [
   'plaintext'
 ] as const
 
+type Lang = (typeof LANGS)[number]
+
 let highlighterPromise: Promise<Highlighter> | null = null
+const langLoads = new Map<Lang, Promise<boolean>>()
 
 function getHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
     highlighterPromise = import('shiki').then((shiki) =>
-      shiki.createHighlighter({ themes: ['github-light', 'github-dark'], langs: [...LANGS] })
+      shiki.createHighlighter({ themes: ['github-light', 'github-dark'], langs: [] })
     )
   }
   return highlighterPromise
+}
+
+/** 言語を初めて使うときに読み込む。読めなければ false（次回また試す）。 */
+function ensureLang(highlighter: Highlighter, lang: Lang): Promise<boolean> {
+  if (lang === 'plaintext') return Promise.resolve(true)
+  let load = langLoads.get(lang)
+  if (!load) {
+    load = highlighter.loadLanguage(lang).then(
+      () => true,
+      () => {
+        langLoads.delete(lang)
+        return false
+      }
+    )
+    langLoads.set(lang, load)
+  }
+  return load
+}
+
+function isLang(lang: string): lang is Lang {
+  return (LANGS as readonly string[]).includes(lang)
 }
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -83,7 +107,7 @@ const EXT_TO_LANG: Record<string, string> = {
 /** Markdown のフェンスの言語名（`ts` / `typescript` / `sh` など）を shiki の言語名にする。 */
 export function langFromFence(lang: string): string {
   const lower = lang.toLowerCase()
-  if ((LANGS as readonly string[]).includes(lower)) return lower
+  if (isLang(lower)) return lower
   const aliases: Record<string, string> = { shell: 'bash', console: 'bash', text: 'plaintext', txt: 'plaintext', dockerfile: 'docker' }
   return aliases[lower] ?? langFromFilename(`x.${lower}`)
 }
@@ -99,7 +123,7 @@ export function langFromFilename(name: string): string {
  */
 export async function highlightToHtml(code: string, lang: string): Promise<string> {
   const highlighter = await getHighlighter()
-  const effectiveLang = highlighter.getLoadedLanguages().includes(lang) ? lang : 'plaintext'
+  const effectiveLang = isLang(lang) && (await ensureLang(highlighter, lang)) ? lang : 'plaintext'
   return highlighter.codeToHtml(code, {
     lang: effectiveLang,
     themes: { light: 'github-light', dark: 'github-dark' }

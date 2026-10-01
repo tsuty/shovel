@@ -53,7 +53,7 @@ function isSameOrigin(a: string, b: string): boolean {
   const ua = parseUrl(a)
   const ub = parseUrl(b)
   if (!ua || !ub) return false
-  // file: の origin は "null" になるので、プロトコルとホストで比べる。
+  // file: の origin は "null" になるので、プロトコルとホストで比べる（app:// もこれで足りる）。
   return ua.protocol === ub.protocol && ua.host === ub.host
 }
 

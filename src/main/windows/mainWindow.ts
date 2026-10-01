@@ -1,5 +1,5 @@
-import path from 'node:path'
 import { createSecureWindow } from './createSecureWindow'
+import { rendererPageUrl } from './rendererProtocol'
 import { getProjectManagerWindow, getProjectWindow, registerProjectWindow } from './registry'
 import { closeAllTabsForWindow } from '../domain/sessionManager'
 
@@ -20,13 +20,7 @@ export function openProjectWindow(projectId: string): void {
   // プロジェクトのウィンドウが表示されたら、プロジェクト一覧を閉じる。
   win.once('ready-to-show', closeProjectManager)
 
-  const rendererUrl = process.env.ELECTRON_RENDERER_URL
-  const query = `projectId=${encodeURIComponent(projectId)}`
-  if (rendererUrl) {
-    void win.loadURL(`${rendererUrl}/main-window.html?${query}`)
-  } else {
-    void win.loadFile(path.join(__dirname, '../renderer/main-window.html'), { search: query })
-  }
+  void win.loadURL(rendererPageUrl('main-window.html', `projectId=${encodeURIComponent(projectId)}`))
 }
 
 function closeProjectManager(): void {

@@ -1197,6 +1197,24 @@ renderer（ウィンドウごと）
 - `contextIsolation: true` / `nodeIntegration: false` / CSP /
   `will-navigate` と `setWindowOpenHandler` を塞ぐ（N-1 で決定済み）。
 
+## F-1b. renderer は `file://` ではなく `app://` で読み込む（2026-10-01 決定）
+
+**決定**: ビルド済みの renderer（`out/renderer`）は `loadFile`（`file://`）で読まず、
+独自スキーム `app://renderer/...` で読む。main が `protocol.handle` でパスを
+`out/renderer` 配下に限って解決し、`fs` で読んで返す
+（`src/main/windows/rendererProtocol.ts`）。開発時は従来どおり Vite の開発サーバー。
+
+**理由**: Electron 44 では、`file://` から多数のモジュールを同時に動的 import すると
+一部が `net::ERR_FAILED` で失敗する（Electron 33 では起きない。破壊的変更の一覧にも
+無い）。shiki の言語定義や Mermaid の図のチャンクが読めず、ハイライトと図が壊れた。
+Chromium の `file://` ローダーの問題で、`app://` でも中身を `net.fetch(file://...)` で
+取ると同じく失敗する。`fs` で読んで返すと起きない。
+
+- `app://` は `standard` / `secure` で登録するので、CSP の `'self'` と
+  `will-navigate` の同一 origin 判定はそのまま効く。
+- **採らなかった案**: shiki の言語読み込みを直列化する（Mermaid の図は内部で
+  多数のチャンクを静的 import するので直せない）。
+
 ## F-2. 永続化
 
 **決定**

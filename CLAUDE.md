@@ -203,6 +203,9 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   `rehype-raw` — raw HTML in Markdown is never rendered), `shiki` for syntax highlighting,
   `react-arborist` for the file tree. preload uses `contextBridge` only — never expose Node APIs
   directly to renderer (`contextIsolation: true`, `nodeIntegration: false`).
+  Built renderer pages load from `app://renderer/...` (served by main from `out/renderer` via
+  `fs`, `src/main/windows/rendererProtocol.ts`), not `file://` — Electron 44's `file://` loader
+  fails many concurrent dynamic imports, which broke shiki/Mermaid chunks (decisions.md F-1b).
 - Path translation: every `Project` stores both `hostPath` and `sandboxPath`; `sandboxPath` is
   **measured** right after sandbox creation via `sbx exec <name> pwd`, never assumed from a
   hard-coded mount convention (macOS mounts are identity; Windows uses MSYS-style `/c/...` paths).
