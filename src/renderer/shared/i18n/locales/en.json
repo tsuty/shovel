@@ -138,7 +138,7 @@
   "history": {
     "title": "History",
     "untitled": "Untitled session",
-    "readOnlyNotice": "Read-only history. The agent no longer remembers this conversation.",
+    "readOnlyNotice": "Read-only history.",
     "startNew": "Start new session",
     "empty": "Nothing was recorded for this session.",
     "confirmDelete": "Delete this session? It will disappear from the history list, but the record can still be opened read-only via \"Show deleted\".",
