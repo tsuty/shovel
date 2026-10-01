@@ -27,3 +27,6 @@ out/
 
 # temporary
 tmp/
+
+# serena (AI coding tool, personal)
+.serena/

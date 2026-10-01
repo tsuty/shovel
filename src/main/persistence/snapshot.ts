@@ -14,7 +14,7 @@ import type { LocalRecordKind, LocalRecordSummary, SessionSnapshot } from '@shar
  *   - `{sessionId}.json.{epochMillis}.deleted` ソフトデリート
  */
 
-const SCHEMA_VERSION = 1 as const
+const SCHEMA_VERSION = 1
 
 const RECORD_FILE_RE = /^(.+)\.json(?:\.(\d+)\.(backup|deleted))?$/
 
@@ -102,10 +102,10 @@ async function writeAtomically(finalPath: string, content: string): Promise<void
 
 function parseSnapshot(raw: string): SessionSnapshot | null {
   try {
-    const parsed = JSON.parse(raw) as SessionSnapshot
+    const parsed = JSON.parse(raw) as { schemaVersion?: unknown }
     // 移行経路の無いバージョンは「履歴なし」として扱う。
     if (parsed.schemaVersion !== SCHEMA_VERSION) return null
-    return parsed
+    return parsed as SessionSnapshot
   } catch {
     return null
   }

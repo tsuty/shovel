@@ -602,7 +602,7 @@ ProseMirror ベースの実装が必要になり、実装量が跳ね上がる�
 
 ### N-3-8. Diff ビューア：自前の行差分、unified 1列
 
-**決定**: 差分計算も描画も**自前で書く**（`shared/lib/diff.ts` ＋
+**決定**: 差分計算も描画も**自前で書く**（`src/shared/diff.ts` ＋
 `shared/components/DiffView.tsx`）。差分ライブラリは足さない。
 
 - **表示は unified（1列）。** 左右2列の split は採らない。サイドバーに入る

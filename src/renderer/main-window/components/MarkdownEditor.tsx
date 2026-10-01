@@ -4,6 +4,7 @@ import { Columns2, Eye, PanelRight, SquareCode, X } from 'lucide-react'
 import { Markdown } from '../../shared/components/Markdown'
 import { Button } from '../../shared/components/ui/button'
 import { registerFlush } from '../editorRegistry'
+import { conflictPath, decideEditorSync } from '../editorSync'
 import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/types/filer'
 import { FileStatusBar } from './FileStatusBar'
 
@@ -25,18 +26,6 @@ function savedByteSize(text: string, meta: FileMeta): number {
   return bytes + newlines + (meta.encoding === 'UTF-8 BOM' ? 3 : 0)
 }
 const EXTERNAL_CHECK_INTERVAL_MS = 3000
-
-function conflictPath(relPath: string): string {
-  const dot = relPath.lastIndexOf('.')
-  const stamp = new Date()
-    .toISOString()
-    .replace(/[-:]/g, '')
-    .replace('T', '-')
-    .slice(0, 15)
-  return dot >= 0
-    ? `${relPath.slice(0, dot)}.conflict-${stamp}${relPath.slice(dot)}`
-    : `${relPath}.conflict-${stamp}`
-}
 
 /**
  * Markdown エディタ。分割ビュー（ソース/プレビュー）と、どちらか単独の表示を切り替える。
@@ -75,8 +64,15 @@ export function MarkdownEditor({
   const readOnly = !isWritableEncoding(meta.encoding)
 
   const savedTextRef = useRef('')
-  const dirtyRef = useRef(false)
+  const textRef = useRef('')
+  const deletedRef = useRef(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const syncQueueRef = useRef<Promise<void>>(Promise.resolve())
+
+  const applyText = useCallback((content: string): void => {
+    textRef.current = content
+    setText(content)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -88,27 +84,77 @@ export function MarkdownEditor({
         setMeta({ encoding: result.encoding, lineEnding: result.lineEnding })
         setDiskSize(result.size)
       }
-      setText(content)
+      applyText(content)
       savedTextRef.current = content
-      dirtyRef.current = false
       setLoaded(true)
     })
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, relPath])
+  }, [projectId, relPath, applyText])
+
+  /**
+   * ディスクの内容と突き合わせる。外部で変更されていれば再読込するか、未保存の編集を
+   * 競合コピーに退避してから最新へ切り替える。`save` のときは、外部変更が無ければ
+   * 未保存の編集を書き込む。ポーリングと保存が重ならないよう、1つずつ順に実行する。
+   */
+  const syncWithDisk = useCallback(
+    (save: boolean): Promise<void> => {
+      const run = async (): Promise<void> => {
+        if (deletedRef.current) return
+        const result = await window.shovel.fs.readFile(projectId, relPath)
+        const editorText = textRef.current
+        const action = decideEditorSync(result, savedTextRef.current, editorText)
+        switch (action.kind) {
+          case 'deleted':
+            deletedRef.current = true
+            setDeleted(true)
+            return
+          case 'unreadable':
+            return
+          case 'reload':
+            applyText(action.content)
+            savedTextRef.current = action.content
+            break
+          case 'conflict': {
+            applyText(action.content)
+            savedTextRef.current = action.content
+            const backupPath = conflictPath(relPath)
+            await window.shovel.fs.writeTextFile(projectId, backupPath, editorText)
+            setNotice(t('editor.conflict', { path: backupPath }))
+            break
+          }
+          case 'unchanged':
+            if (save && editorText !== savedTextRef.current) {
+              await window.shovel.fs.writeTextFile(projectId, relPath, editorText)
+              savedTextRef.current = editorText
+            }
+            break
+        }
+        if (result.kind === 'text') {
+          setMeta((prev) =>
+            prev.encoding === result.encoding && prev.lineEnding === result.lineEnding
+              ? prev
+              : { encoding: result.encoding, lineEnding: result.lineEnding }
+          )
+          setDiskSize(result.size)
+        }
+      }
+      const next = syncQueueRef.current.then(run)
+      syncQueueRef.current = next.catch(() => {})
+      return next
+    },
+    [projectId, relPath, applyText, t]
+  )
 
   const flush = useCallback(async (): Promise<void> => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
       debounceRef.current = null
     }
-    if (!dirtyRef.current) return
-    await window.shovel.fs.writeTextFile(projectId, relPath, text)
-    savedTextRef.current = text
-    dirtyRef.current = false
-  }, [projectId, relPath, text])
+    if (textRef.current === savedTextRef.current) return
+    await syncWithDisk(true)
+  }, [syncWithDisk])
 
   useEffect(() => registerFlush(flush), [flush])
 
@@ -119,45 +165,21 @@ export function MarkdownEditor({
 
   function onChange(value: string): void {
     if (readOnly) return
-    setText(value)
-    dirtyRef.current = true
+    applyText(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     // 発火時点の最新の flush を呼ぶ。
-    debounceRef.current = setTimeout(() => void flushRef.current(), AUTOSAVE_DEBOUNCE_MS)
+    debounceRef.current = setTimeout(() => {
+      flushRef.current().catch((err: unknown) => console.warn('[editor] autosave failed', err))
+    }, AUTOSAVE_DEBOUNCE_MS)
   }
 
   // 開いている間はポーリングで外部変更を検知する。
   useEffect(() => {
-    const interval = setInterval(async () => {
-      const result = await window.shovel.fs.readFile(projectId, relPath)
-      if (result.kind === 'missing') {
-        setDeleted(true)
-        return
-      }
-      if (result.kind !== 'text') return
-      setMeta((prev) =>
-        prev.encoding === result.encoding && prev.lineEnding === result.lineEnding
-          ? prev
-          : { encoding: result.encoding, lineEnding: result.lineEnding }
-      )
-      setDiskSize(result.size)
-      if (result.content === savedTextRef.current) return
-      // ディスクが savedTextRef と食い違った → 外部で変更された。
-      if (!dirtyRef.current || text === savedTextRef.current) {
-        setText(result.content)
-        savedTextRef.current = result.content
-        dirtyRef.current = false
-        return
-      }
-      const backupPath = conflictPath(relPath)
-      await window.shovel.fs.writeTextFile(projectId, backupPath, text)
-      setText(result.content)
-      savedTextRef.current = result.content
-      dirtyRef.current = false
-      setNotice(t('editor.conflict', { path: backupPath }))
+    const interval = setInterval(() => {
+      syncWithDisk(false).catch((err: unknown) => console.warn('[editor] external change check failed', err))
     }, EXTERNAL_CHECK_INTERVAL_MS)
     return () => clearInterval(interval)
-  }, [projectId, relPath, text, t])
+  }, [syncWithDisk])
 
   if (!loaded) {
     return <div className="p-4 text-sm text-muted-foreground">{t('common.loading')}</div>
@@ -231,7 +253,7 @@ export function MarkdownEditor({
         )}
       </div>
       <FileStatusBar
-        size={dirtyRef.current ? savedByteSize(text, meta) : diskSize}
+        size={text !== savedTextRef.current ? savedByteSize(text, meta) : diskSize}
         encoding={meta.encoding}
         lineEnding={meta.lineEnding}
         readOnly={readOnly}

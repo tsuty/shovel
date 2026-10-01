@@ -183,7 +183,7 @@ export async function listHistory(projectId: string): Promise<HistoryListing> {
       key: snapshot.sessionId,
       snapshotId: snapshot.sessionId,
       acpSessionId: snapshot.acpSessionId,
-      title: sessionTitleStore.get(snapshot.sessionId) ?? snapshot.title ?? agent?.title ?? '',
+      title: sessionTitleStore.get(snapshot.sessionId) ?? (snapshot.title || agent?.title || ''),
       updatedAt: Math.max(snapshot.savedAt, agent?.updatedAt ?? 0),
       state: agentSessions === null ? 'unknown' : agent ? 'both' : 'localOnly'
     })

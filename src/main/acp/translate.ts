@@ -19,6 +19,7 @@ import type {
   ToolCallStatus,
   TranscriptEvent
 } from '@shared/types/transcript'
+import { diffRowsFromTexts } from '@shared/diff'
 
 /**
  * ACP の `session/update` / `session/request_permission` を `TranscriptEvent` へ翻訳する。
@@ -243,6 +244,7 @@ export class SessionTranslator {
     const previous = this.toolCalls.get(payload.toolCallId)
     // 既知のツールコールの更新は、元のグループのまま差し替える。
     if (!previous && this.openGroupId === null) {
+      events.push(...this.finalizeAgent())
       this.openGroupId = randomUUID()
       events.push({ type: 'group', id: this.openGroupId, timed: true, closed: false })
     }
@@ -363,14 +365,13 @@ function mergeToolCallUpdate(previous: ToolCallPayload, payload: ToolCall | Tool
 }
 
 function diffToPayload(diff: Diff): ToolCallPayload['diffs'][number] {
-  const oldLines = diff.oldText ? diff.oldText.split('\n').length : 0
-  const newLines = diff.newText.split('\n').length
+  const rows = diffRowsFromTexts(diff.oldText ?? '', diff.newText)
   return {
     path: diff.path,
     oldText: diff.oldText ?? undefined,
     newText: diff.newText,
-    added: diff.oldText === undefined || diff.oldText === null ? newLines : Math.max(0, newLines - oldLines),
-    removed: diff.oldText === undefined || diff.oldText === null ? 0 : Math.max(0, oldLines - newLines)
+    added: rows.filter((row) => row.kind === 'add').length,
+    removed: rows.filter((row) => row.kind === 'remove').length
   }
 }
 

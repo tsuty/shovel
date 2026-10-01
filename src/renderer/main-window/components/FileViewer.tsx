@@ -24,24 +24,24 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
   const [openError, setOpenError] = useState<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false
+    const run = { cancelled: false }
     setView({ kind: 'loading' })
     setOpenError(null)
     void (async () => {
       try {
         const result = await window.shovel.fs.readFile(projectId, relPath)
         if (result.kind !== 'text') {
-          if (!cancelled) setView(result)
+          if (!run.cancelled) setView(result)
           return
         }
         const html = await highlightToHtml(result.content, langFromFilename(relPath))
-        if (!cancelled) setView({ kind: 'text', html, file: result })
+        if (!run.cancelled) setView({ kind: 'text', html, file: result })
       } catch (err) {
-        if (!cancelled) setView({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+        if (!run.cancelled) setView({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       }
     })()
     return () => {
-      cancelled = true
+      run.cancelled = true
     }
   }, [projectId, relPath])
 

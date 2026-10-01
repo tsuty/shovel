@@ -28,6 +28,7 @@ const defaults: StoreSchema = {
 }
 
 // electron-store の型定義は CommonJS デフォルトエクスポートと相性が悪いため any 経由にする。
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 const store = new (Store as any)({ defaults }) as {
   get<K extends keyof StoreSchema>(key: K): StoreSchema[K]
   set<K extends keyof StoreSchema>(key: K, value: StoreSchema[K]): void

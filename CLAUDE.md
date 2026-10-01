@@ -119,7 +119,7 @@ Known, deliberate scope-narrowings worth knowing about before extending this cod
   main⇔renderer IPC boundary. See
   architecture.md §5 for the full per-action breakdown and `sessionManager.ts`'s
   `dispatchTranscriptAction` for the (permanently unreached) rest of the switch.
-- The Diff viewer (`src/renderer/shared/components/DiffView.tsx` + `shared/lib/diff.ts`) is
+- The Diff viewer (`src/renderer/shared/components/DiffView.tsx` + `src/shared/diff.ts`) is
   hand-written — no diff dependency was added. It renders unified (single-column) with both old and
   new line-number gutters. Its only input now is a tool call's own before/after text
   (`TextDiffView`, LCS-computed, far context collapsed to `… N lines`) — the LCS falls back to a
@@ -160,8 +160,9 @@ what has since changed, since this note is a snapshot.
 | `docs/design/decisions.md` | **Decision log** — why things are the way they are, including rejected alternatives. Check this before re-litigating a design choice |
 | `docs/design/open-issues.md` | Unresolved/unverified items (labelled V-N for things needing hands-on verification, and lettered items for undiscussed topics) |
 
-`docs/DEVELOPMENT.md` is the environment setup guide; it explicitly defers "build/lint/test
-commands" to be filled in once implementation exists.
+`docs/DEVELOPMENT.md` is the environment setup guide and lists the build/lint/typecheck/test
+commands (`pnpm typecheck`, `pnpm lint`, `pnpm test`). Unit tests live under `test/` (Vitest) and
+cover pure logic only; run all three after changes.
 
 ## Development environment
 

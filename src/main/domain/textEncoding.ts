@@ -87,7 +87,8 @@ export function encodeForWrite(content: string, existing: Buffer | null): Buffer
   if (decoded.kind === 'binary' || (decoded.encoding !== 'UTF-8' && decoded.encoding !== 'UTF-8 BOM')) {
     throw new Error('refusing to overwrite a file that is not UTF-8 text')
   }
-  const eol = decoded.lineEnding === 'none' ? '\n' : dominantLineEnding(existing.toString('utf8'))
-  const body = Buffer.from(eol === '\r\n' ? normalized.replace(/\n/g, '\r\n') : normalized, 'utf8')
+  const eol =
+    decoded.lineEnding === 'none' ? '\n' : decoded.lineEnding === 'CR' ? '\r' : dominantLineEnding(existing.toString('utf8'))
+  const body = Buffer.from(eol === '\n' ? normalized : normalized.replace(/\n/g, eol), 'utf8')
   return decoded.encoding === 'UTF-8 BOM' ? Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), body]) : body
 }

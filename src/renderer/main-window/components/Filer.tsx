@@ -292,7 +292,7 @@ export function Filer({
 
   /** ドロップ先の行（`data-relpath`）から、取り込み先のディレクトリを決める。 */
   function dropDirFor(target: EventTarget | null): string {
-    const row = (target as HTMLElement | null)?.closest?.('[data-relpath]') as HTMLElement | null
+    const row = (target as HTMLElement | null)?.closest('[data-relpath]') as HTMLElement | null
     if (!row) return ''
     const node = findNode(data, row.dataset.relpath ?? '')
     return targetDirFor(node && !node.placeholder ? node : null)
@@ -351,7 +351,7 @@ export function Filer({
           rowHeight={24}
           onToggle={handleToggle}
           disableDrag={(node) => node.placeholder === true}
-          disableDrop={({ parentNode }) => parentNode?.data.placeholder === true}
+          disableDrop={({ parentNode }) => parentNode.data.placeholder === true}
           onActivate={(node) => handleActivate(node.data)}
           onRename={({ id, name }) => {
             const node = findNode(data, id)

@@ -129,14 +129,17 @@ sbx diagnose
   ```bash
   pnpm dev         # electron-vite の開発サーバーを起動（HMR 付き）
   pnpm build       # main / preload / renderer を out/ にビルド
-  pnpm typecheck   # main+preload と renderer を別々の tsconfig で型検査
-  pnpm lint        # ESLint
+  pnpm typecheck   # main+preload・renderer・テストを別々の tsconfig で型検査
+  pnpm lint        # ESLint（型情報を使うルールを含む）
+  pnpm test        # Vitest で単体テストを実行（pnpm test:watch で監視実行）
   pnpm pack        # ビルド後、署名なしでアンパック済みアプリを release/ に出力（動作確認用）
   pnpm dist        # electron-builder でインストーラを生成（証明書は未設定。decisions.md F-3）
   ```
 
-  自動テスト（unit/e2e）は未整備。`sbx` が無い環境（このリポジトリの開発コンテナなど）では
-  ACP 接続や sbx 呼び出しを伴う経路は実機で確認できないため、型検査とビルドで検証する。
+  単体テストは `test/` 配下に置き、Electron や `sbx` に依存しない純粋なロジック
+  （ACP イベントの翻訳、スナップショットの蓄積と比較、差分計算、文字コード・改行の扱い、
+  パス変換など）を対象にする。`electron` を読み込むモジュールは `vi.mock('electron')` で
+  差し替えて検証する。e2e テストは未整備で、ACP 接続や sbx 呼び出しを伴う経路は実機で確認する。
 
 ## 開発時の注意点
 

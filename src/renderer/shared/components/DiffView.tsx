@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { collapseContext, diffRowsFromTexts, type DiffRow } from '../lib/diff'
+import { collapseContext, diffRowsFromTexts, type DiffRow } from '@shared/diff'
 import { cn } from '../lib/utils'
 
 /** Diff ビューア。ツールコールの前後全文（`TextDiffView`）を `DiffRow` の列に畳み、unified（1列）で描く。 */

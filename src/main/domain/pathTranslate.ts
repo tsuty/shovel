@@ -12,9 +12,13 @@ export interface PathTranslationRoots {
   sandboxPath: string
 }
 
+function isOutside(rel: string, sep: string, isAbsolute: (p: string) => boolean): boolean {
+  return rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)
+}
+
 export function hostToSandboxPath(roots: PathTranslationRoots, hostAbsPath: string): string {
   const rel = path.relative(roots.hostPath, hostAbsPath)
-  if (rel.startsWith('..')) {
+  if (isOutside(rel, path.sep, path.isAbsolute)) {
     throw new Error(`path ${hostAbsPath} is outside of project root ${roots.hostPath}`)
   }
   const relPosix = rel.split(path.sep).join('/')
@@ -23,7 +27,7 @@ export function hostToSandboxPath(roots: PathTranslationRoots, hostAbsPath: stri
 
 export function sandboxToHostPath(roots: PathTranslationRoots, sandboxAbsPath: string): string {
   const rel = path.posix.relative(roots.sandboxPath, sandboxAbsPath)
-  if (rel.startsWith('..')) {
+  if (isOutside(rel, '/', path.posix.isAbsolute)) {
     throw new Error(`path ${sandboxAbsPath} is outside of sandbox workspace ${roots.sandboxPath}`)
   }
   const relParts = rel === '' ? [] : rel.split('/')

@@ -39,7 +39,7 @@ export async function migrateFlatLogs(): Promise<void> {
       const from = path.join(root, name)
       if (!(await stat(from)).isFile()) continue
       const dir = path.join(root, safeProjectSegment(m[2]!))
-      const to = path.join(dir, `${m[1]}_${m[3]}`)
+      const to = path.join(dir, `${m[1]!}_${m[3]!}`)
       if (await stat(to).then(() => true, () => false)) continue
       await mkdir(dir, { recursive: true })
       await rename(from, to)

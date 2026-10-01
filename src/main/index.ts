@@ -24,7 +24,7 @@ if (!gotLock) {
     )
     registerIpc()
     openProjectManagerWindow()
-  })
+  }).catch((err: unknown) => console.error('[startup] failed', err))
 
   app.on('window-all-closed', () => {
     // 全ウィンドウが閉じたときの終了は OS の慣習に従う。

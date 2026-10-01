@@ -31,14 +31,14 @@ function run(args: string[], opts: { input?: string; cwd?: string } = {}): Promi
 async function runOk(args: string[], opts: { input?: string; cwd?: string } = {}): Promise<SbxExecResult> {
   const result = await run(args, opts)
   if (result.code !== 0) {
-    throw new SbxCommandError(`sbx ${args.join(' ')} failed with code ${result.code}`, result)
+    throw new SbxCommandError(`sbx ${args.join(' ')} failed with code ${String(result.code)}`, result)
   }
   return result
 }
 
 export async function sbxLs(): Promise<SbxLsEntry[]> {
   const result = await runOk(['ls', '--json'])
-  const parsed = JSON.parse(result.stdout) as { sandboxes: SbxLsEntry[] }
+  const parsed = JSON.parse(result.stdout) as { sandboxes?: SbxLsEntry[] }
   return parsed.sandboxes ?? []
 }
 
@@ -84,7 +84,7 @@ export function sbxCreate(opts: SbxCreateOptions): Promise<void> {
     child.on('error', (err) => reject(toFriendlyError(err)))
     child.on('close', (code) => {
       if (code === 0) resolve()
-      else reject(new SbxCommandError(`sbx create failed with code ${code}`, { code, stdout: '', stderr }))
+      else reject(new SbxCommandError(`sbx create failed with code ${String(code)}`, { code, stdout: '', stderr }))
     })
   })
 }
