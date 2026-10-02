@@ -72,6 +72,7 @@ export const IpcChannel = {
   FsOpenInOS: 'fs:openInOS',
   FsMkdir: 'fs:mkdir',
   FsCreateMarkdownFile: 'fs:createMarkdownFile',
+  FsCreateMermaidFile: 'fs:createMermaidFile',
   FsReadClipboardFiles: 'fs:readClipboardFiles',
   FsCopyExternal: 'fs:copyExternal',
 
@@ -243,6 +244,7 @@ export interface RendererApi {
     openInOS(projectId: string, relPath: string): Promise<void>
     mkdir(projectId: string, parentRelPath: string): Promise<string>
     createMarkdownFile(projectId: string, parentRelPath: string): Promise<string>
+    createMermaidFile(projectId: string, parentRelPath: string): Promise<string>
     /** OS のクリップボードにある「コピーされたファイル」の絶対パス（無ければ空）。 */
     readClipboardFiles(): Promise<string[]>
     /** アプリ外のファイル・フォルダをプロジェクト内へコピーする（移動はしない）。 */

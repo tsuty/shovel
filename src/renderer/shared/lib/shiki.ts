@@ -28,6 +28,7 @@ const LANGS = [
   'toml',
   'xml',
   'docker',
+  'mermaid',
   'plaintext'
 ] as const
 
@@ -101,7 +102,9 @@ const EXT_TO_LANG: Record<string, string> = {
   php: 'php',
   toml: 'toml',
   xml: 'xml',
-  dockerfile: 'docker'
+  dockerfile: 'docker',
+  mmd: 'mermaid',
+  mermaid: 'mermaid'
 }
 
 /** Markdown のフェンスの言語名（`ts` / `typescript` / `sh` など）を shiki の言語名にする。 */

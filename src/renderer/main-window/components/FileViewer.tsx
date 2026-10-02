@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, RotateCw, SquareCode } from 'lucide-react'
 import type { FileReadResult } from '@shared/types/filer'
 import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { Button } from '../../shared/components/ui/button'
+import { MermaidDiagram } from '../../shared/components/MermaidDiagram'
+import { MermaidIcon } from '../../shared/components/icons/MermaidIcon'
 import { FileStatusBar } from './FileStatusBar'
+
+/** 図として表示できる Mermaid のファイルか（拡張子で判定）。 */
+export function isMermaidFile(relPath: string): boolean {
+  return /\.(mmd|mermaid)$/i.test(relPath)
+}
 
 type ViewState =
   | { kind: 'loading' }
@@ -17,11 +24,16 @@ type ViewState =
 /**
  * Markdown 以外のファイルのビューア。テキストは shiki でハイライトし行番号を付けて表示する。
  * 画像はアプリ内でプレビューし、それ以外のバイナリは OS の関連付けアプリで開くボタンを出す。
+ * Mermaid のファイル（.mmd / .mermaid）は図とコードを切り替えて見られ、再読み込みもできる
+ * （エージェントが書き換えた図を見直すため。他のテキストと同じく閲覧のみ）。
  */
 export function FileViewer({ projectId, relPath }: { projectId: string; relPath: string }): React.JSX.Element {
   const { t } = useTranslation()
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [openError, setOpenError] = useState<string | null>(null)
+  const mermaid = isMermaidFile(relPath)
+  const [mermaidMode, setMermaidMode] = useState<'diagram' | 'code'>('diagram')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const run = { cancelled: false }
@@ -43,7 +55,7 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
     return () => {
       run.cancelled = true
     }
-  }, [projectId, relPath])
+  }, [projectId, relPath, reloadKey])
 
   async function openInOS(): Promise<void> {
     setOpenError(null)
@@ -86,9 +98,42 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
     case 'text':
       return (
         <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex-1 overflow-auto p-2">
-            <div className="shiki-lines text-sm" dangerouslySetInnerHTML={{ __html: view.html }} />
-          </div>
+          {mermaid && (
+            <div className="flex items-center gap-1 border-b border-border px-2 py-1">
+              <Button
+                size="sm"
+                variant={mermaidMode === 'diagram' ? 'secondary' : 'ghost'}
+                className="gap-1.5"
+                onClick={() => setMermaidMode('diagram')}
+              >
+                <MermaidIcon size={14} />
+                {t('mermaid.modeDiagram')}
+              </Button>
+              <Button
+                size="sm"
+                variant={mermaidMode === 'code' ? 'secondary' : 'ghost'}
+                className="gap-1.5"
+                onClick={() => setMermaidMode('code')}
+              >
+                <SquareCode size={14} />
+                {t('mermaid.modeCode')}
+              </Button>
+              <div className="flex-1" />
+              <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setReloadKey((k) => k + 1)}>
+                <RotateCw size={14} />
+                {t('mermaid.reload')}
+              </Button>
+            </div>
+          )}
+          {mermaid && mermaidMode === 'diagram' ? (
+            <div className="flex-1 overflow-auto p-4">
+              <MermaidDiagram code={view.file.content} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-auto p-2">
+              <div className="shiki-lines text-sm" dangerouslySetInnerHTML={{ __html: view.html }} />
+            </div>
+          )}
           <FileStatusBar size={view.file.size} encoding={view.file.encoding} lineEnding={view.file.lineEnding} />
         </div>
       )

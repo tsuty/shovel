@@ -83,7 +83,8 @@
     "viewerError": "Couldn't display this file.",
     "fileDeleted": "This file has been deleted.",
     "newFolder": "New folder",
-    "newMarkdownFile": "New markdown file",
+    "newMermaidFile": "New diagram (Mermaid)",
+    "newMarkdownFile": "New note (Markdown)",
     "copy": "Copy",
     "paste": "Paste",
     "unreadable": "This folder's contents can't be shown",
@@ -107,7 +108,10 @@
   "mermaid": {
     "title": "Diagram (Mermaid)",
     "show": "Show diagram",
-    "error": "Couldn't draw the diagram (the Mermaid source has an error)."
+    "error": "Couldn't draw the diagram (the Mermaid source has an error).",
+    "modeDiagram": "Diagram",
+    "modeCode": "Code",
+    "reload": "Reload"
   },
   "editor": {
     "mode": {

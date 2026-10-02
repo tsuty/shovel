@@ -20,6 +20,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import type { FsEntry } from '@shared/types/filer'
 import { cn } from '../../shared/lib/utils'
+import { MERMAID_BRAND_COLOR, MermaidIcon } from '../../shared/components/icons/MermaidIcon'
 import { MenuItem } from './MenuItem'
 
 interface FsNode extends FsEntry {
@@ -243,10 +244,13 @@ export function Filer({
     if (created) setRenaming(created)
   }
 
-  async function handleNewFile(targetNode: FsNode | null): Promise<void> {
+  async function handleNewFile(targetNode: FsNode | null, kind: 'markdown' | 'mermaid'): Promise<void> {
     setMenu(null)
     const parent = targetDirFor(targetNode)
-    const newRelPath = await window.shovel.fs.createMarkdownFile(projectId, parent)
+    const newRelPath =
+      kind === 'markdown'
+        ? await window.shovel.fs.createMarkdownFile(projectId, parent)
+        : await window.shovel.fs.createMermaidFile(projectId, parent)
     const nodes = await revealDir(parent)
     const created = findNode(nodes, newRelPath)
     if (created) setRenaming(created)
@@ -435,8 +439,18 @@ export function Filer({
           <MenuItem icon={<FolderPlus size={14} />} onClick={() => void handleNewFolder(menu.node)}>
             {t('filer.newFolder')}
           </MenuItem>
-          <MenuItem icon={<FileText size={14} />} onClick={() => void handleNewFile(menu.node)}>
+          <MenuItem icon={<FileText size={14} />} onClick={() => void handleNewFile(menu.node, 'markdown')}>
             {t('filer.newMarkdownFile')}
+          </MenuItem>
+          <MenuItem
+            icon={
+              <span className="flex" style={{ color: MERMAID_BRAND_COLOR }}>
+                <MermaidIcon size={14} />
+              </span>
+            }
+            onClick={() => void handleNewFile(menu.node, 'mermaid')}
+          >
+            {t('filer.newMermaidFile')}
           </MenuItem>
           {menu.node && (
             <MenuItem icon={<ClipboardCopy size={14} />} onClick={() => handleCopy(menu.node!)}>

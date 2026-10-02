@@ -48,6 +48,7 @@ import {
   copyExternalEntries,
   createDirectory,
   createMarkdownFile,
+  createMermaidFile,
   deleteEntry,
   listDir,
   moveEntry,
@@ -207,6 +208,9 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IpcChannel.FsCreateMarkdownFile, (_event, projectId: string, parentRelPath: string) =>
     createMarkdownFile(projectId, parentRelPath)
+  )
+  ipcMain.handle(IpcChannel.FsCreateMermaidFile, (_event, projectId: string, parentRelPath: string) =>
+    createMermaidFile(projectId, parentRelPath)
   )
 
   ipcMain.handle(IpcChannel.CommandRun, (event, projectId: string, command: string) => {

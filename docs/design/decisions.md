@@ -432,6 +432,7 @@ VFS リフレッシュ、ファイル関連付け起動、レクサー）を sho
 | 画像（png/jpg/gif/webp/avif/bmp/ico/svg、20MB まで） | **アプリ内でプレビュー**（拡張子で判定。main が data URL にして渡す） |
 | その他のバイナリ | 「プレビューできません」＋「既定のアプリで開く」ボタン。**押したときだけ** OS の関連付けアプリへ（`shell.openPath()`）。勝手には開かない |
 | テキスト（Markdown 以外） | **アプリ内で閲覧のみ**。shiki でハイライトし行番号を付ける。編集不可 |
+| Mermaid（.mmd / .mermaid） | 閲覧のみ。**図／コードを切り替えて表示**（既定は図。N-3-2b 追記） |
 | Markdown | Markdown エディタ（編集可能） |
 
 **重量級のコードエディタ（Monaco / CodeMirror）は採用しない。**
@@ -495,6 +496,21 @@ main 側の書き込みも拒否する。
 `securityLevel: 'strict'`（図の中の HTML・クリック時のスクリプトを無効）で描く。
 CSP の変更は不要（`unsafe-eval` を要しない）。
 
+**Mermaid のファイル（2026-10-02 追記）**: `.mmd` / `.mermaid` を Filer から開くと、
+タブ全体を使って図を描く（`FileViewer`。ポップアップではない）。上端の「図／コード」で
+切り替え（既定は図、コードは shiki の `mermaid` でハイライト）、「再読み込み」で
+ディスクから読み直す。他のテキストと同じく閲覧のみで、編集・自動の再読み込みはしない
+（外部変更の検知は V-8 が未決のため、エージェントが書き換えたら手で読み直す）。
+ポップアップにした理由のうち、書きかけの図はファイルでは起きない。非表示のタブでも
+`mermaid.render` は body 直下の一時要素で寸法を測るので崩れない。テーマの切り替えは
+`<html>` の `dark` クラスを見て描き直す（`MermaidDiagram`、ポップアップと共通）。
+文法エラーはタブの中にエラーと元のコードを出す。
+Filer の右クリックから「新規図（Mermaid）」で `Untitled.mmd` を作れる。空のファイルは
+文法エラーになるため、小さな見本（`flowchart TD` の2ノード）を書いた状態で作る。
+メニューの名前は「新規Markdownファイル」「新規Mermaidファイル」だと先頭が似ていて
+取り違えやすいので、用途を先に出して「新規メモ（Markdown）」「新規図（Mermaid）」とし、
+図のほうは Mermaid のロゴ（ブランド色）で見分けられるようにした。
+
 ### N-3-3. Markdown エディタ
 
 **決定**: **分割ビュー（左=Markdown ソース / 右=プレビュー）を基本とし、
@@ -526,9 +542,9 @@ ProseMirror ベースの実装が必要になり、実装量が跳ね上がる�
   `sbx exec` より速い。
   - git だけサンドボックス内で実行するのは、**`fs` はホストに必ずあるが
     git は無いかもしれない**ため（A-3-7）。
-- **新規作成（ディレクトリ / Markdown ファイル）**: 右クリックしたノード
+- **新規作成（ディレクトリ / Markdown / Mermaid ファイル）**: 右クリックしたノード
   （ディレクトリならその直下、ファイルならその親）、または空白部分の右クリック
-  でプロジェクトルート直下に作成できる。既定名（`New Folder` / `Untitled.md`）
+  でプロジェクトルート直下に作成できる。既定名（`New Folder` / `Untitled.md` / `Untitled.mmd`）
   が衝突する場合は `findAvailableName`（`filerService.ts`）で「name 2」方式の
   連番を自動で振る。作成後は既存のインラインリネーム UI にそのまま入り、
   ユーザーが名前を確定する。
@@ -1360,7 +1376,8 @@ IME 合成中の Enter で送信しない規則はどちらでも同じ。
 - タブバーのアイコン: セッション `bot`、履歴タブ・Read Only タブは時計
   （`clock-3`）、ファイル `file`。
 - ファイラーの右クリックのアイコン: パスをコピー `link` / コンテキストに追加
-  `file-plus` / 新規フォルダ `folder-plus` / 新規 Markdown ファイル `file-text` /
+  `file-plus` / 新規フォルダ `folder-plus` / 新規メモ（Markdown）`file-text` /
+  新規図（Mermaid）Mermaid のロゴ（ブランド色 `#FF3670`）/
   コピー `clipboard-copy` / 貼り付け `clipboard-paste` / 名前を変更 `square-pen` /
   削除 `trash-2` / Finder で開く `folder-open`。削除のアイコンはアプリ内で
   `trash-2` に統一する。

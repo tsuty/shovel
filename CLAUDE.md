@@ -37,7 +37,9 @@ right-click menu — including on empty space for root-level creation/paste — 
 OS file manager by paste or drop (always a copy, never a move; `readClipboardFilePaths` reads
 Electron 44's `text/uri-list` clipboard format (+ `x-special/gnome-copied-files` on Linux), drops use `webUtils.getPathForFile`), a manual refresh button, and
 "Open in Finder/Explorer" for folders; `.git` is always hidden, the old toggle is gone) with a
-read-only syntax-highlighted viewer (images previewed in-app; other binaries show an
+read-only syntax-highlighted viewer (images previewed in-app; `.mmd`/`.mermaid` files render as a
+full-tab Mermaid diagram with a diagram/code toggle and a manual reload button, and can be created
+from the right-click menu as "新規図（Mermaid）" with a starter template (decisions.md N-3-2b); other binaries show an
 "open with default app" button rather than opening automatically; text views and the Markdown
 editor have a status bar with size/encoding/line ending — writes preserve the file's original
 line ending and BOM, and non-UTF-8 files are view-only, see decisions.md N-3-2) and a split-view Markdown

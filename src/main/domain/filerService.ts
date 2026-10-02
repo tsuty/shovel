@@ -137,6 +137,17 @@ export async function createMarkdownFile(projectId: string, parentRelPath: strin
   return parentRelPath ? `${parentRelPath}/${name}` : name
 }
 
+/** 開いてすぐ図が見えるように、小さな見本を書いた状態で作る（空だと文法エラーになる）。 */
+const MERMAID_TEMPLATE = 'flowchart TD\n  A[Start] --> B[End]\n'
+
+export async function createMermaidFile(projectId: string, parentRelPath: string): Promise<string> {
+  const project = requireProject(projectId)
+  const parentAbs = resolveAbsolute(project, parentRelPath)
+  const name = await findAvailableName(parentAbs, 'Untitled', '.mmd')
+  await writeFile(path.join(parentAbs, name), MERMAID_TEMPLATE, 'utf8')
+  return parentRelPath ? `${parentRelPath}/${name}` : name
+}
+
 export async function renameEntry(projectId: string, relPath: string, newName: string): Promise<void> {
   const project = requireProject(projectId)
   const absPath = resolveAbsolute(project, relPath)

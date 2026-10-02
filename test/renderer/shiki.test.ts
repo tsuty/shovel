@@ -4,6 +4,8 @@ describe('langFromFilename', () => {
   it('拡張子から言語を決める', () => {
     expect(langFromFilename('a.ts')).toBe('typescript')
     expect(langFromFilename('src/b.PY')).toBe('python')
+    expect(langFromFilename('flow.mmd')).toBe('mermaid')
+    expect(langFromFilename('docs/flow.Mermaid')).toBe('mermaid')
   })
 
   it('ディレクトリ配下でも、拡張子の無いファイル名そのもので引く', () => {

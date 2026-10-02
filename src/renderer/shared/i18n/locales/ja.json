@@ -83,7 +83,8 @@
     "viewerError": "このファイルを表示できませんでした。",
     "fileDeleted": "このファイルは削除されました。",
     "newFolder": "新規フォルダ",
-    "newMarkdownFile": "新規Markdownファイル",
+    "newMarkdownFile": "新規メモ（Markdown）",
+    "newMermaidFile": "新規図（Mermaid）",
     "copy": "コピー",
     "paste": "貼り付け",
     "unreadable": "このフォルダの中身は表示できません",
@@ -106,7 +107,10 @@
   "mermaid": {
     "title": "図（Mermaid）",
     "show": "図を表示",
-    "error": "図を描けませんでした（Mermaid の書き方に誤りがあります）。"
+    "error": "図を描けませんでした（Mermaid の書き方に誤りがあります）。",
+    "modeDiagram": "図",
+    "modeCode": "コード",
+    "reload": "再読み込み"
   },
   "editor": {
     "mode": {
