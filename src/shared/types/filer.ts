@@ -30,7 +30,12 @@ export type FileReadResult =
       encoding: TextEncoding
       lineEnding: LineEnding
     }
-  | { kind: 'image'; dataUrl: string }
+  | {
+      kind: 'image'
+      dataUrl: string
+      /** ディスク上のバイト数。 */
+      size: number
+    }
   | { kind: 'binary' }
   | { kind: 'missing' }
 

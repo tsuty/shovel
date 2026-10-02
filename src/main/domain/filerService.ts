@@ -100,7 +100,7 @@ export async function readFileForViewer(projectId: string, relPath: string): Pro
     if (mime) {
       if (info.size > MAX_IMAGE_PREVIEW_BYTES) return { kind: 'binary' }
       const data = await readFile(absPath)
-      return { kind: 'image', dataUrl: `data:${mime};base64,${data.toString('base64')}` }
+      return { kind: 'image', dataUrl: `data:${mime};base64,${data.toString('base64')}`, size: info.size }
     }
     const decoded = decodeText(await readFile(absPath))
     if (decoded.kind === 'binary') return { kind: 'binary' }

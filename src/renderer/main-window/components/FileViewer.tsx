@@ -6,17 +6,35 @@ import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { Button } from '../../shared/components/ui/button'
 import { MermaidDiagram } from '../../shared/components/MermaidDiagram'
 import { MermaidIcon } from '../../shared/components/icons/MermaidIcon'
-import { FileStatusBar } from './FileStatusBar'
+import { FileStatusBar, ImageStatusBar } from './FileStatusBar'
 
 /** 図として表示できる Mermaid のファイルか（拡張子で判定）。 */
 export function isMermaidFile(relPath: string): boolean {
   return /\.(mmd|mermaid)$/i.test(relPath)
 }
 
+/**
+ * 画像が固有の幅×高さを持つか。SVG はルートに `width`/`height` が絶対値で両方あるときだけ持つ
+ * （無い・% 指定のときも Chromium は `naturalWidth/Height` に既定の 300×150 を返すので、それを除く）。
+ */
+function hasIntrinsicSize(dataUrl: string): boolean {
+  const prefix = 'data:image/svg+xml;base64,'
+  if (!dataUrl.startsWith(prefix)) return true
+  try {
+    const bytes = Uint8Array.from(atob(dataUrl.slice(prefix.length)), (c) => c.charCodeAt(0))
+    const doc = new DOMParser().parseFromString(new TextDecoder().decode(bytes), 'image/svg+xml')
+    const root = doc.documentElement
+    const isAbsolute = (value: string | null): boolean => value !== null && /^\s*[\d.]+\s*(px|pt|pc|mm|cm|in|em|ex)?\s*$/i.test(value)
+    return root.localName === 'svg' && isAbsolute(root.getAttribute('width')) && isAbsolute(root.getAttribute('height'))
+  } catch {
+    return false
+  }
+}
+
 type ViewState =
   | { kind: 'loading' }
   | { kind: 'text'; html: string; file: Extract<FileReadResult, { kind: 'text' }> }
-  | { kind: 'image'; dataUrl: string }
+  | Extract<FileReadResult, { kind: 'image' }>
   | { kind: 'binary' }
   | { kind: 'missing' }
   | { kind: 'error'; message: string }
@@ -34,11 +52,14 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
   const mermaid = isMermaidFile(relPath)
   const [mermaidMode, setMermaidMode] = useState<'diagram' | 'code'>('diagram')
   const [reloadKey, setReloadKey] = useState(0)
+  /** 画像の幅×高さ。読み込み前は `undefined`、取れなかった（寸法のない SVG など）ときは `null`。 */
+  const [imageDims, setImageDims] = useState<{ width: number; height: number } | null | undefined>(undefined)
 
   useEffect(() => {
     const run = { cancelled: false }
     setView({ kind: 'loading' })
     setOpenError(null)
+    setImageDims(undefined)
     void (async () => {
       try {
         const result = await window.shovel.fs.readFile(projectId, relPath)
@@ -91,8 +112,20 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
       )
     case 'image':
       return (
-        <div className="flex flex-1 items-center justify-center overflow-auto p-4">
-          <img src={view.dataUrl} alt={relPath} className="max-h-full max-w-full object-contain" />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex flex-1 items-center justify-center overflow-auto p-4">
+            <img
+              src={view.dataUrl}
+              alt={relPath}
+              className="max-h-full max-w-full object-contain"
+              onLoad={(e) => {
+                const { naturalWidth: width, naturalHeight: height } = e.currentTarget
+                setImageDims(width > 0 && height > 0 && hasIntrinsicSize(view.dataUrl) ? { width, height } : null)
+              }}
+              onError={() => setImageDims(null)}
+            />
+          </div>
+          <ImageStatusBar size={view.size} dimensions={imageDims} />
         </div>
       )
     case 'text':
@@ -131,7 +164,7 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
             </div>
           ) : (
             <div className="flex-1 overflow-auto p-2">
-              <div className="shiki-lines text-sm" dangerouslySetInnerHTML={{ __html: view.html }} />
+              <div className="shiki-lines text-editor" dangerouslySetInnerHTML={{ __html: view.html }} />
             </div>
           )}
           <FileStatusBar size={view.file.size} encoding={view.file.encoding} lineEnding={view.file.lineEnding} />

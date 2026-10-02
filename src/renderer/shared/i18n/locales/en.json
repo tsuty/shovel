@@ -75,6 +75,11 @@
     "commands": "Run command",
     "comingSoon": "Coming soon"
   },
+  "tabBar": {
+    "close": "Close",
+    "closeOtherFiles": "Close other files",
+    "closeAllFiles": "Close all files"
+  },
   "filer": {
     "copyPath": "Copy path",
     "addToContext": "Add to context",
@@ -134,6 +139,7 @@
     "light": "Light",
     "dark": "Dark",
     "transcriptFontSize": "Transcript font size",
+    "editorFontSize": "File viewer font size",
     "autoAttachActiveFile": "Automatically attach the active file",
     "sendKey": "Send key",
     "sendKeyEnter": "Enter to send (Shift+Enter for newline)",

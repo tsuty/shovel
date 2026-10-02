@@ -21,7 +21,9 @@ scaffold (Electron + electron-vite + React + TypeScript + Tailwind), main-proces
 (sbx CLI wrapper, path translation, project persistence, ACP connection/translation, filer,
 one-shot command execution, sign-in status check/guidance),
 the IPC contract, and the renderer (Project Manager window with all three creation flows plus a
-per-project details/diagnostics dialog; main window with tabs, transcript rendering (per-message
+per-project details/diagnostics dialog; main window with tabs (right-click menu: close / close
+other files / close all files — the bulk actions never close chat or history tabs, decisions.md
+G-1-12), transcript rendering (per-message
 copy, clickable tool-call locations/diffs, clickable attachment chips, code-block copy buttons and shiki highlighting of fenced code blocks (finalized blocks only),
 GFM task lists in agent replies rendered as interactive checkboxes + Send, a slash-command
 autocomplete dropdown driven by `available_commands_update`, a dedicated live-thinking strip above
@@ -36,8 +38,12 @@ folder/Markdown file, rename, delete, move via drag & drop, and clipboard copy/p
 right-click menu — including on empty space for root-level creation/paste — plus copy-in from the
 OS file manager by paste or drop (always a copy, never a move; `readClipboardFilePaths` reads
 Electron 44's `text/uri-list` clipboard format (+ `x-special/gnome-copied-files` on Linux), drops use `webUtils.getPathForFile`), a manual refresh button, and
-"Open in Finder/Explorer" for folders; `.git` is always hidden, the old toggle is gone) with a
-read-only syntax-highlighted viewer (images previewed in-app; `.mmd`/`.mermaid` files render as a
+"Open in Finder/Explorer" for folders; `.git` is always hidden, the old toggle is gone; files open
+on double-click or Enter — single click/arrow keys only select, folders still toggle on single
+click (decisions.md N-3-4); a right-click "open with default app" for files was deliberately
+rejected because `shell.openPath` can execute agent-written scripts on the host) with a
+read-only syntax-highlighted viewer (images previewed in-app with a size + width×height status
+bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those; `.mmd`/`.mermaid` files render as a
 full-tab Mermaid diagram with a diagram/code toggle and a manual reload button, and can be created
 from the right-click menu as "新規図（Mermaid）" with a starter template (decisions.md N-3-2b); other binaries show an
 "open with default app" button rather than opening automatically; text views and the Markdown
@@ -56,7 +62,9 @@ reads the file itself inside the sandbox (decisions.md G-1-5a); rendered on the 
 block, and restored as chips from `session/load` replay, where claude-agent-acp echoes them back
 as `[@name](file://…)` mentions; optional auto-attach-last-opened-file setting), resizable + persisted-width
 sidebar panels, and a settings dialog (changes broadcast to every open window) for language/theme/transcript
-font size (drives `text-transcript*` sizes in the transcript and history views)/send key (Enter vs Cmd/Ctrl+Enter,
+font size (drives `text-transcript*` sizes in the transcript and history views)/file-view font
+size (`editorFontSize` → `text-editor*`: viewer, Markdown editor source+preview, diff view; no
+font-family setting, decisions.md G-1-13)/send key (Enter vs Cmd/Ctrl+Enter,
 prompt input only)) — type-checks, lints, and
 builds cleanly, and the packaged app has been smoke-tested (boots, no renderer exceptions) under
 Xvfb.

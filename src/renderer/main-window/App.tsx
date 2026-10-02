@@ -382,6 +382,20 @@ export function App(): React.JSX.Element {
     })
   }
 
+  /**
+   * ファイルのタブをまとめて閉じる（チャット・履歴のタブは残す）。`keepId` を渡すとそのタブは残して
+   * 前面に出す。ファイルのタブは main 側に後始末がないので、`closeTab` を経由しない。
+   */
+  function closeFileTabs(keepId: string | null): void {
+    const remains = (tab: Tab): boolean => tab.kind !== 'file' || tab.sessionId === keepId
+    const next = tabs.filter(remains)
+    setTabs((prev) => prev.filter(remains))
+    if (keepId) setActiveSessionId(keepId)
+    else if (!next.some((tab) => tab.sessionId === activeSessionId)) {
+      setActiveSessionId(next.length > 0 ? next[next.length - 1]!.sessionId : null)
+    }
+  }
+
   /** 背景タブの通知状態。変化がなければ同一参照を返す。 */
   function updateTabStatus(
     sessionId: string,
@@ -471,6 +485,7 @@ export function App(): React.JSX.Element {
             activeSessionId={activeSessionId}
             onSelect={setActiveSessionId}
             onClose={(id) => void closeTab(id)}
+            onCloseFiles={closeFileTabs}
             onNew={() => void openNewTab()}
             canAddTab={limitedTabCount < MAX_SESSION_TABS}
           />

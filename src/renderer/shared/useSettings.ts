@@ -22,6 +22,7 @@ export function useSettings(): {
     applyTheme(settings.theme)
     void i18n.changeLanguage(settings.locale ?? navigatorLocale())
     document.documentElement.style.setProperty('--transcript-font-size', `${settings.transcriptFontSize}px`)
+    document.documentElement.style.setProperty('--editor-font-size', `${settings.editorFontSize}px`)
   }, [settings])
 
   async function update(patch: Partial<AppSettings>): Promise<void> {

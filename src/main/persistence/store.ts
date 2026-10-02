@@ -21,6 +21,7 @@ const defaults: StoreSchema = {
     theme: 'system',
     autoAttachActiveFile: false,
     transcriptFontSize: 14,
+    editorFontSize: 14,
     sendKey: 'enter'
   },
   sessionTitleOverrides: {},

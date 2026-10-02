@@ -28,17 +28,17 @@ export function DiffView({ rows, className }: { rows: DiffRow[]; className?: str
   }
 
   return (
-    <div className={cn('overflow-auto font-mono text-xs leading-5', className)}>
+    <div className={cn('overflow-auto font-mono text-editor-sm', className)}>
       <div className="min-w-max">
         {rows.map((row, index) => (
           <div key={index} className={cn('flex', ROW_CLASS[row.kind])}>
-            <span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground/60">
+            <span className="w-[3.4em] shrink-0 select-none px-1 text-right text-muted-foreground/60">
               {row.oldNo ?? ''}
             </span>
-            <span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground/60">
+            <span className="w-[3.4em] shrink-0 select-none px-1 text-right text-muted-foreground/60">
               {row.newNo ?? ''}
             </span>
-            <span className={cn('w-3 shrink-0 select-none text-center', TEXT_CLASS[row.kind])}>
+            <span className={cn('w-[1em] shrink-0 select-none text-center', TEXT_CLASS[row.kind])}>
               {MARK[row.kind]}
             </span>
             <span className={cn('whitespace-pre pr-3', TEXT_CLASS[row.kind])}>

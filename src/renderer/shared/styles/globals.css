@@ -46,6 +46,12 @@
   --text-transcript-xs: calc(var(--transcript-font-size) * 0.78);
   --text-transcript-xs--line-height: 1.5;
 
+  /* ビューア・Markdown エディタ・差分表示。-sm は差分表示用（既定で従来の text-xs 相当）。 */
+  --text-editor: var(--editor-font-size);
+  --text-editor--line-height: 1.5;
+  --text-editor-sm: calc(var(--editor-font-size) * 0.86);
+  --text-editor-sm--line-height: 1.65;
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -56,6 +62,7 @@
     /* ニュートラルトークンは色相 200、primary は無彩色グレー（hsl(0 0% 29%)）。 */
     /* useSettings が上書きする既定値。 */
     --transcript-font-size: 14px;
+    --editor-font-size: 14px;
     --terminal: 220 13% 13%;
     --terminal-foreground: 0 0% 92%;
     --terminal-muted: 220 8% 60%;

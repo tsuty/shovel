@@ -240,7 +240,7 @@ export function MarkdownEditor({
       <div className="flex flex-1 overflow-hidden">
         {mode !== 'preview' && (
           <textarea
-            className="h-full flex-1 resize-none overflow-auto border-r border-border bg-transparent p-3 font-mono text-sm outline-hidden"
+            className="h-full flex-1 resize-none overflow-auto border-r border-border bg-transparent p-3 font-mono text-editor outline-hidden"
             value={text}
             readOnly={readOnly}
             onChange={(e) => onChange(e.target.value)}
@@ -248,7 +248,7 @@ export function MarkdownEditor({
         )}
         {mode !== 'source' && (
           <div className="h-full flex-1 overflow-auto p-3">
-            <Markdown text={text} />
+            <Markdown text={text} className="text-editor" />
           </div>
         )}
       </div>

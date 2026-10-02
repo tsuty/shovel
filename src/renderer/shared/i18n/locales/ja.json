@@ -75,6 +75,11 @@
     "commands": "コマンド実行",
     "comingSoon": "近日対応"
   },
+  "tabBar": {
+    "close": "閉じる",
+    "closeOtherFiles": "他のファイルを閉じる",
+    "closeAllFiles": "すべてのファイルを閉じる"
+  },
   "filer": {
     "copyPath": "パスをコピー",
     "addToContext": "コンテキストに追加",
@@ -133,6 +138,7 @@
     "light": "ライト",
     "dark": "ダーク",
     "transcriptFontSize": "トランスクリプトの文字サイズ",
+    "editorFontSize": "ファイル表示の文字サイズ",
     "autoAttachActiveFile": "開いているファイルを自動的に添付する",
     "sendKey": "送信キー",
     "sendKeyEnter": "Enter で送信（Shift+Enter で改行）",

@@ -55,6 +55,16 @@ export function SettingsDialog({
             />
             <span className="ml-2 text-xs text-muted-foreground">{settings.transcriptFontSize}px</span>
           </Field>
+          <Field label={t('settings.editorFontSize')}>
+            <input
+              type="range"
+              min={11}
+              max={20}
+              value={settings.editorFontSize}
+              onChange={(e) => onUpdate({ editorFontSize: Number(e.target.value) })}
+            />
+            <span className="ml-2 text-xs text-muted-foreground">{settings.editorFontSize}px</span>
+          </Field>
           <Field label={t('settings.sendKey')}>
             <select
               className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"

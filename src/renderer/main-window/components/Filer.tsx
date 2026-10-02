@@ -206,6 +206,21 @@ export function Filer({
     onOpenFile(node.relPath, node.name.toLowerCase().endsWith('.md'))
   }
 
+  /**
+   * Enter でフォーカス中のファイルを開く（フォルダは開閉）。react-arborist の既定では Enter は
+   * 名前の変更なので、その前に横取りする。名前変更中の入力欄での Enter はそのまま通す。
+   */
+  function handleTreeKeyDown(e: React.KeyboardEvent): void {
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+    if (e.target instanceof HTMLInputElement) return
+    const node = treeRef.current?.focusedNode
+    if (!node || node.data.placeholder) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (node.data.isDir) node.toggle()
+    else handleActivate(node.data)
+  }
+
   async function refreshParent(relPath: string): Promise<void> {
     const parent = relPath.includes('/') ? relPath.slice(0, relPath.lastIndexOf('/')) : ''
     await loadDir(parent)
@@ -343,6 +358,7 @@ export function Filer({
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null)
         }}
         onDrop={(e) => void handleExternalDrop(e)}
+        onKeyDownCapture={handleTreeKeyDown}
       >
         <Tree<FsNode>
           ref={treeRef}
@@ -356,7 +372,6 @@ export function Filer({
           onToggle={handleToggle}
           disableDrag={(node) => node.placeholder === true}
           disableDrop={({ parentNode }) => parentNode.data.placeholder === true}
-          onActivate={(node) => handleActivate(node.data)}
           onRename={({ id, name }) => {
             const node = findNode(data, id)
             if (node) void commitRename(node, name)
@@ -390,6 +405,7 @@ export function Filer({
                 isRenaming={renaming?.relPath === props.node.data.relPath}
                 isDropTarget={dropTarget !== null && dropTarget !== '' && dropTarget === props.node.data.relPath}
                 onContextMenu={(e) => openMenu(e, props.node.data)}
+                onOpen={() => handleActivate(props.node.data)}
                 onCommitRename={(name) => void commitRename(props.node.data, name)}
               />
             )
@@ -492,12 +508,15 @@ function FilerRow({
   isRenaming,
   isDropTarget,
   onContextMenu,
+  onOpen,
   onCommitRename
 }: NodeRendererProps<FsNode> & {
   isRenaming: boolean
   /** アプリ外からのドロップの取り込み先として強調する。 */
   isDropTarget: boolean
   onContextMenu: (e: React.MouseEvent) => void
+  /** ファイルを開く（ダブルクリック）。 */
+  onOpen: () => void
   onCommitRename: (name: string) => void
 }): React.JSX.Element {
   const entry = node.data
@@ -512,7 +531,9 @@ function FilerRow({
         (node.isSelected || isDropTarget) && 'bg-accent',
         entry.ignored && 'opacity-45'
       )}
-      onClick={() => (entry.isDir ? node.toggle() : node.activate())}
+      // ファイルはシングルクリックでは選択だけ（選択は react-arborist の行が行う）。開くのはダブルクリックか Enter。
+      onClick={() => entry.isDir && node.toggle()}
+      onDoubleClick={() => !entry.isDir && onOpen()}
       onContextMenu={onContextMenu}
     >
       {entry.isDir ? (
