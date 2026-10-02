@@ -189,7 +189,7 @@ export function ChatHistoryPanel({
         ))}
       </ul>
 
-      {records.length > 0 && (
+      {(pastHistory.length > 0 || records.length > 0) && (
         <>
           <div className="mb-2 mt-4 flex items-center justify-between text-xs font-medium text-muted-foreground">
             <span>{t('history.title')}</span>
