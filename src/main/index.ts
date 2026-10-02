@@ -2,6 +2,7 @@ import { app, session } from 'electron'
 import { registerIpc } from './ipc/registerIpc'
 import { migrateFlatLogs } from './log'
 import { migrateFlatSnapshots } from './persistence/snapshot'
+import { applyLoginShellPath } from './shellPath'
 import { openProjectManagerWindow } from './windows/projectManagerWindow'
 import { installRendererProtocol, registerRendererScheme } from './windows/rendererProtocol'
 import { anyProjectWindowOpen, getProjectManagerWindow } from './windows/registry'
@@ -22,10 +23,14 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     installContentSecurityPolicy()
     installRendererProtocol()
-    // 旧形式のログをプロジェクトごとのディレクトリへ移す。
-    await Promise.all([migrateFlatSnapshots(), migrateFlatLogs()]).catch((err) =>
-      console.warn('[startup] migration of local records failed', err)
-    )
+    await Promise.all([
+      // GUI から起動するとログインシェルの PATH が無く `sbx` が見つからないため、先に取り込む。
+      applyLoginShellPath(),
+      // 旧形式のログをプロジェクトごとのディレクトリへ移す。
+      Promise.all([migrateFlatSnapshots(), migrateFlatLogs()]).catch((err) =>
+        console.warn('[startup] migration of local records failed', err)
+      )
+    ])
     registerIpc()
     openProjectManagerWindow()
   }).catch((err: unknown) => console.error('[startup] failed', err))
