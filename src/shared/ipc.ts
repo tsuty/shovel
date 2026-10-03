@@ -5,7 +5,7 @@
  */
 
 import type { TranscriptAction, TranscriptEvent } from './types/transcript'
-import type { AgentEntry, Project, ProjectWithStatus } from './types/project'
+import type { AcpUpdateOffer, AgentEntry, Project, ProjectWithStatus } from './types/project'
 import type {
   HistoryListing,
   LocalRecordSummary,
@@ -44,6 +44,8 @@ export const IpcChannel = {
   AuthSetApiKey: 'auth:setApiKey',
   AuthOpenLoginTerminal: 'auth:openLoginTerminal',
   AgentsList: 'agents:list',
+  AgentsAcpUpdateOffer: 'agents:acpUpdateOffer',
+  AgentsResolveAcpUpdate: 'agents:resolveAcpUpdate',
 
   SessionOpenTab: 'session:openTab',
   SessionResumeTab: 'session:resumeTab',
@@ -132,6 +134,8 @@ export interface SessionEnvelope {
 /** プロジェクトの詳細の診断情報。 */
 export interface ProjectDiagnostics {
   project: Project
+  /** エージェントの表示名（ACP レジストリの `name`。例: `Claude Agent`）。 */
+  agentName: string
   diagnoseOutput: string
   sbxLsEntry: SbxLsEntry | null
   /**
@@ -194,6 +198,10 @@ export interface RendererApi {
   }
   agents: {
     list(): Promise<AgentEntry[]>
+    /** ACP アダプタの更新を尋ねるべきなら、その内容（decisions.md N-2-5b）。 */
+    acpUpdateOffer(projectId: string): Promise<AcpUpdateOffer | null>
+    /** 更新の確認への答え（true: 最新版にする、false: 今の版のまま）。 */
+    resolveAcpUpdate(projectId: string, update: boolean): Promise<void>
   }
   session: {
     /** `sessionId` はタブ id、`snapshotId` はそのタブがいま書き込んでいるスナップショットの id。 */

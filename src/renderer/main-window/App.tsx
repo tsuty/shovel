@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ProjectWithStatus } from '@shared/types/project'
+import type { AcpUpdateOffer, ProjectWithStatus } from '@shared/types/project'
 import type { HistoryEntry, LocalRecordSummary, SessionMeta, SessionSnapshot } from '@shared/types/session'
 import { Header } from './components/Header'
 import { Sidebar, type SidebarPanel } from './components/Sidebar'
@@ -15,6 +15,7 @@ import { useSettings } from '../shared/useSettings'
 import { SettingsDialog } from '../shared/components/SettingsDialog'
 import { AuthDialog } from './components/AuthDialog'
 import { AttachTargetDialog } from './components/AttachTargetDialog'
+import { AcpUpdateDialog } from './components/AcpUpdateDialog'
 import { ProjectDetailDialog } from '../shared/components/ProjectDetailDialog'
 import { preloadMermaid } from '../shared/lib/mermaid'
 import { isAuthRequiredMessage } from '@shared/authMarker'
@@ -93,6 +94,8 @@ export function App(): React.JSX.Element {
   const [lastOpenedFilePath, setLastOpenedFilePath] = useState<string | null>(null)
   /** 添え先が1つに決まらなかったときに、どのチャットに添えるかを選ばせる対象ファイル。 */
   const [attachPickerPath, setAttachPickerPath] = useState<string | null>(null)
+  /** ウィンドウを開いたときに尋ねる ACP アダプタの更新。答えるまで最初のタブは開かない。 */
+  const [acpUpdateOffer, setAcpUpdateOffer] = useState<AcpUpdateOffer | null>(null)
   const [attachedWidth, setAttachedWidth] = useState(ATTACHED_DEFAULT_WIDTH)
   const [commandsHeight, setCommandsHeight] = useState(COMMANDS_DEFAULT_HEIGHT)
   const [tabStatuses, setTabStatuses] = useState<
@@ -150,14 +153,29 @@ export function App(): React.JSX.Element {
   }
 
   // StrictMode の二重発火でセッションが2つ開かないよう、ref で一度だけに絞る。
+  // ACP アダプタの新しい版が出ていれば、最初のタブを開く前に更新するか尋ねる（decisions.md N-2-5b）。
   const didOpenInitialTabRef = useRef(false)
   useEffect(() => {
     if (projectId && !didOpenInitialTabRef.current) {
       didOpenInitialTabRef.current = true
-      void openNewTab()
+      void window.shovel.agents
+        .acpUpdateOffer(projectId)
+        .catch(() => null)
+        .then((offer) => {
+          if (offer) setAcpUpdateOffer(offer)
+          else void openNewTab()
+        })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
+
+  async function answerAcpUpdate(update: boolean | null): Promise<void> {
+    setAcpUpdateOffer(null)
+    if (projectId && update !== null) {
+      await window.shovel.agents.resolveAcpUpdate(projectId, update).catch(() => {})
+    }
+    await openNewTab()
+  }
 
   function openFile(relPath: string, isMarkdown: boolean): void {
     setLastOpenedFilePath(relPath)
@@ -599,6 +617,11 @@ export function App(): React.JSX.Element {
         />
       )}
       <ProjectDetailDialog projectId={projectId} open={detailsOpen} onOpenChange={setDetailsOpen} />
+      <AcpUpdateDialog
+        offer={acpUpdateOffer}
+        onAnswer={(update) => void answerAcpUpdate(update)}
+        onDismiss={() => void answerAcpUpdate(null)}
+      />
       <AttachTargetDialog
         relPath={attachPickerPath}
         chatTabs={chatTabs}

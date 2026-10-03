@@ -44,7 +44,7 @@ export function ProjectDetailDialog({
       `hostPath: ${diagnostics.project.hostPath}`,
       `sandboxName: ${diagnostics.project.sandboxName}`,
       `sandboxId: ${diagnostics.project.sandboxId}`,
-      `agentId: ${diagnostics.project.agentId}`,
+      `agent: ${agentLabel(diagnostics)}`,
       `logsDir: ${diagnostics.logsDir}`,
       `snapshotsDir: ${diagnostics.snapshotsDir}`,
       '',
@@ -91,7 +91,7 @@ export function ProjectDetailDialog({
               <dt className="text-muted-foreground">{t('detail.sandboxName')}</dt>
               <dd className="truncate">{diagnostics.project.sandboxName}</dd>
               <dt className="text-muted-foreground">{t('detail.agent')}</dt>
-              <dd>{diagnostics.project.agentId}</dd>
+              <dd>{agentLabel(diagnostics)}</dd>
               <dt className="text-muted-foreground">{t('detail.logsDir')}</dt>
               <DataDirRow path={diagnostics.logsDir} onOpen={() => void openDataDir('logs')} />
               <dt className="text-muted-foreground">{t('detail.snapshotsDir')}</dt>
@@ -148,4 +148,10 @@ function DataDirRow({ path, onOpen }: { path: string; onOpen: () => void }): Rea
       </button>
     </dd>
   )
+}
+
+/** `Claude Agent 0.85.1` の形。版が未記録なら名前だけ。 */
+function agentLabel(diagnostics: ProjectDiagnostics): string {
+  const { agentName, project } = diagnostics
+  return project.acpVersion ? `${agentName} ${project.acpVersion}` : agentName
 }

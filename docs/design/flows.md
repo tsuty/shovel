@@ -142,15 +142,21 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
   │
   ├─ BrowserWindow を生成
   │
+  ├─ ACP アダプタの更新確認（decisions.md N-2-5b）
+  │   記録した acpVersion より、プロジェクトマネージャを開いたときに ACP レジストリで
+  │   控えた最新版が新しければ「更新する／今のバージョンのまま」を尋ねる。答えてから次へ
+  │
   └─ タブ1つ目の接続を開始
        │
        ├─ 1. 生存確認     sbx exec -i <name> echo ...    終了コードのみで判定
        │                   失敗 → エラー表示。接続を試みない
        │
-       ├─ 2. プロセス起動  sbx exec -i <name> npx -y <acpPackage>
+       ├─ 2. プロセス起動  sbx exec -i <name> npx -y <acpPackage>@<version>
+       │                   version = acpVersion → 控えた最新版 → latest の順
        │                   stdout → ACP パーサ / stderr → ログと進捗表示へ分離
        │
        ├─ 3. initialize   protocolVersion: 1, clientInfo
+       │                   応答の agentInfo.version を Project.acpVersion に記録
        │                   fs.readTextFile / fs.writeTextFile / terminal = false
        │                   ← アイドルタイムアウト（既定180秒。無音時間で測る）
        │                   接続中は「Negotiating ACP… 12s · {stderr の最終行}」を毎秒更新

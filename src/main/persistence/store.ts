@@ -1,6 +1,7 @@
 import Store from 'electron-store'
 import type { Project } from '@shared/types/project'
 import type { AppSettings } from '@shared/types/settings'
+import type { AcpRegistryEntry } from '@shared/acpVersion'
 
 /** `electron-store`（JSON）に保存する設定・プロジェクト・履歴。 */
 export type { AppSettings }
@@ -12,6 +13,8 @@ interface StoreSchema {
   commandHistory: Record<string, string[]>
   sidebar: { widths: Record<string, number> }
   lastPickedDirectory: string | null
+  /** ACP レジストリから読んだ、パッケージ名ごとの表示名と最新バージョン。 */
+  acpRegistryEntries: Record<string, AcpRegistryEntry>
 }
 
 const defaults: StoreSchema = {
@@ -27,7 +30,8 @@ const defaults: StoreSchema = {
   sessionTitleOverrides: {},
   commandHistory: {},
   sidebar: { widths: {} },
-  lastPickedDirectory: null
+  lastPickedDirectory: null,
+  acpRegistryEntries: {}
 }
 
 const store = new Store<StoreSchema>({ defaults })
@@ -125,5 +129,17 @@ export const pickDirectoryStore = {
   },
   set(dir: string): void {
     store.set('lastPickedDirectory', dir)
+  }
+}
+
+/** ACP レジストリで見た表示名と最新バージョンの控え（decisions.md N-2-5b）。 */
+export const acpRegistryStore = {
+  get(packageName: string): AcpRegistryEntry | undefined {
+    return store.get('acpRegistryEntries')[packageName]
+  },
+  set(packageName: string, entry: AcpRegistryEntry): void {
+    const map = store.get('acpRegistryEntries')
+    map[packageName] = entry
+    store.set('acpRegistryEntries', map)
   }
 }

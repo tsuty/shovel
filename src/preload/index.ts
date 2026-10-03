@@ -49,7 +49,9 @@ const api: RendererApi = {
     }
   },
   agents: {
-    list: () => ipcRenderer.invoke(IpcChannel.AgentsList)
+    list: () => ipcRenderer.invoke(IpcChannel.AgentsList),
+    acpUpdateOffer: (projectId) => ipcRenderer.invoke(IpcChannel.AgentsAcpUpdateOffer, projectId),
+    resolveAcpUpdate: (projectId, update) => ipcRenderer.invoke(IpcChannel.AgentsResolveAcpUpdate, projectId, update)
   },
   session: {
     openTab: (projectId) => ipcRenderer.invoke(IpcChannel.SessionOpenTab, projectId),

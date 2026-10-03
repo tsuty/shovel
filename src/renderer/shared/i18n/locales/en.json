@@ -131,6 +131,15 @@
       "description": "Choose the chat to show {{path}} beside."
     }
   },
+  "acpUpdate": {
+    "title": "Agent update available",
+    "description": "A newer version of the ACP adapter used by this project is available. Update now?",
+    "agent": "Agent",
+    "current": "Current",
+    "latest": "Latest",
+    "keep": "Keep current version",
+    "update": "Update"
+  },
   "settings": {
     "title": "Settings",
     "language": "Language",

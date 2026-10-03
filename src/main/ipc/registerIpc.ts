@@ -61,6 +61,7 @@ import {
 import { cancelRun, commandHistory, removeCommandHistory, runCommand, sendInput } from '../domain/commandService'
 import { listLocalRecords, readLocalRecord } from '../persistence/snapshot'
 import { searchLocalRecords } from '../domain/localSearch'
+import { getAcpUpdateOffer, resolveAcpUpdate } from '../domain/acpVersionService'
 
 export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AppOpenProjectManager, () => openProjectManagerWindow())
@@ -121,6 +122,10 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle(IpcChannel.AgentsList, () => AGENT_TABLE)
+  ipcMain.handle(IpcChannel.AgentsAcpUpdateOffer, (_event, projectId: string) => getAcpUpdateOffer(projectId))
+  ipcMain.handle(IpcChannel.AgentsResolveAcpUpdate, (_event, projectId: string, update: boolean) =>
+    resolveAcpUpdate(projectId, update)
+  )
 
   ipcMain.handle(IpcChannel.SessionOpenTab, (event, projectId: string) => openTab(projectId, event.sender))
   ipcMain.handle(IpcChannel.SessionResumeTab, (event, projectId: string, snapshotSessionId: string) =>

@@ -104,8 +104,11 @@ Electron バージョン × OS × CPU アーキテクチャごとのビルドが
 ### 起動
 
 ```
-sbx exec -i "<sandbox-name>" npx -y <acp-package>
+sbx exec -i "<sandbox-name>" npx -y <acp-package>@<version>
 ```
+
+- **版を必ず明示する。** バージョン無しだと `npx` はサンドボックス内のキャッシュにある版を
+  使い続け、新しい版を取りに行かない。版の決め方は decisions.md N-2-5b
 
 - **引数ベクタを直接組み立て、シェルを介さない。** クォートやパス区切りの
   OS 差を吸収でき、サンドボックス名に何が含まれていても単一引数として渡る

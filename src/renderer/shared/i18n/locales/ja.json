@@ -130,6 +130,15 @@
       "description": "{{path}} を横に表示するチャットを選んでください。"
     }
   },
+  "acpUpdate": {
+    "title": "エージェントの更新があります",
+    "description": "このプロジェクトで使っている ACP アダプタに新しいバージョンが出ています。更新しますか？",
+    "agent": "エージェント",
+    "current": "現在",
+    "latest": "最新",
+    "keep": "今のバージョンのまま",
+    "update": "更新する"
+  },
   "settings": {
     "title": "設定",
     "language": "言語",

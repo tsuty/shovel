@@ -18,6 +18,8 @@ type Project = {
   sandboxName: string   // sbx の制約に従って導出＋衝突回避
   sandboxId:   string   // sbx が採番した UUID。照合に使う
   agentId:     string   // エージェント対応表のキー
+  acpVersion?:        string  // 使う ACP アダプタの版。セッション開始時に initialize の agentInfo.version を記録
+  skippedAcpVersion?: string  // 更新の確認で「今のまま」を選んだ版（decisions.md N-2-5b）
 }
 ```
 
@@ -29,6 +31,7 @@ type Project = {
 | `displayName` | `sbx --name` が許すのは英数字・ハイフン・ピリオド・プラス・マイナスのみで、日本語やスペースを含む名前は使えない |
 | `sandboxPath` | ACP が報告するパスはサンドボックス内のもの。ホストのパスとの変換に必要（Windows では原理的に一致しない） |
 | `sandboxId` | 名前より ID の方が照合が堅牢。`sbx ls --json` が UUID を返す |
+| `acpVersion` | バージョン無しの `npx -y <pkg>` はキャッシュの古い版を使い続けるため、版を明示して起動する。更新はユーザーが確認して決める（decisions.md N-2-5b） |
 
 ### 持たないもの
 

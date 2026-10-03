@@ -1,6 +1,7 @@
 import { createSecureWindow } from './createSecureWindow'
 import { rendererPageUrl } from './rendererProtocol'
 import { getProjectManagerWindow, setProjectManagerWindow } from './registry'
+import { refreshLatestAcpVersions } from '../domain/acpVersionService'
 
 export function openProjectManagerWindow(): void {
   const existing = getProjectManagerWindow()
@@ -11,6 +12,8 @@ export function openProjectManagerWindow(): void {
 
   const win = createSecureWindow({ width: 760, height: 560, title: 'shovel' })
   setProjectManagerWindow(win)
+  // ACP アダプタの最新版を控えておく（decisions.md N-2-5b）。
+  void refreshLatestAcpVersions()
 
   void win.loadURL(rendererPageUrl('project-manager.html'))
 }

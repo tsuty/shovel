@@ -201,8 +201,13 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   if the agent runs git inside the sandbox on its own, that's between the agent and the sandbox.
 - **1 window = 1 project = 1 sandbox.** **1 tab = 1 ACP session = 1 `sbx exec` child process**,
   capped at 10 tabs.
-- Agent connection: `sbx exec -i "<sandbox>" npx -y <acp-package>`, argv-based spawn
-  (`shell: false`) — never build a shell command string. Only `stdout` is fed to the JSON-RPC
+- Agent connection: `sbx exec -i "<sandbox>" npx -y <acp-package>@<version>`, argv-based spawn
+  (`shell: false`) — never build a shell command string. The version is always explicit (a bare
+  package name makes `npx` reuse its stale cache): `Project.acpVersion` (recorded from
+  `initialize`'s `agentInfo.version`) → the latest version cached from the ACP registry (fetched
+  when the Project Manager opens) → `latest`. When a newer registry version exists, the project
+  window asks "update / keep" before opening its first tab (decisions.md N-2-5b,
+  `src/main/domain/acpVersionService.ts`). Only `stdout` is fed to the JSON-RPC
   parser; `stderr` is captured separately for logs (mixing them breaks parsing because `npx`
   writes progress to stderr). Line splitting must accept both `\n` and `\r\n`.
 - ACP v1 only, and all client capabilities (`fs.readTextFile`, `fs.writeTextFile`, `terminal`) are

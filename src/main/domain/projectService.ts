@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { dialog, shell } from 'electron'
 import { getAgentEntry } from '@shared/agentTable'
+import { acpAgentName } from './acpVersionService'
 import type { Project, ProjectWithStatus, SandboxStatus } from '@shared/types/project'
 import type {
   CreateExistingDirRequest,
@@ -250,7 +251,17 @@ export async function getProjectDiagnostics(id: string): Promise<ProjectDiagnost
     readSessionLogs(id)
   ])
   const sbxLsEntry = sandboxes.find((s) => s.id === project.sandboxId) ?? null
-  return { project, diagnoseOutput, sbxLsEntry, ...logs, logsDir: logsDir(id), snapshotsDir: snapshotDir(id) }
+  const agent = getAgentEntry(project.agentId)
+  const agentName = agent ? acpAgentName(agent) : project.agentId
+  return {
+    project,
+    agentName,
+    diagnoseOutput,
+    sbxLsEntry,
+    ...logs,
+    logsDir: logsDir(id),
+    snapshotsDir: snapshotDir(id)
+  }
 }
 
 export async function openDataDir(id: string, kind: DataDirKind): Promise<void> {

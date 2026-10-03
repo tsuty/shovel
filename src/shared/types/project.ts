@@ -19,6 +19,21 @@ export interface Project {
   agentId: string
   /** 作成時刻 (epoch ms)。プロジェクトマネージャでの並び順に使う。 */
   createdAt: number
+  /**
+   * このプロジェクトで使う ACP アダプタのバージョン（`npx -y <package>@<acpVersion>`）。
+   * セッション開始時にエージェントが `initialize` で告げた版を記録する。未記録なら undefined。
+   */
+  acpVersion?: string
+  /** 更新の確認で「今のまま」を選んだ版。これより新しい版が出るまでは再び尋ねない。 */
+  skippedAcpVersion?: string
+}
+
+/** プロジェクトのウィンドウを開いたときに尋ねる、ACP アダプタの更新。 */
+export interface AcpUpdateOffer {
+  /** エージェントの表示名（ACP レジストリの `name`。例: `Claude Agent`）。 */
+  agentName: string
+  current: string
+  latest: string
 }
 
 /** `sbx ls --json` と shovel の設定を突き合わせた結果。 */

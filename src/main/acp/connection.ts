@@ -36,6 +36,7 @@ import { permissionRequestToEvent, SessionTranslator } from './translate'
 import { backupSnapshot, saveSnapshot } from '../persistence/snapshot'
 import { compareByMessageId, describeMessageIdComparison, SnapshotAccumulator } from './snapshotRecord'
 import { sessionTitleStore } from '../persistence/store'
+import { acpPackageSpec, recordAcpVersion } from '../domain/acpVersionService'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
 
@@ -114,8 +115,8 @@ class IdleWatchdog {
 /**
  * サンドボックス内の ACP アダプタへ接続し、1つの ACP セッションを開始する。
  *   1. 生存確認（終了コードのみで判定）
- *   2. `sbx exec -i` でプロセス起動、stdout/stderr を分離
- *   3. initialize（アイドルタイムアウト）
+ *   2. `sbx exec -i` でプロセス起動（`npx -y <package>@<version>`）、stdout/stderr を分離
+ *   3. initialize（アイドルタイムアウト）。告げられたアダプタの版をプロジェクトに記録
  *   4. session/new（`restore` が指定されたときは session/load か session/resume）
  *
  * 戻り値の `sessionId` は shovel が払い出すタブ id で、ACP の `SessionId` とは別物。
@@ -136,7 +137,7 @@ export async function openAcpSession(
 
   const acp = await loadAcpSdk()
   const logger = new SessionLogger(sessionId, project.id)
-  const child = sbxSpawnInteractive(project.sandboxName, ['npx', '-y', agent.acpPackage], {
+  const child = sbxSpawnInteractive(project.sandboxName, ['npx', '-y', acpPackageSpec(project, agent)], {
     cwd: project.sandboxPath
   })
 
@@ -425,6 +426,8 @@ export async function openAcpSession(
           )
 
           capabilities = readCapabilities(initResponse)
+          // 実際に動いている版をプロジェクトに記録する（decisions.md N-2-5b）。
+          recordAcpVersion(project.id, (initResponse as InitializeResponse | undefined)?.agentInfo?.version)
           const started = restore
             ? await startRestoredSession(ctx, capabilities, restore)
             : await startNewSession(ctx)
