@@ -25,7 +25,7 @@ import {
 } from '../domain/projectService'
 import { openSandboxTerminal } from '../domain/terminal'
 import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authService'
-import { openProjectWindow } from '../windows/mainWindow'
+import { openProjectWindow, refreshProjectWindowTitle } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
 import { projectsStore, settingsStore, sidebarStore } from '../persistence/store'
 import {
@@ -99,9 +99,10 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.ProjectsCreateFromExisting, (_event, req: CreateFromExistingRequest) =>
     createFromExistingSandbox(req)
   )
-  ipcMain.handle(IpcChannel.ProjectsRename, (_event, id: string, displayName: string) =>
+  ipcMain.handle(IpcChannel.ProjectsRename, (_event, id: string, displayName: string) => {
     renameProject(id, displayName)
-  )
+    refreshProjectWindowTitle(id)
+  })
   ipcMain.handle(IpcChannel.ProjectsRemove, (_event, id: string, trashHostDir: boolean) =>
     removeProject(id, trashHostDir)
   )
