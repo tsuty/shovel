@@ -27,6 +27,7 @@ import { openSandboxTerminal } from '../domain/terminal'
 import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authService'
 import { openProjectWindow, refreshProjectWindowTitle } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
+import { installAppMenu } from '../windows/appMenu'
 import { projectsStore, settingsStore, sidebarStore } from '../persistence/store'
 import {
   cancelSession,
@@ -68,6 +69,7 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.SettingsGet, () => settingsStore.get())
   ipcMain.handle(IpcChannel.SettingsUpdate, (_event, patch: Partial<AppSettings>) => {
     const next = settingsStore.set(patch)
+    if ('locale' in patch) installAppMenu()
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.webContents.isDestroyed()) win.webContents.send(IpcChannel.SettingsChanged, next)
     }

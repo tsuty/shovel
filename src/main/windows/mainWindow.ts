@@ -1,6 +1,13 @@
 import { createSecureWindow } from './createSecureWindow'
 import { rendererPageUrl } from './rendererProtocol'
-import { getProjectManagerWindow, getProjectWindow, registerProjectWindow } from './registry'
+import { openProjectManagerWindow } from './projectManagerWindow'
+import {
+  anyProjectWindowOpen,
+  getProjectManagerWindow,
+  getProjectWindow,
+  isQuitting,
+  registerProjectWindow
+} from './registry'
 import { closeAllTabsForWindow } from '../domain/sessionManager'
 import { projectsStore } from '../persistence/store'
 
@@ -20,7 +27,11 @@ export function openProjectWindow(projectId: string): void {
   registerProjectWindow(projectId, win)
   // 'closed' の時点では win が破棄済みなので、webContents を先に確保しておく。
   const webContents = win.webContents
-  win.on('closed', () => closeAllTabsForWindow(webContents))
+  win.on('closed', () => {
+    closeAllTabsForWindow(webContents)
+    // 最後のプロジェクトのウィンドウを閉じたら、入口のプロジェクトマネージャへ戻る。
+    if (!isQuitting() && !anyProjectWindowOpen()) openProjectManagerWindow()
+  })
   // プロジェクトのウィンドウが表示されたら、プロジェクト一覧を閉じる。
   win.once('ready-to-show', closeProjectManager)
 

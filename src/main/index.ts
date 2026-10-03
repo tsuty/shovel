@@ -3,9 +3,10 @@ import { registerIpc } from './ipc/registerIpc'
 import { migrateFlatLogs } from './log'
 import { migrateFlatSnapshots } from './persistence/snapshot'
 import { applyLoginShellPath } from './shellPath'
+import { installAppMenu } from './windows/appMenu'
 import { openProjectManagerWindow } from './windows/projectManagerWindow'
 import { installRendererProtocol, registerRendererScheme } from './windows/rendererProtocol'
-import { anyProjectWindowOpen, getProjectManagerWindow } from './windows/registry'
+import { anyProjectWindowOpen, getProjectManagerWindow, markQuitting } from './windows/registry'
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -32,12 +33,17 @@ if (!gotLock) {
       )
     ])
     registerIpc()
+    installAppMenu()
     openProjectManagerWindow()
   }).catch((err: unknown) => console.error('[startup] failed', err))
 
+  app.on('before-quit', markQuitting)
+
   app.on('window-all-closed', () => {
-    // 全ウィンドウが閉じたときの終了は OS の慣習に従う。
-    if (process.platform !== 'darwin') app.quit()
+    // 最後のプロジェクトのウィンドウを閉じるとプロジェクトマネージャが開き直されるので、ここに来るのは
+    // プロジェクトマネージャを閉じたときか終了処理中だけ。macOS でもウィンドウ無しで常駐させず終了する
+    // （何もできない状態を残さない）。
+    app.quit()
   })
 
   app.on('activate', () => {

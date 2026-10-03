@@ -3,6 +3,16 @@ import { BrowserWindow } from 'electron'
 /** プロジェクト id ごとに開いているウィンドウを管理する。 */
 const windowsByProjectId = new Map<string, BrowserWindow>()
 let projectManagerWindow: BrowserWindow | null = null
+/** アプリの終了処理中か。終了でウィンドウが閉じていく途中に、プロジェクトマネージャを開き直さないために使う。 */
+let quitting = false
+
+export function markQuitting(): void {
+  quitting = true
+}
+
+export function isQuitting(): boolean {
+  return quitting
+}
 
 export function getProjectWindow(projectId: string): BrowserWindow | null {
   const win = windowsByProjectId.get(projectId)
