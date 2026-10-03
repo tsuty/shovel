@@ -1,21 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { History, Info, SquareTerminal, X } from 'lucide-react'
+import { History, Info, Pin, SquareTerminal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { CommandExit, CommandOutputChunk } from '@shared/types/command'
+import type { CommandExit, CommandHistory, CommandOutputChunk } from '@shared/types/command'
 import { cn } from '../../shared/lib/utils'
 
 const MAX_LINES = 2000
 /** 履歴の表示件数。 */
 const HISTORY_LIMIT = 20
+/** ピン留めの上限（main の `PINNED_COMMAND_LIMIT` と揃える）。 */
+const PINNED_LIMIT = 10
 
 /**
  * コマンド実行パネル。`\r` で上書きされる進捗行は1行として畳み、出力行数には上限を設ける。
  * 履歴は ↑↓キーと右側の一覧から入力欄に呼び戻す（実行はしない）。
+ * ピン留めは一覧の上部に固定され、↑↓キーでは辿らない。
  */
 export function Commands({ projectId, onClose }: { projectId: string; onClose: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   const [command, setCommand] = useState('')
-  const [history, setHistory] = useState<string[]>([])
+  const [{ pinned, recent: history }, setHistory] = useState<CommandHistory>({ pinned: [], recent: [] })
   const [runId, setRunId] = useState<string | null>(null)
   const [lines, setLines] = useState<string[]>([])
   const [stdin, setStdin] = useState('')
@@ -108,7 +111,12 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
     const early = earlyRef.current.get(newRunId) ?? []
     earlyRef.current.clear()
     for (const event of early) handleRunEvent(event)
-    setHistory((prev) => [trimmed, ...prev.filter((c) => c !== trimmed)].slice(0, HISTORY_LIMIT))
+    // ピン留め済みのコマンドはピン側の位置のまま動かさない（main の push と同じ規則）。
+    setHistory((prev) =>
+      prev.pinned.includes(trimmed)
+        ? prev
+        : { ...prev, recent: [trimmed, ...prev.recent.filter((c) => c !== trimmed)].slice(0, HISTORY_LIMIT) }
+    )
     setCommand('')
     historyIndexRef.current = -1
   }
@@ -144,6 +152,16 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
   async function removeFromHistory(entry: string): Promise<void> {
     historyIndexRef.current = -1
     setHistory(await window.shovel.command.removeHistory(projectId, entry))
+  }
+
+  async function pinEntry(entry: string): Promise<void> {
+    historyIndexRef.current = -1
+    setHistory(await window.shovel.command.pin(projectId, entry))
+  }
+
+  async function unpinEntry(entry: string): Promise<void> {
+    historyIndexRef.current = -1
+    setHistory(await window.shovel.command.unpin(projectId, entry))
   }
 
   async function sendStdin(): Promise<void> {
@@ -254,6 +272,27 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
               {t('commands.historyHint')}
             </div>
             <ul className="flex-1 overflow-y-auto p-1">
+              {pinned.map((entry) => (
+                <li key={`pinned:${entry}`} className="flex items-center rounded hover:bg-accent">
+                  <button
+                    className="min-w-0 flex-1 truncate px-1.5 py-0.5 text-left font-mono text-xs"
+                    title={entry}
+                    onClick={() => insertFromHistory(entry)}
+                  >
+                    {entry}
+                  </button>
+                  {/* ピン留め中は削除させず、外すだけ（外すと履歴の先頭に戻る）。 */}
+                  <button
+                    className="mr-1 shrink-0 rounded p-0.5 text-foreground hover:text-muted-foreground"
+                    title={t('commands.unpin')}
+                    aria-label={t('commands.unpin')}
+                    onClick={() => void unpinEntry(entry)}
+                  >
+                    <Pin size={12} className="fill-current" />
+                  </button>
+                </li>
+              ))}
+              {pinned.length > 0 && <li role="separator" className="mx-1 my-1 border-t border-border" />}
               {history.map((entry) => (
                 <li key={entry} className="group/history flex items-center rounded hover:bg-accent">
                   <button
@@ -262,6 +301,15 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
                     onClick={() => insertFromHistory(entry)}
                   >
                     {entry}
+                  </button>
+                  <button
+                    className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-0 disabled:hover:text-muted-foreground group-hover/history:opacity-100 group-hover/history:disabled:opacity-40"
+                    title={pinned.length >= PINNED_LIMIT ? t('commands.pinLimit', { count: PINNED_LIMIT }) : t('commands.pin')}
+                    aria-label={t('commands.pin')}
+                    disabled={pinned.length >= PINNED_LIMIT}
+                    onClick={() => void pinEntry(entry)}
+                  >
+                    <Pin size={12} />
                   </button>
                   {/* 確認なしで即座に消す。 */}
                   <button
@@ -274,7 +322,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
                   </button>
                 </li>
               ))}
-              {history.length === 0 && (
+              {history.length === 0 && pinned.length === 0 && (
                 <li className="px-1.5 py-0.5 text-xs text-muted-foreground">{t('commands.historyEmpty')}</li>
               )}
             </ul>

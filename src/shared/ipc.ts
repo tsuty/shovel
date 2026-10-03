@@ -14,7 +14,7 @@ import type {
   SessionSnapshot
 } from './types/session'
 import type { FileReadResult, FsEntry } from './types/filer'
-import type { CommandExit, CommandOutputChunk } from './types/command'
+import type { CommandExit, CommandHistory, CommandOutputChunk } from './types/command'
 import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
 
@@ -83,6 +83,8 @@ export const IpcChannel = {
   CommandCancel: 'command:cancel',
   CommandHistory: 'command:history',
   CommandRemoveHistory: 'command:removeHistory',
+  CommandPin: 'command:pin',
+  CommandUnpin: 'command:unpin',
 
   // main -> renderer (send)
   TranscriptEvent: 'transcript:event',
@@ -264,8 +266,10 @@ export interface RendererApi {
     run(projectId: string, command: string): Promise<{ runId: string }>
     sendInput(runId: string, text: string): Promise<void>
     cancel(runId: string): Promise<void>
-    history(projectId: string): Promise<string[]>
-    removeHistory(projectId: string, command: string): Promise<string[]>
+    history(projectId: string): Promise<CommandHistory>
+    removeHistory(projectId: string, command: string): Promise<CommandHistory>
+    pin(projectId: string, command: string): Promise<CommandHistory>
+    unpin(projectId: string, command: string): Promise<CommandHistory>
     onOutput(cb: (chunk: CommandOutputChunk) => void): () => void
     onExit(cb: (exit: CommandExit) => void): () => void
   }

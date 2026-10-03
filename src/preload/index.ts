@@ -115,6 +115,8 @@ const api: RendererApi = {
     cancel: (runId) => ipcRenderer.invoke(IpcChannel.CommandCancel, runId),
     history: (projectId) => ipcRenderer.invoke(IpcChannel.CommandHistory, projectId),
     removeHistory: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandRemoveHistory, projectId, command),
+    pin: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandPin, projectId, command),
+    unpin: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandUnpin, projectId, command),
     onOutput: (cb) => {
       const listener = (_event: unknown, payload: CommandOutputChunk): void => cb(payload)
       ipcRenderer.on(IpcChannel.CommandOutput, listener)

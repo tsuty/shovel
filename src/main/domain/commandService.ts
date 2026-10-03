@@ -3,6 +3,7 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { sbxSpawnInteractive } from '../sbx/cli'
 import { projectsStore, commandHistoryStore } from '../persistence/store'
 import type { Project } from '@shared/types/project'
+import type { CommandHistory } from '@shared/types/command'
 
 /**
  * コマンド実行パネルのバックエンド。入力されたコマンドを `sbx exec -i` でサンドボックス内の
@@ -62,13 +63,23 @@ export function cancelRun(runId: string): void {
   run.child.kill()
 }
 
-export function commandHistory(projectId: string): string[] {
+export function commandHistory(projectId: string): CommandHistory {
   return commandHistoryStore.get(projectId)
 }
 
 /** 履歴から1件消し、消した後の一覧を返す。 */
-export function removeCommandHistory(projectId: string, command: string): string[] {
+export function removeCommandHistory(projectId: string, command: string): CommandHistory {
   return commandHistoryStore.remove(projectId, command)
+}
+
+/** 履歴のコマンドをピン留めし、変更後の一覧を返す。 */
+export function pinCommand(projectId: string, command: string): CommandHistory {
+  return commandHistoryStore.pin(projectId, command)
+}
+
+/** ピン留めを外し（履歴の先頭に戻る）、変更後の一覧を返す。 */
+export function unpinCommand(projectId: string, command: string): CommandHistory {
+  return commandHistoryStore.unpin(projectId, command)
 }
 
 function stripAnsi(text: string): string {

@@ -59,7 +59,15 @@ import {
   renameEntry,
   writeTextFile
 } from '../domain/filerService'
-import { cancelRun, commandHistory, removeCommandHistory, runCommand, sendInput } from '../domain/commandService'
+import {
+  cancelRun,
+  commandHistory,
+  pinCommand,
+  removeCommandHistory,
+  runCommand,
+  sendInput,
+  unpinCommand
+} from '../domain/commandService'
 import { listLocalRecords, readLocalRecord } from '../persistence/snapshot'
 import { searchLocalRecords } from '../domain/localSearch'
 import { getAcpUpdateOffer, resolveAcpUpdate } from '../domain/acpVersionService'
@@ -239,5 +247,9 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.CommandHistory, (_event, projectId: string) => commandHistory(projectId))
   ipcMain.handle(IpcChannel.CommandRemoveHistory, (_event, projectId: string, command: string) =>
     removeCommandHistory(projectId, command)
+  )
+  ipcMain.handle(IpcChannel.CommandPin, (_event, projectId: string, command: string) => pinCommand(projectId, command))
+  ipcMain.handle(IpcChannel.CommandUnpin, (_event, projectId: string, command: string) =>
+    unpinCommand(projectId, command)
   )
 }
