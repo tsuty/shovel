@@ -99,6 +99,8 @@ export type TranscriptEvent =
    *     ローカルをバックアップへ退避して表示をエージェント側の記録に置き換えた。
    */
   | { type: 'notice'; id: string; key: 'replayAdopted' }
+  /** エージェントが付けたセッションのタイトル（`session_info_update`）。タブ名に反映する。 */
+  | { type: 'title'; title: string }
   /**
    * セッションのメタ状態（モード・configOptions・使用量・利用可能コマンド）。
    * 更新を受け取るたびに、その時点の状態を丸ごと送る。

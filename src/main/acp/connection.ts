@@ -171,6 +171,8 @@ export async function openAcpSession(
   let currentAcpSessionId: string | null = null
   /** 復元したスナップショットのタイトル。記録を replay で置き換えるときに引き継ぐ。 */
   let restoredTitle: string | undefined = restore?.title
+  /** エージェントが `session_info_update` で付けたタイトル。最初の発言から作るタイトルより優先する。 */
+  let agentTitle: string | undefined
   /** 書き込み先のスナップショット id（`OpenedSession.snapshotId` の説明を参照）。 */
   let snapshotId = restore?.snapshotId ?? sessionId
   /**
@@ -186,6 +188,16 @@ export async function openAcpSession(
     void persistSnapshot().then(() => callbacks.onTurnSaved())
   }
 
+  /**
+   * `session_info_update` のタイトル。ターン終了の保存より後に届くことがあるので、ここで
+   * 保存し直す。名前を変更済みのタブには知らせない（上書きを優先する）。
+   */
+  function applyAgentTitle(title: string): void {
+    agentTitle = title
+    if (sessionTitleStore.get(snapshotId) === undefined) callbacks.onEvent({ type: 'title', title })
+    persistAfterTurn()
+  }
+
   async function persistSnapshot(): Promise<void> {
     if (snapshotAcc.isEmpty()) return
     await saveSnapshot({
@@ -193,8 +205,8 @@ export async function openAcpSession(
       sessionId: snapshotId,
       acpSessionId: currentAcpSessionId ?? undefined,
       projectId: project.id,
-      // 名前変更の上書きがあれば、推定したタイトルより優先する。
-      title: sessionTitleStore.get(snapshotId) ?? restoredTitle ?? snapshotAcc.title(),
+      // 名前変更の上書き → エージェントが付けたタイトル → 復元元のタイトル → 最初の発言、の順。
+      title: sessionTitleStore.get(snapshotId) ?? agentTitle ?? restoredTitle ?? snapshotAcc.title(),
       savedAt: Date.now(),
       entries: snapshotAcc.snapshotEntries()
     }).catch(() => {
@@ -448,7 +460,7 @@ export async function openAcpSession(
           // 復元後の内容でスナップショットを取り直す。
           if (started.replayed.length > 0) {
             for (const message of started.replayed) {
-              handleSessionMessage(message, translator, callbacks, metaState, snapshotAcc, () => {})
+              handleSessionMessage(message, translator, callbacks, metaState, snapshotAcc, () => {}, applyAgentTitle)
             }
             handleSessionMessage(
               { kind: 'stop', response: { stopReason: 'end_turn' }, stopReason: 'end_turn' },
@@ -456,12 +468,13 @@ export async function openAcpSession(
               callbacks,
               metaState,
               snapshotAcc,
-              persistAfterTurn
+              persistAfterTurn,
+              applyAgentTitle
             )
           }
           translator.setReplayMode(false)
 
-          void runUpdateLoop(session, translator, callbacks, metaState, snapshotAcc, persistAfterTurn)
+          void runUpdateLoop(session, translator, callbacks, metaState, snapshotAcc, persistAfterTurn, applyAgentTitle)
         } catch (err) {
           rejectReady(err)
           throw err
@@ -570,6 +583,7 @@ export async function openAcpSession(
       // 前の会話の記録を閉じ、新しい会話は新しい `{snapshotId}.json` に書く。
       await persistSnapshot()
       restoredTitle = undefined
+      agentTitle = undefined
       snapshotId = randomUUID()
       currentSession.dispose()
       snapshotAcc.reset()
@@ -588,7 +602,7 @@ export async function openAcpSession(
 
       callbacks.onEvent({ type: 'reset', sessionId })
       callbacks.onEvent({ ...resolvedMetaState, type: 'sessionMeta' })
-      void runUpdateLoop(newSession, translator, callbacks, resolvedMetaState, snapshotAcc, persistAfterTurn)
+      void runUpdateLoop(newSession, translator, callbacks, resolvedMetaState, snapshotAcc, persistAfterTurn, applyAgentTitle)
       return snapshotId
     },
     async listAgentSessions() {
@@ -792,7 +806,8 @@ function handleSessionMessage(
   callbacks: SessionRuntimeCallbacks,
   metaState: MutableMetaState,
   snapshotAcc: SnapshotAccumulator,
-  onStop: () => void
+  onStop: () => void,
+  onTitle: (title: string) => void
 ): void {
   {
     if (message.kind === 'stop') {
@@ -803,6 +818,10 @@ function handleSessionMessage(
       return
     }
     const update = message.update
+    if (update.sessionUpdate === 'session_info_update') {
+      if (update.title) onTitle(update.title)
+      return
+    }
     if (applyMetaUpdate(update, metaState, callbacks)) return
     const events = translator.handleSessionUpdate(update)
     snapshotAcc.track(events)
@@ -816,7 +835,8 @@ async function runUpdateLoop(
   callbacks: SessionRuntimeCallbacks,
   metaState: MutableMetaState,
   snapshotAcc: SnapshotAccumulator,
-  onStop: () => void
+  onStop: () => void,
+  onTitle: (title: string) => void
 ): Promise<void> {
   // prompt() の完了は `stop` メッセージとして下のループに流れてくる。
   for (;;) {
@@ -827,7 +847,7 @@ async function runUpdateLoop(
       // セッションが閉じられた（dispose/接続終了）。ループを終える。
       return
     }
-    handleSessionMessage(message, translator, callbacks, metaState, snapshotAcc, onStop)
+    handleSessionMessage(message, translator, callbacks, metaState, snapshotAcc, onStop, onTitle)
   }
 }
 

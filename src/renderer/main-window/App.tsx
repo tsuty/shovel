@@ -103,12 +103,25 @@ export function App(): React.JSX.Element {
   >({})
   const { settings, update: updateSettings } = useSettings()
 
-  useEffect(() => {
+  /**
+   * プロジェクト一覧とサンドボックスの状態（`sbx ls`）を取り直す。タブの接続（`sbx exec`）で
+   * サンドボックスが起動するので、接続の成功後とウィンドウへのフォーカス時に呼ぶ。
+   */
+  function refreshProjects(): void {
     if (!projectId) return
     void window.shovel.projects.list().then((projects) => {
       setAllProjects(projects)
       setProject(projects.find((p) => p.id === projectId) ?? null)
     })
+  }
+  const refreshProjectsRef = useRef(refreshProjects)
+  refreshProjectsRef.current = refreshProjects
+
+  useEffect(() => {
+    refreshProjectsRef.current()
+    const onFocus = (): void => refreshProjectsRef.current()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [projectId])
 
   const sessionTabCount = tabs.filter((tab) => tab.kind === 'session').length
@@ -127,6 +140,7 @@ export function App(): React.JSX.Element {
       }
 
       const { sessionId, snapshotId, meta } = await window.shovel.session.openTab(projectId)
+      refreshProjects()
       // 自動添付が有効なら、最後に開いていたファイルを初期チップにする。
       const initialAttachments = settings?.autoAttachActiveFile && lastOpenedFilePath ? [lastOpenedFilePath] : []
       setTabs((prev) => [
@@ -295,6 +309,7 @@ export function App(): React.JSX.Element {
       agentOnly && snapshot.acpSessionId
         ? await window.shovel.session.resumeAgentSession(projectId, snapshot.acpSessionId, snapshot.title || undefined)
         : await window.shovel.session.resumeTab(projectId, snapshot.sessionId)
+    refreshProjects()
     setTabs((prev) =>
       prev.map((tab) =>
         tab.sessionId === `history:${snapshot.sessionId}`
@@ -539,6 +554,7 @@ export function App(): React.JSX.Element {
                           onOpenFile={(relPath) => openFile(relPath, relPath.toLowerCase().endsWith('.md'))}
                           onStatusChange={(status) => updateTabStatus(tab.sessionId, status)}
                           onRefreshed={(snapshotId) => handleRefreshed(tab.sessionId, snapshotId)}
+                          onTitleChange={(title) => renameTab(tab.sessionId, title)}
                         />
                       ) : (
                         <HistoryView

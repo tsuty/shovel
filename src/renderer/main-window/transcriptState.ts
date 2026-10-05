@@ -186,6 +186,7 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
     case 'theme':
     case 'turnEnd':
     case 'sessionMeta':
+    case 'title':
       return state
   }
 }

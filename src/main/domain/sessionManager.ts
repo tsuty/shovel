@@ -183,7 +183,8 @@ export async function listHistory(projectId: string): Promise<HistoryListing> {
       key: snapshot.sessionId,
       snapshotId: snapshot.sessionId,
       acpSessionId: snapshot.acpSessionId,
-      title: sessionTitleStore.get(snapshot.sessionId) ?? (snapshot.title || agent?.title || ''),
+      // 名前変更の上書き → エージェントが付けたタイトル → ローカル記録のタイトル（最初の発言）。
+      title: sessionTitleStore.get(snapshot.sessionId) ?? (agent?.title || snapshot.title || ''),
       updatedAt: Math.max(snapshot.savedAt, agent?.updatedAt ?? 0),
       state: agentSessions === null ? 'unknown' : agent ? 'both' : 'localOnly'
     })

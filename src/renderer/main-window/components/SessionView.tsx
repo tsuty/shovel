@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { RotateCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionMeta } from '@shared/types/session'
@@ -21,6 +21,7 @@ export function SessionView({
   onOpenFile,
   onStatusChange,
   onRefreshed,
+  onTitleChange,
   sendKey
 }: {
   sendKey?: 'enter' | 'modEnter'
@@ -32,6 +33,8 @@ export function SessionView({
   onStatusChange?: (status: { sending: boolean; hasPendingPermission: boolean }) => void
   /** ↻ の完了。新しい会話の書き込み先スナップショット id を渡す。 */
   onRefreshed?: (snapshotId: string) => void
+  /** エージェントがセッションにタイトルを付けた。 */
+  onTitleChange?: (title: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [state, dispatch] = useReducer(transcriptReducer, initialTranscriptState)
@@ -40,11 +43,19 @@ export function SessionView({
   const [refreshing, setRefreshing] = useState(false)
   const [attachments, setAttachments] = useState<AttachmentChip[]>(() => initialAttachments.map(chipFromRelPath))
 
+  // 購読し直さずに最新のコールバックを呼ぶ。
+  const onTitleChangeRef = useRef(onTitleChange)
+  onTitleChangeRef.current = onTitleChange
+
   useEffect(() => {
     return subscribeSessionEvents(sessionId, (event) => {
       if (event.type === 'sessionMeta') {
         const { modes, currentModeId, configOptions, usage, commands } = event
         setMeta((prev) => ({ ...prev, modes, currentModeId, configOptions, usage, commands }))
+        return
+      }
+      if (event.type === 'title') {
+        onTitleChangeRef.current?.(event.title)
         return
       }
       dispatch(event)
