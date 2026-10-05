@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import { IpcChannel, type ProjectProgress, type RendererApi, type SessionEnvelope } from '@shared/ipc'
+import { IpcChannel, type ProjectProgress, type RendererApi, type SessionEnvelope, type SessionOpenProgress } from '@shared/ipc'
 import type { CommandExit, CommandOutputChunk } from '@shared/types/command'
 import type { AppSettings } from '@shared/types/settings'
 
@@ -54,7 +54,12 @@ const api: RendererApi = {
     resolveAcpUpdate: (projectId, update) => ipcRenderer.invoke(IpcChannel.AgentsResolveAcpUpdate, projectId, update)
   },
   session: {
-    openTab: (projectId) => ipcRenderer.invoke(IpcChannel.SessionOpenTab, projectId),
+    openTab: (projectId, requestId) => ipcRenderer.invoke(IpcChannel.SessionOpenTab, projectId, requestId),
+    onOpenProgress: (cb) => {
+      const listener = (_event: unknown, payload: SessionOpenProgress): void => cb(payload)
+      ipcRenderer.on(IpcChannel.SessionOpenProgress, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.SessionOpenProgress, listener)
+    },
     resumeTab: (projectId, snapshotSessionId) =>
       ipcRenderer.invoke(IpcChannel.SessionResumeTab, projectId, snapshotSessionId),
     resumeAgentSession: (projectId, acpSessionId, title) =>

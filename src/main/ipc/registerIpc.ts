@@ -138,7 +138,13 @@ export function registerIpc(): void {
     resolveAcpUpdate(projectId, update)
   )
 
-  ipcMain.handle(IpcChannel.SessionOpenTab, (event, projectId: string) => openTab(projectId, event.sender))
+  ipcMain.handle(IpcChannel.SessionOpenTab, (event, projectId: string, requestId?: string) =>
+    openTab(projectId, event.sender, (step, detail) => {
+      if (requestId && !event.sender.isDestroyed()) {
+        event.sender.send(IpcChannel.SessionOpenProgress, { requestId, step, detail })
+      }
+    })
+  )
   ipcMain.handle(IpcChannel.SessionResumeTab, (event, projectId: string, snapshotSessionId: string) =>
     resumeTab(projectId, snapshotSessionId, event.sender)
   )

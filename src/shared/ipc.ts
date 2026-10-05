@@ -92,7 +92,8 @@ export const IpcChannel = {
   SandboxStatusChanged: 'sandbox:statusChanged',
   CommandOutput: 'command:output',
   CommandExit: 'command:exit',
-  SessionLocalRecordsChanged: 'session:localRecordsChanged'
+  SessionLocalRecordsChanged: 'session:localRecordsChanged',
+  SessionOpenProgress: 'session:openProgress'
 } as const
 
 export interface CreateNewDirRequest {
@@ -126,6 +127,23 @@ export interface CreateFromExistingRequest {
 export interface ProjectProgress {
   step: string
   message: string
+}
+
+/**
+ * 新しいタブを開くまでの段階。
+ *   - auth: エージェントの認証状態の確認（renderer が `auth.status` を呼ぶ）
+ *   - sandbox: サンドボックスの生存確認（`sbx exec <name> echo`）
+ *   - adapter: ACP アダプタの起動と `initialize`（`npx` によるパッケージ取得を含む）
+ *   - session: `session/new`（復元時は `session/load` / `session/resume`）
+ */
+export type SessionOpenStep = 'auth' | 'sandbox' | 'adapter' | 'session'
+
+/** `openTab` の途中経過。`requestId` は renderer が `openTab` に渡した id。 */
+export interface SessionOpenProgress {
+  requestId: string
+  step: SessionOpenStep
+  /** 実行しているコマンドやメソッド（表示用）。 */
+  detail?: string
 }
 
 export interface SessionEnvelope {
@@ -207,7 +225,12 @@ export interface RendererApi {
   }
   session: {
     /** `sessionId` はタブ id、`snapshotId` はそのタブがいま書き込んでいるスナップショットの id。 */
-    openTab(projectId: string): Promise<{ sessionId: string; snapshotId: string; meta: SessionMeta }>
+    openTab(
+      projectId: string,
+      requestId?: string
+    ): Promise<{ sessionId: string; snapshotId: string; meta: SessionMeta }>
+    /** `openTab` の途中経過（`requestId` を渡したときだけ届く）。 */
+    onOpenProgress(cb: (progress: SessionOpenProgress) => void): () => void
     /** 過去のセッションを session/load か session/resume で再開する。 */
     resumeTab(
       projectId: string,

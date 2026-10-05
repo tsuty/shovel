@@ -60,7 +60,10 @@ editor (any editable file type, not just Markdown) that can also be attached to 
 Resume, source/preview only; if the target isn't obvious — active tab isn't a chat and there are
 several chat/history tabs — a picker dialog asks which one), a command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete), a
 session-history panel backed by local snapshots with rename/delete, a per-tab refresh action
-(↻, reuses the connection and sends a fresh `session/new`), Cmd/Ctrl+0-9 tab-switching shortcuts,
+(↻, reuses the connection and sends a fresh `session/new`), Cmd/Ctrl+0-9 tab-switching shortcuts, a "connecting" tab shown immediately on "+" that lists
+each connect step (sign-in check → sandbox liveness → adapter start/`initialize` → `session/new`)
+with the command being run and elapsed time, swapped in place for the session tab on success
+(flows.md §3 接続中タブ; progress via `session:openProgress`),
 background-tab notifications (a pulsing tab label while that session is sending, a small badge
 while it has a pending permission request — both suppressed on the active tab), context-attachment
 chips (Filer "add to context" → sent as `resource_link` content blocks — path only, the agent

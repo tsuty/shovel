@@ -27,6 +27,7 @@ import type {
   SnapshotEntry
 } from '@shared/types/session'
 import type { TranscriptEvent } from '@shared/types/transcript'
+import type { SessionOpenStep } from '@shared/ipc'
 import { snapshotEntriesToEvents } from '@shared/snapshotEvents'
 import { sbxLivenessCheck, sbxSpawnInteractive } from '../sbx/cli'
 import { SessionLogger } from '../log'
@@ -57,6 +58,8 @@ export interface SessionRuntimeCallbacks {
   onLocalRecordsChanged: () => void
   /** ターンの記録を保存し終えたことを知らせる。 */
   onTurnSaved: () => void
+  /** 接続の段階が進んだことを知らせる（タブを開く途中の表示用）。 */
+  onProgress?: (step: Exclude<SessionOpenStep, 'auth'>, detail?: string) => void
 }
 
 /** `session/list` の1件。 */
@@ -128,6 +131,7 @@ export async function openAcpSession(
   callbacks: SessionRuntimeCallbacks,
   restore?: RestoreRequest
 ): Promise<OpenedSession> {
+  callbacks.onProgress?.('sandbox', `sbx exec ${project.sandboxName} echo`)
   const alive = await sbxLivenessCheck(project.sandboxName)
   if (!alive) {
     throw new Error(
@@ -137,7 +141,9 @@ export async function openAcpSession(
 
   const acp = await loadAcpSdk()
   const logger = new SessionLogger(sessionId, project.id)
-  const child = sbxSpawnInteractive(project.sandboxName, ['npx', '-y', acpPackageSpec(project, agent)], {
+  const packageSpec = acpPackageSpec(project, agent)
+  callbacks.onProgress?.('adapter', `npx -y ${packageSpec}`)
+  const child = sbxSpawnInteractive(project.sandboxName, ['npx', '-y', packageSpec], {
     cwd: project.sandboxPath
   })
 
@@ -440,6 +446,10 @@ export async function openAcpSession(
           capabilities = readCapabilities(initResponse)
           // 実際に動いている版をプロジェクトに記録する（decisions.md N-2-5b）。
           recordAcpVersion(project.id, (initResponse as InitializeResponse | undefined)?.agentInfo?.version)
+          callbacks.onProgress?.(
+            'session',
+            !restore ? 'session/new' : capabilities.load ? 'session/load' : 'session/resume'
+          )
           const started = restore
             ? await startRestoredSession(ctx, capabilities, restore)
             : await startNewSession(ctx)

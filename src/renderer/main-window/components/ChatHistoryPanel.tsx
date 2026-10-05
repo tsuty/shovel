@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  AlertTriangle,
   Bot,
   ChevronDown,
   ChevronRight,
@@ -7,6 +8,7 @@ import {
   Cloud,
   CloudOff,
   History,
+  Loader2,
   MessageSquareX,
   Search,
   SquarePen,
@@ -26,7 +28,14 @@ function formatSize(bytes: number): string {
   return `${Math.max(0.1, bytes / 1024).toFixed(1)} KB`
 }
 
-function TabKindIcon({ kind }: { kind: TabInfo['kind'] }): React.JSX.Element {
+function TabKindIcon({ kind, failed }: { kind: TabInfo['kind']; failed?: boolean }): React.JSX.Element {
+  if (kind === 'connecting') {
+    return failed ? (
+      <AlertTriangle size={14} className="shrink-0 text-destructive" />
+    ) : (
+      <Loader2 size={14} className="shrink-0 animate-spin text-muted-foreground" />
+    )
+  }
   if (kind === 'history') return <Clock3 size={14} className="shrink-0 text-muted-foreground" />
   return <Bot size={14} className="shrink-0 text-muted-foreground" />
 }
@@ -178,10 +187,12 @@ export function ChatHistoryPanel({
                 onContextMenu={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
+                  // 接続中のタブにはまだ名前を付けられる記録が無い。
+                  if (tab.kind === 'connecting') return
                   setMenu({ x: e.clientX, y: e.clientY, kind: 'tab', sessionId: tab.sessionId, currentTitle: tab.title })
                 }}
               >
-                <TabKindIcon kind={tab.kind} />
+                <TabKindIcon kind={tab.kind} failed={tab.failed} />
                 <span className="truncate" title={tab.title}>
                   {tab.title}
                 </span>

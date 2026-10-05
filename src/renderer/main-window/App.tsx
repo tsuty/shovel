@@ -26,6 +26,8 @@ import { ResizablePanel } from './components/ResizablePanel'
 import { cn } from '../shared/lib/utils'
 import { friendlyErrorMessage } from '../shared/friendlyError'
 import { editorLanguageFor, type EditorLanguage } from '@shared/fileKinds'
+import { getAgentEntry } from '@shared/agentTable'
+import { ConnectingView, type ConnectingStepRecord } from './components/ConnectingView'
 
 const MAX_SESSION_TABS = 10
 /** チャットの右に添えたファイルのペインの既定幅（px）。 */
@@ -47,6 +49,18 @@ type Tab =
        * チャットタブを閉じると一緒に閉じる。
        */
       attachedFile?: string
+    }
+  | {
+      /**
+       * 接続中の新しいタブ。「+」を押したらすぐ出し、接続できたらその場で `session` に差し替える。
+       * `sessionId` は `connecting:<uuid>` の仮の id で、`openTab` の `requestId` にも使う。
+       */
+      kind: 'connecting'
+      sessionId: string
+      title: string
+      steps: ConnectingStepRecord[]
+      /** 失敗したときのエラー（表示用に整えたもの）。 */
+      error?: string
     }
   | { kind: 'file'; sessionId: string; title: string; relPath: string; editor: EditorLanguage | null }
   | {
@@ -72,7 +86,7 @@ function isChatTab(tab: Tab): tab is ChatTab {
 
 /** タブ数の上限に数えるタブ。 */
 function countsTowardTabLimit(tab: Tab): boolean {
-  return tab.kind === 'session' || (tab.kind === 'history' && tab.readOnlyKind !== undefined)
+  return tab.kind === 'session' || tab.kind === 'connecting' || (tab.kind === 'history' && tab.readOnlyKind !== undefined)
 }
 
 function getProjectIdFromQuery(): string | null {
@@ -125,46 +139,98 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('focus', onFocus)
   }, [projectId])
 
-  const sessionTabCount = tabs.filter((tab) => tab.kind === 'session').length
+  const sessionTabCount = tabs.filter((tab) => tab.kind === 'session' || tab.kind === 'connecting').length
   const limitedTabCount = tabs.filter(countsTowardTabLimit).length
+  /** 接続の途中で閉じられた接続中タブの id。接続が終わったら後始末する。 */
+  const abandonedConnectingIdsRef = useRef(new Set<string>())
 
-  async function openNewTab(): Promise<void> {
+  // main から届く接続の途中経過を、対応する接続中タブに積む。
+  useEffect(
+    () =>
+      window.shovel.session.onOpenProgress(({ requestId, step, detail }) => {
+        setTabs((prev) =>
+          prev.map((tab) =>
+            tab.sessionId === requestId && tab.kind === 'connecting'
+              ? { ...tab, steps: [...tab.steps, { step, detail, startedAt: Date.now() }] }
+              : tab
+          )
+        )
+      }),
+    []
+  )
+
+  /** 接続中タブをすぐに出してから接続する。接続できたらその場でセッションタブに差し替える。 */
+  function openNewTab(): void {
     if (!projectId || limitedTabCount >= MAX_SESSION_TABS) return
     setError(null)
+    const id = `connecting:${crypto.randomUUID()}`
+    setTabs((prev) => [
+      ...prev,
+      {
+        kind: 'connecting',
+        sessionId: id,
+        title: t('mainWindow.newChatTitle', { count: sessionTabCount + 1 }),
+        steps: []
+      }
+    ])
+    setActiveSessionId(id)
+    void connectTab(id)
+  }
+
+  function updateConnectingTab(id: string, patch: { steps?: ConnectingStepRecord[]; error?: string }): void {
+    setTabs((prev) => prev.map((tab) => (tab.sessionId === id && tab.kind === 'connecting' ? { ...tab, ...patch } : tab)))
+  }
+
+  /** 接続中タブ（またはその再試行）の接続。 */
+  async function connectTab(id: string): Promise<void> {
+    if (!projectId) return
+    // 認証状態の確認は renderer から呼ぶので、この段階だけはここで積む。
+    updateConnectingTab(id, { steps: [{ step: 'auth', startedAt: Date.now() }], error: undefined })
 
     try {
       // 接続前に認証状態を確認し、未ログインなら認証画面を出す。
       const status = await window.shovel.auth.status(projectId)
+      if (abandonedConnectingIdsRef.current.delete(id)) return
       if (!status.checkFailed && !status.loggedIn) {
+        removeConnectingTab(id)
         setAuthOpen(true)
         return
       }
 
-      const { sessionId, snapshotId, meta } = await window.shovel.session.openTab(projectId)
+      const { sessionId, snapshotId, meta } = await window.shovel.session.openTab(projectId, id)
+      // 接続の途中で閉じられていたら、開けたセッションをそのまま閉じる。
+      if (abandonedConnectingIdsRef.current.delete(id)) {
+        void window.shovel.session.closeTab(sessionId)
+        discardSessionEvents(sessionId)
+        return
+      }
       refreshProjects()
       // 自動添付が有効なら、最後に開いていたファイルを初期チップにする。
       const initialAttachments = settings?.autoAttachActiveFile && lastOpenedFilePath ? [lastOpenedFilePath] : []
-      setTabs((prev) => [
-        ...prev,
-        {
-          kind: 'session',
-          sessionId,
-          snapshotId,
-          title: t('mainWindow.newChatTitle', { count: sessionTabCount + 1 }),
-          meta,
-          initialAttachments
-        }
-      ])
-      setActiveSessionId(sessionId)
+      setTabs((prev) =>
+        prev.map((tab) =>
+          tab.sessionId === id && tab.kind === 'connecting'
+            ? { kind: 'session', sessionId, snapshotId, title: tab.title, meta, initialAttachments }
+            : tab
+        )
+      )
+      setActiveSessionId((prev) => (prev === id ? sessionId : prev))
     } catch (err) {
+      if (abandonedConnectingIdsRef.current.delete(id)) return
       const message = err instanceof Error ? err.message : String(err)
       // 接続時の認証エラーでも認証画面を出す。
       if (isAuthRequiredMessage(message)) {
+        removeConnectingTab(id)
         setAuthOpen(true)
         return
       }
-      setError(friendlyErrorMessage(message, t))
+      updateConnectingTab(id, { error: friendlyErrorMessage(message, t) })
     }
+  }
+
+  function removeConnectingTab(id: string): void {
+    setTabs((prev) => prev.filter((tab) => tab.sessionId !== id))
+    setActiveSessionId((prev) => (prev === id ? null : prev))
   }
 
   // StrictMode の二重発火でセッションが2つ開かないよう、ref で一度だけに絞る。
@@ -178,7 +244,7 @@ export function App(): React.JSX.Element {
         .catch(() => null)
         .then((offer) => {
           if (offer) setAcpUpdateOffer(offer)
-          else void openNewTab()
+          else openNewTab()
         })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,7 +255,7 @@ export function App(): React.JSX.Element {
     if (projectId && update !== null) {
       await window.shovel.agents.resolveAcpUpdate(projectId, update).catch(() => {})
     }
-    await openNewTab()
+    openNewTab()
   }
 
   function openFile(relPath: string): void {
@@ -411,6 +477,8 @@ export function App(): React.JSX.Element {
       await window.shovel.session.closeTab(id)
       discardSessionEvents(id)
     }
+    // 接続の途中なら、接続が終わったところで後始末する（失敗済みなら何も残っていない）。
+    if (tab?.kind === 'connecting' && !tab.error) abandonedConnectingIdsRef.current.add(id)
     setTabs((prev) => {
       const next = prev.filter((t) => t.sessionId !== id)
       if (activeSessionId === id) {
@@ -490,6 +558,7 @@ export function App(): React.JSX.Element {
     title: tab.title,
     kind: tab.kind,
     snapshotId: tab.kind === 'session' ? tab.snapshotId : undefined,
+    failed: tab.kind === 'connecting' ? tab.error !== undefined : undefined,
     status: tab.kind === 'session' ? tabStatuses[tab.sessionId] : undefined
   }))
   const activeTab = tabs.find((tab) => tab.sessionId === activeSessionId) ?? null
@@ -530,18 +599,13 @@ export function App(): React.JSX.Element {
             onSelect={setActiveSessionId}
             onClose={(id) => void closeTab(id)}
             onCloseFiles={closeFileTabs}
-            onNew={() => void openNewTab()}
+            onNew={openNewTab}
             canAddTab={limitedTabCount < MAX_SESSION_TABS}
           />
           {error && (
             <div className="flex items-start gap-2 border-b border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span className="flex-1">{error}</span>
-              {error !== t('mainWindow.tabLimitReached') && (
-                <button className="shrink-0 font-medium hover:underline" onClick={() => void openNewTab()}>
-                  {t('common.retry')}
-                </button>
-              )}
             </div>
           )}
           <div className="flex flex-1 flex-col overflow-hidden">
@@ -574,7 +638,7 @@ export function App(): React.JSX.Element {
                           recordTimestamp={tab.recordTimestamp}
                           agentOnly={tab.agentOnly}
                           onResume={() => resumeHistory(tab.snapshot, tab.agentOnly)}
-                          onStartNew={() => void openNewTab()}
+                          onStartNew={openNewTab}
                           onOpenFile={openFile}
                         />
                       )}
@@ -602,6 +666,14 @@ export function App(): React.JSX.Element {
                       </ResizablePanel>
                     )}
                   </div>
+                ) : tab.kind === 'connecting' ? (
+                  <ConnectingView
+                    steps={tab.steps}
+                    authCommand={project ? getAgentEntry(project.agentId)?.auth.statusCommand.join(' ') : undefined}
+                    error={tab.error}
+                    onRetry={() => void connectTab(tab.sessionId)}
+                    onClose={() => void closeTab(tab.sessionId)}
+                  />
                 ) : tab.editor ? (
                   <TextFileEditor
                     projectId={projectId}
@@ -664,7 +736,7 @@ export function App(): React.JSX.Element {
         open={authOpen}
         onOpenChange={setAuthOpen}
         projectId={projectId}
-        onConfirmed={() => void openNewTab()}
+        onConfirmed={openNewTab}
       />
     </div>
   )

@@ -236,6 +236,18 @@
     "newChatTitle": "Chat {{count}}",
     "tabLimitReached": "You can have up to 10 tabs. Close a tab and try again."
   },
+  "connecting": {
+    "title": "Preparing a new chat",
+    "failedTitle": "Couldn't open a new chat",
+    "seconds": "{{value}}s",
+    "adapterHint": "Starting the agent inside the sandbox and waiting for it to respond. The first run or a version update takes longer while the package is downloaded.",
+    "steps": {
+      "auth": "Check the agent's sign-in status",
+      "sandbox": "Check that the sandbox is reachable",
+      "adapter": "Start the agent (ACP adapter)",
+      "session": "Start the session"
+    }
+  },
   "diff": {
     "empty": "No diff to show.",
     "hiddenLines": "… {{count}} lines"

@@ -4,7 +4,13 @@ import { getAgentEntry } from '@shared/agentTable'
 import type { HistoryEntry, HistoryListing, SessionMeta } from '@shared/types/session'
 import type { TranscriptAction, TranscriptEvent } from '@shared/types/transcript'
 import { IpcChannel, type SessionEnvelope } from '@shared/ipc'
-import { openAcpSession, type AgentSessionInfo, type OpenedSession, type RestoreRequest } from '../acp/connection'
+import {
+  openAcpSession,
+  type AgentSessionInfo,
+  type OpenedSession,
+  type RestoreRequest,
+  type SessionRuntimeCallbacks
+} from '../acp/connection'
 import { projectsStore, sessionTitleStore } from '../persistence/store'
 import {
   listSnapshotsForProject,
@@ -41,7 +47,8 @@ async function startTab(
   projectId: string,
   webContents: WebContents,
   sessionId: string,
-  restore?: RestoreRequest
+  restore?: RestoreRequest,
+  onProgress?: SessionRuntimeCallbacks['onProgress']
 ): Promise<OpenedTab> {
   if (tabCountForWindow(webContents) >= MAX_TABS_PER_WINDOW) {
     throw new Error('タブは最大10個までです。')
@@ -63,7 +70,8 @@ async function startTab(
         onMetaChanged: () => {},
         onFatalError: (message) => sendEnvelope(sessionId, { type: 'toast', text: message }),
         onLocalRecordsChanged: () => notifyHistoryChanged(webContents, projectId),
-        onTurnSaved: () => notifyHistoryChanged(webContents, projectId)
+        onTurnSaved: () => notifyHistoryChanged(webContents, projectId),
+        onProgress
       },
       restore
     )
@@ -83,8 +91,12 @@ async function startTab(
   return { sessionId, snapshotId: opened.snapshotId, meta: opened.meta }
 }
 
-export async function openTab(projectId: string, webContents: WebContents): Promise<OpenedTab> {
-  return startTab(projectId, webContents, randomUUID())
+export async function openTab(
+  projectId: string,
+  webContents: WebContents,
+  onProgress?: SessionRuntimeCallbacks['onProgress']
+): Promise<OpenedTab> {
+  return startTab(projectId, webContents, randomUUID(), undefined, onProgress)
 }
 
 /**

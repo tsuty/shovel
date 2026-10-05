@@ -146,7 +146,10 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
   │   記録した acpVersion より、プロジェクトマネージャを開いたときに ACP レジストリで
   │   控えた最新版が新しければ「更新する／今のバージョンのまま」を尋ねる。答えてから次へ
   │
-  └─ タブ1つ目の接続を開始
+  └─ タブ1つ目の接続を開始（「+」で2つ目以降を開くときも同じ）
+       │   接続中タブを即座に出し、以下の段階を進むたびに表示を更新する（下記「接続中タブ」）
+       │
+       ├─ 0. 認証状態の確認  sbx exec <name> claude auth status --json（1-2 節）
        │
        ├─ 1. 生存確認     sbx exec -i <name> echo ...    終了コードのみで判定
        │                   失敗 → エラー表示。接続を試みない
@@ -159,13 +162,30 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
        │                   応答の agentInfo.version を Project.acpVersion に記録
        │                   fs.readTextFile / fs.writeTextFile / terminal = false
        │                   ← アイドルタイムアウト（既定180秒。無音時間で測る）
-       │                   接続中は「Negotiating ACP… 12s · {stderr の最終行}」を毎秒更新
        │
        ├─ 4. session/list  （sessionCapabilities.list があれば）
        │
        └─ 5. session/new   cwd = sandboxPath, mcpServers = []
                            ← sessionId / models / modes / configOptions
 ```
+
+### 接続中タブ
+
+「+」を押してから接続が終わるまでには、`sbx exec` 2回（認証確認・生存確認）と
+`npx` によるアダプタの起動を直列に待つため、数秒〜数十秒かかる。接続を待ってからタブを出すと
+押しても何も起きないように見えるので、**タブは押した直後に出し、いま何を実行しているかを正直に見せる**。
+
+- 段階は「ログイン状態の確認 → サンドボックスへの到達確認 → エージェント（ACP アダプタ）の起動 →
+  セッションの開始」の4つ（`SessionOpenStep`）。各段階で実行しているコマンド／メソッド
+  （`sbx exec <name> echo`、`npx -y <package>@<version>`、`session/new` など）と経過秒数を出す
+- ログイン状態の確認は renderer が `auth.status` を呼ぶ前に自分で積み、残りは main が
+  `session:openProgress` で知らせる（`openTab` に渡した `requestId` で接続中タブと対応づける）
+- エージェントの起動は `npx` のパッケージ取得と `initialize` の応答待ちを区別できないので1つの段階にまとめ、
+  「初回やバージョン更新時は時間がかかる」と添える
+- 接続できたら、その接続中タブをその場でセッションタブに差し替える（タブの位置・名前はそのまま）
+- 失敗したら、止まった段階とエラーをそのタブに出し、再試行・閉じるを選ばせる。
+  未ログイン（認証確認・接続時の認証エラー）のときはタブを閉じて認証画面を出す
+- 接続中に閉じたタブは、接続が終わったところで main 側のセッションも閉じる
 
 `sbx exec` は停止中のサンドボックスを自動的に起動するため、**「起動」という
 操作は存在しない**。

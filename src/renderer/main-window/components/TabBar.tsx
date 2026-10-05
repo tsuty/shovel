@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, Clock3, CopyX, File, FileX, Plus, X } from 'lucide-react'
+import { AlertTriangle, Bot, Clock3, CopyX, File, FileX, Loader2, Plus, X } from 'lucide-react'
 import { cn } from '../../shared/lib/utils'
 import { MenuItem } from './MenuItem'
 
 export interface TabInfo {
   sessionId: string
   title: string
-  kind: 'session' | 'file' | 'history'
+  kind: 'session' | 'file' | 'history' | 'connecting'
   /**
    * セッションタブがいま書き込んでいるスナップショットの id。↻ で新しい会話を
    * 始めると変わる（タブ id の `sessionId` は変わらない）。
@@ -15,6 +15,8 @@ export interface TabInfo {
   snapshotId?: string
   /** 背景タブの通知状態。`undefined` はセッション以外のタブ（ファイル/履歴）。 */
   status?: { sending: boolean; hasPendingPermission: boolean }
+  /** 接続中タブの接続が失敗した。 */
+  failed?: boolean
 }
 
 export function TabBar({
@@ -117,6 +119,12 @@ export function TabBar({
               {tab.kind === 'file' && <File size={12} className="shrink-0" />}
               {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
               {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
+              {tab.kind === 'connecting' &&
+                (tab.failed ? (
+                  <AlertTriangle size={12} className="shrink-0 text-destructive" />
+                ) : (
+                  <Loader2 size={12} className="shrink-0 animate-spin" />
+                ))}
               <span className="truncate" title={tab.title}>
                 {tab.title}
               </span>
