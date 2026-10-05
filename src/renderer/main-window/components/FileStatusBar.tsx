@@ -46,7 +46,8 @@ export function FileStatusBar({
   encoding,
   lineEnding,
   readOnly = false,
-  savedAt = null
+  savedAt = null,
+  problem = null
 }: {
   size: number
   encoding: TextEncoding
@@ -55,6 +56,8 @@ export function FileStatusBar({
   readOnly?: boolean
   /** Markdown エディタ: 最後に自動保存が完了した時刻（まだ保存していなければ null）。 */
   savedAt?: number | null
+  /** エディタ: 内容の問題（JSON の書式の誤りなど）。押すとその位置へ移る。 */
+  problem?: { label: string; detail: string; onClick?: () => void } | null
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const items = [
@@ -64,12 +67,22 @@ export function FileStatusBar({
   ]
   return (
     <StatusBarFrame items={items}>
-      {readOnly && <span className="mr-auto">{t('fileStatus.readOnly')}</span>}
-      {!readOnly && savedAt !== null && (
-        <span className="mr-auto">
-          {t('fileStatus.savedAt', { time: new Date(savedAt).toLocaleTimeString(i18n.language) })}
-        </span>
-      )}
+      <div className="mr-auto flex min-w-0 items-center gap-4">
+        {readOnly && <span>{t('fileStatus.readOnly')}</span>}
+        {problem && (
+          <button
+            className="truncate text-destructive hover:underline disabled:no-underline"
+            title={problem.detail}
+            disabled={!problem.onClick}
+            onClick={problem.onClick}
+          >
+            {problem.label}
+          </button>
+        )}
+        {!readOnly && savedAt !== null && (
+          <span>{t('fileStatus.savedAt', { time: new Date(savedAt).toLocaleTimeString(i18n.language) })}</span>
+        )}
+      </div>
     </StatusBarFrame>
   )
 }

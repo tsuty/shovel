@@ -1,0 +1,33 @@
+/**
+ * ファイラーの「新規ファイル」で作れるファイルの種類と、アプリ内エディタで編集できるファイル。
+ * 編集できるのは Markdown / Mermaid / プレーンテキスト（.txt）と、MCP などの設定に使う JSON / YAML だけ
+ * （decisions.md N-3-1）。
+ */
+
+export const NEW_FILE_KINDS = ['markdown', 'text', 'mermaid', 'json', 'yaml'] as const
+export type NewFileKind = (typeof NEW_FILE_KINDS)[number]
+
+export function isNewFileKind(value: unknown): value is NewFileKind {
+  return typeof value === 'string' && (NEW_FILE_KINDS as readonly string[]).includes(value)
+}
+
+/**
+ * アプリ内エディタで開くときの種類。Markdown / Mermaid は「分割・ソース・プレビュー」、
+ * JSON / YAML / テキストは「表示（ハイライト。テキストは色なし）・編集」を切り替える。
+ */
+export type EditorLanguage = 'markdown' | 'mermaid' | 'json' | 'yaml' | 'text'
+
+/** 「表示・編集」を切り替える種類か（そうでなければ「分割・ソース・プレビュー」）。 */
+export function usesViewEditModes(language: EditorLanguage): boolean {
+  return language === 'json' || language === 'yaml' || language === 'text'
+}
+
+export function editorLanguageFor(relPath: string): EditorLanguage | null {
+  const lower = relPath.toLowerCase()
+  if (lower.endsWith('.md')) return 'markdown'
+  if (lower.endsWith('.mmd') || lower.endsWith('.mermaid')) return 'mermaid'
+  if (lower.endsWith('.json')) return 'json'
+  if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'yaml'
+  if (lower.endsWith('.txt')) return 'text'
+  return null
+}

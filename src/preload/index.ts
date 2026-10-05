@@ -100,10 +100,8 @@ const api: RendererApi = {
       ipcRenderer.invoke(IpcChannel.FsCopy, projectId, relPath, destDirRelPath),
     openInOS: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.FsOpenInOS, projectId, relPath),
     mkdir: (projectId, parentRelPath) => ipcRenderer.invoke(IpcChannel.FsMkdir, projectId, parentRelPath),
-    createMarkdownFile: (projectId, parentRelPath) =>
-      ipcRenderer.invoke(IpcChannel.FsCreateMarkdownFile, projectId, parentRelPath),
-    createMermaidFile: (projectId, parentRelPath) =>
-      ipcRenderer.invoke(IpcChannel.FsCreateMermaidFile, projectId, parentRelPath),
+    createFile: (projectId, parentRelPath, kind) =>
+      ipcRenderer.invoke(IpcChannel.FsCreateFile, projectId, parentRelPath, kind),
     readClipboardFiles: () => ipcRenderer.invoke(IpcChannel.FsReadClipboardFiles),
     copyExternal: (projectId, absPaths, destDirRelPath) =>
       ipcRenderer.invoke(IpcChannel.FsCopyExternal, projectId, absPaths, destDirRelPath),

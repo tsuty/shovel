@@ -32,8 +32,8 @@ export function Sidebar({
   onRenameTab,
   onCloseTab,
   onAddToContext,
-  onAttachMarkdown,
-  canAttachMarkdown
+  onAttachFile,
+  canAttachFile
 }: {
   projectId: string
   openPanels: Set<SidebarPanel>
@@ -43,14 +43,14 @@ export function Sidebar({
   tabs: TabInfo[]
   activeSessionId: string | null
   onSelectTab: (sessionId: string) => void
-  onOpenFile: (relPath: string, isMarkdown: boolean) => void
+  onOpenFile: (relPath: string) => void
   onOpenHistory: (entry: HistoryEntry) => void
   onOpenLocalRecord: (record: LocalRecordSummary) => void
   onRenameTab: (sessionId: string, title: string) => void
   onCloseTab: (sessionId: string) => void
   onAddToContext: (relPath: string) => void
-  onAttachMarkdown: (relPath: string) => void
-  canAttachMarkdown: boolean
+  onAttachFile: (relPath: string) => void
+  canAttachFile: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [widths, setWidths] = useState<Record<string, number>>({})
@@ -109,8 +109,8 @@ export function Sidebar({
               projectId={projectId}
               onOpenFile={onOpenFile}
               onAddToContext={onAddToContext}
-              onAttachMarkdown={onAttachMarkdown}
-              canAttachMarkdown={canAttachMarkdown}
+              onAttachFile={onAttachFile}
+              canAttachFile={canAttachFile}
             />
           )}
         </ResizablePanel>

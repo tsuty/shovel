@@ -90,6 +90,10 @@
     "newFolder": "新規フォルダ",
     "newMarkdownFile": "新規メモ（Markdown）",
     "newMermaidFile": "新規図（Mermaid）",
+    "newFile": "新規ファイル",
+    "newTextFile": "新規メモ（Text）",
+    "newJsonFile": "新規設定（JSON）",
+    "newYamlFile": "新規設定（YAML）",
     "copy": "コピー",
     "paste": "貼り付け",
     "unreadable": "このフォルダの中身は表示できません",
@@ -113,19 +117,20 @@
   "mermaid": {
     "title": "図（Mermaid）",
     "show": "図を表示",
-    "error": "図を描けませんでした（Mermaid の書き方に誤りがあります）。",
-    "modeDiagram": "図",
-    "modeCode": "コード",
-    "reload": "再読み込み"
+    "error": "図を描けませんでした（Mermaid の書き方に誤りがあります）。"
   },
   "editor": {
     "mode": {
       "split": "分割",
       "source": "ソース",
-      "preview": "プレビュー"
+      "preview": "プレビュー",
+      "view": "表示",
+      "edit": "編集"
     },
     "conflict": "AI がこのファイルを変更したため、あなたの編集を {{path}} に保存しました。",
     "attachToChat": "チャットの横に表示",
+    "jsonInvalid": "JSON の書式に誤りがあります",
+    "jsonInvalidAt": "JSON の書式に誤りがあります（{{line}} 行目 {{column}} 列目）",
     "attachTarget": {
       "title": "どのチャットの横に表示しますか？",
       "description": "{{path}} を横に表示するチャットを選んでください。"

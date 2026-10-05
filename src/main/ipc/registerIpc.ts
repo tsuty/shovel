@@ -9,6 +9,7 @@ import {
 import type { TranscriptAction } from '@shared/types/transcript'
 import type { AppSettings } from '@shared/types/settings'
 import { AGENT_TABLE } from '@shared/agentTable'
+import type { NewFileKind } from '@shared/fileKinds'
 import {
   createFromExistingDirectory,
   createFromExistingSandbox,
@@ -48,8 +49,7 @@ import {
   copyEntry,
   copyExternalEntries,
   createDirectory,
-  createMarkdownFile,
-  createMermaidFile,
+  createNewFile,
   deleteEntry,
   listDir,
   moveEntry,
@@ -222,11 +222,8 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.FsMkdir, (_event, projectId: string, parentRelPath: string) =>
     createDirectory(projectId, parentRelPath)
   )
-  ipcMain.handle(IpcChannel.FsCreateMarkdownFile, (_event, projectId: string, parentRelPath: string) =>
-    createMarkdownFile(projectId, parentRelPath)
-  )
-  ipcMain.handle(IpcChannel.FsCreateMermaidFile, (_event, projectId: string, parentRelPath: string) =>
-    createMermaidFile(projectId, parentRelPath)
+  ipcMain.handle(IpcChannel.FsCreateFile, (_event, projectId: string, parentRelPath: string, kind: NewFileKind) =>
+    createNewFile(projectId, parentRelPath, kind)
   )
 
   ipcMain.handle(IpcChannel.CommandRun, (event, projectId: string, command: string) => {

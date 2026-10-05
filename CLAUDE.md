@@ -43,13 +43,19 @@ on double-click or Enter — single click/arrow keys only select, folders still 
 click (decisions.md N-3-4); a right-click "open with default app" for files was deliberately
 rejected because `shell.openPath` can execute agent-written scripts on the host) with a
 read-only syntax-highlighted viewer (images previewed in-app with a size + width×height status
-bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those; `.mmd`/`.mermaid` files render as a
-full-tab Mermaid diagram with a diagram/code toggle and a manual reload button, and can be created
-from the right-click menu as "新規図（Mermaid）" with a starter template (decisions.md N-3-2b); other binaries show an
+bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those. Editable text files all
+open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in
+`src/shared/fileKinds.ts`): Markdown and Mermaid get split/source/preview (Mermaid's preview is the diagram, debounced),
+JSON/YAML (and plain `.txt`, uncoloured) get a highlighted "表示" view by default plus an "編集" toggle (`usesViewEditModes`). The editing
+surface is still a plain textarea, plus Tab/Shift+Tab indent (via `execCommand('insertText')` so undo works), a
+line-number gutter with no wrapping for everything but Markdown (Markdown keeps wrapping, no gutter), and a clickable
+"JSON の書式に誤り（N 行目 M 列目）" status-bar entry (`src/renderer/main-window/textEditing.ts`). The Filer's
+creation items live under a "新規ファイル ▸" submenu (Markdown / Text / Mermaid / JSON / YAML; JSON starts as `{}`, Mermaid
+with a starter template); other binaries show an
 "open with default app" button rather than opening automatically; text views and the Markdown
 editor have a status bar with size/encoding/line ending (plus the last autosave time in the editor) — writes preserve the file's original
 line ending and BOM, and non-UTF-8 files are view-only, see decisions.md N-3-2) and a split-view Markdown
-editor that can also be attached to the right of a chat tab or an un-resumed history tab
+editor (any editable file type, not just Markdown) that can also be attached to the right of a chat tab or an un-resumed history tab
 (decisions.md G-1-9: bound to that tab, not in the tab bar, closes with it, carried over on
 Resume, source/preview only; if the target isn't obvious — active tab isn't a chat and there are
 several chat/history tabs — a picker dialog asks which one), a command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete), a

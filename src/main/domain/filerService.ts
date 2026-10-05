@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import ignore, { type Ignore } from 'ignore'
 import type { FileReadResult, FsEntry } from '@shared/types/filer'
 import type { Project } from '@shared/types/project'
+import { isNewFileKind, type NewFileKind } from '@shared/fileKinds'
 import { projectsStore } from '../persistence/store'
 import { decodeText, encodeForWrite } from './textEncoding'
 
@@ -129,22 +130,25 @@ export async function createDirectory(projectId: string, parentRelPath: string):
   return parentRelPath ? `${parentRelPath}/${name}` : name
 }
 
-export async function createMarkdownFile(projectId: string, parentRelPath: string): Promise<string> {
-  const project = requireProject(projectId)
-  const parentAbs = resolveAbsolute(project, parentRelPath)
-  const name = await findAvailableName(parentAbs, 'Untitled', '.md')
-  await writeFile(path.join(parentAbs, name), '', 'utf8')
-  return parentRelPath ? `${parentRelPath}/${name}` : name
+/**
+ * 「新規ファイル」の種類ごとの拡張子と初期内容。Mermaid は開いてすぐ図が見えるように小さな見本を
+ * 書いておく（空だと文法エラーになる）。JSON も空だと不正なので `{}` にしておく。
+ */
+const NEW_FILE_SPECS: Record<NewFileKind, { ext: string; content: string }> = {
+  markdown: { ext: '.md', content: '' },
+  text: { ext: '.txt', content: '' },
+  mermaid: { ext: '.mmd', content: 'flowchart TD\n  A[Start] --> B[End]\n' },
+  json: { ext: '.json', content: '{}\n' },
+  yaml: { ext: '.yaml', content: '' }
 }
 
-/** 開いてすぐ図が見えるように、小さな見本を書いた状態で作る（空だと文法エラーになる）。 */
-const MERMAID_TEMPLATE = 'flowchart TD\n  A[Start] --> B[End]\n'
-
-export async function createMermaidFile(projectId: string, parentRelPath: string): Promise<string> {
+export async function createNewFile(projectId: string, parentRelPath: string, kind: NewFileKind): Promise<string> {
+  if (!isNewFileKind(kind)) throw new Error(`unknown file kind: ${String(kind)}`)
+  const spec = NEW_FILE_SPECS[kind]
   const project = requireProject(projectId)
   const parentAbs = resolveAbsolute(project, parentRelPath)
-  const name = await findAvailableName(parentAbs, 'Untitled', '.mmd')
-  await writeFile(path.join(parentAbs, name), MERMAID_TEMPLATE, 'utf8')
+  const name = await findAvailableName(parentAbs, 'Untitled', spec.ext)
+  await writeFile(path.join(parentAbs, name), spec.content, 'utf8')
   return parentRelPath ? `${parentRelPath}/${name}` : name
 }
 

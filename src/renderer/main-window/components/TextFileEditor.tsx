@@ -1,16 +1,42 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Columns2, Eye, PanelRight, SquareCode, X } from 'lucide-react'
+import { Columns2, Eye, PanelRight, SquareCode, SquarePen, X } from 'lucide-react'
 import { Markdown } from '../../shared/components/Markdown'
+import { MermaidDiagram } from '../../shared/components/MermaidDiagram'
 import { Button } from '../../shared/components/ui/button'
+import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { registerFlush } from '../editorRegistry'
 import { conflictPath, decideEditorSync } from '../editorSync'
 import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/types/filer'
 import { FileStatusBar } from './FileStatusBar'
+import { computeIndent, findJsonProblem, lineNumbersText, offsetAt, type JsonProblem } from '../textEditing'
+import { usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
 
-type ViewMode = 'split' | 'source' | 'preview'
+/**
+ * 表示の切り替え。Markdown / Mermaid は「分割・ソース・プレビュー」、
+ * JSON / YAML / テキストは「表示（ハイライト、既定）・編集」。
+ */
+type ViewMode = 'split' | 'source' | 'preview' | 'view' | 'edit'
 
-const MODE_ICONS = { split: Columns2, source: SquareCode, preview: Eye } as const
+const MODE_ICONS = { split: Columns2, source: SquareCode, preview: Eye, view: Eye, edit: SquarePen } as const
+
+/** 先頭が既定のモード。チャットの横に添えたときは「分割」を出さない（decisions.md G-1-9）。 */
+function modesFor(language: EditorLanguage, variant: 'tab' | 'attached'): [ViewMode, ...ViewMode[]] {
+  if (usesViewEditModes(language)) return ['view', 'edit']
+  return variant === 'attached' ? ['source', 'preview'] : ['split', 'source', 'preview']
+}
+
+/** Mermaid の図は打鍵ごとに描き直すと重く、書きかけの文法エラーでちらつくので、少し待ってから描く。 */
+const MERMAID_PREVIEW_DELAY_MS = 400
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(timer)
+  }, [value, delayMs])
+  return debounced
+}
 
 const AUTOSAVE_DEBOUNCE_MS = 600
 
@@ -28,15 +54,18 @@ function savedByteSize(text: string, meta: FileMeta): number {
 const EXTERNAL_CHECK_INTERVAL_MS = 3000
 
 /**
- * Markdown エディタ。分割ビュー（ソース/プレビュー）と、どちらか単独の表示を切り替える。
+ * アプリ内で編集できるテキストファイル（Markdown / Mermaid / JSON / YAML / .txt、decisions.md N-3-1）の
+ * エディタ。Markdown / Mermaid は分割ビュー（ソース/プレビュー）と、どちらか単独の表示を切り替える。
+ * JSON / YAML / テキストは編集したい場面の方が少ないので、ハイライトした表示を既定にし、「編集」で書き換えられる。
  * 編集は自動保存する。外部での変更は、未保存編集がなければ黙って再読込し、
  * あれば競合コピーを残してから最新へ切り替える。
  *
- * `variant: 'attached'` はチャットタブの右に添えたときで、ソースとプレビューの切り替えだけにする。
+ * `variant: 'attached'` はチャットタブの右に添えたときで、「分割」は出さない。
  */
-export function MarkdownEditor({
+export function TextFileEditor({
   projectId,
   relPath,
+  language = 'markdown',
   variant = 'tab',
   onAttachToChat,
   canAttachToChat = false,
@@ -44,6 +73,7 @@ export function MarkdownEditor({
 }: {
   projectId: string
   relPath: string
+  language?: EditorLanguage
   variant?: 'tab' | 'attached'
   /** タブとして開いているとき: チャットの右に添える。 */
   onAttachToChat?: () => void
@@ -52,8 +82,10 @@ export function MarkdownEditor({
   onClose?: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const modes: ViewMode[] = variant === 'attached' ? ['source', 'preview'] : ['split', 'source', 'preview']
-  const [mode, setMode] = useState<ViewMode>(variant === 'attached' ? 'source' : 'split')
+  const modes = modesFor(language, variant)
+  const [mode, setMode] = useState<ViewMode>(modes[0])
+  const showSource = mode === 'split' || mode === 'source' || mode === 'edit'
+  const showPreview = mode === 'split' || mode === 'preview' || mode === 'view'
   const [text, setText] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -107,6 +139,7 @@ export function MarkdownEditor({
         const result = await window.shovel.fs.readFile(projectId, relPath)
         const editorText = textRef.current
         const action = decideEditorSync(result, savedTextRef.current, editorText)
+        let sizeOnDisk = result.kind === 'text' ? result.size : 0
         switch (action.kind) {
           case 'deleted':
             deletedRef.current = true
@@ -131,6 +164,8 @@ export function MarkdownEditor({
               await window.shovel.fs.writeTextFile(projectId, relPath, editorText)
               savedTextRef.current = editorText
               setSavedAt(Date.now())
+              // 読み込んだのは書く前なので、サイズは書いた内容から見積もる。
+              if (result.kind === 'text') sizeOnDisk = savedByteSize(editorText, result)
             }
             break
         }
@@ -140,7 +175,7 @@ export function MarkdownEditor({
               ? prev
               : { encoding: result.encoding, lineEnding: result.lineEnding }
           )
-          setDiskSize(result.size)
+          setDiskSize(sizeOnDisk)
         }
       }
       const next = syncQueueRef.current.then(run)
@@ -175,6 +210,76 @@ export function MarkdownEditor({
       flushRef.current().catch((err: unknown) => console.warn('[editor] autosave failed', err))
     }, AUTOSAVE_DEBOUNCE_MS)
   }
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const gutterRef = useRef<HTMLPreElement>(null)
+
+  /**
+   * Tab / Shift+Tab でインデントを増やす・減らす（フォーカスを次の要素へ移さない）。
+   * `execCommand('insertText')` で入れるので、元に戻す（Cmd/Ctrl+Z）が効き、input イベント経由で
+   * 自動保存も走る。使えない環境では値を直接書き換える。
+   */
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
+    if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.nativeEvent.isComposing || readOnly) return
+    e.preventDefault()
+    const area = e.currentTarget
+    const edit = computeIndent(area.value, area.selectionStart, area.selectionEnd, e.shiftKey)
+    if (!edit) return
+    area.setSelectionRange(edit.replaceStart, edit.replaceEnd)
+    const inserted =
+      edit.insert === '' ? document.execCommand('delete') : document.execCommand('insertText', false, edit.insert)
+    if (!inserted) {
+      area.setRangeText(edit.insert, edit.replaceStart, edit.replaceEnd)
+      onChange(area.value)
+    }
+    area.setSelectionRange(edit.selectionStart, edit.selectionEnd)
+  }
+
+  // 行番号は折り返しと両立しないので、図と設定ファイルだけに付けて折り返さない。
+  // Markdown は文章なので、折り返しを優先して行番号を付けない。
+  const showLineNumbers = language !== 'markdown'
+  const lineNumbers = useMemo(() => (showLineNumbers ? lineNumbersText(text) : ''), [showLineNumbers, text])
+  function syncGutter(): void {
+    if (gutterRef.current && textareaRef.current) gutterRef.current.scrollTop = textareaRef.current.scrollTop
+  }
+
+  // JSON は書式の誤りをステータスバーに出し、押すとその位置を編集できるようにする。
+  const jsonProblem = useMemo(() => (language === 'json' ? findJsonProblem(text) : null), [language, text])
+  /** 誤りの位置へ移るとき、textarea が出てからカーソルを置くための保留。 */
+  const pendingCaretRef = useRef<number | null>(null)
+  function revealProblem(problem: JsonProblem): void {
+    if (problem.line === undefined) return
+    pendingCaretRef.current = offsetAt(textRef.current, problem.line, problem.column ?? 1)
+    if (!showSource) setMode(modes.includes('edit') ? 'edit' : 'source')
+    else placePendingCaret()
+  }
+  function placePendingCaret(): void {
+    const area = textareaRef.current
+    const caret = pendingCaretRef.current
+    if (!area || caret === null) return
+    pendingCaretRef.current = null
+    area.focus()
+    area.setSelectionRange(caret, caret)
+  }
+  useEffect(() => {
+    if (showSource) placePendingCaret()
+  })
+
+  const mermaidCode = useDebouncedValue(text, MERMAID_PREVIEW_DELAY_MS)
+
+  // JSON / YAML / テキストの表示は shiki で描く（テキストは色なしで行番号だけ。外部での変更を読み直したときも描き直す）。
+  const [highlighted, setHighlighted] = useState<string | null>(null)
+  const highlightsCode = usesViewEditModes(language) && showPreview
+  useEffect(() => {
+    if (!highlightsCode) return
+    let cancelled = false
+    void highlightToHtml(text, langFromFilename(relPath)).then((html) => {
+      if (!cancelled) setHighlighted(html)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [highlightsCode, text, relPath])
 
   // 開いている間はポーリングで外部変更を検知する。
   useEffect(() => {
@@ -241,17 +346,41 @@ export function MarkdownEditor({
         )}
       </div>
       <div className="flex flex-1 overflow-hidden">
-        {mode !== 'preview' && (
-          <textarea
-            className="h-full flex-1 resize-none overflow-auto border-r border-border bg-transparent p-3 font-mono text-editor outline-hidden"
-            value={text}
-            readOnly={readOnly}
-            onChange={(e) => onChange(e.target.value)}
-          />
+        {showSource && (
+          <div className="flex h-full min-w-0 flex-1 overflow-hidden border-r border-border">
+            {showLineNumbers && (
+              // 横スクロールバーの分だけ textarea の方が深くスクロールできるので、下に余白を足しておく。
+              <pre
+                ref={gutterRef}
+                aria-hidden
+                className="shrink-0 select-none overflow-hidden pt-3 pb-8 pl-3 pr-2 text-right font-mono text-editor text-muted-foreground/60"
+              >
+                {lineNumbers}
+              </pre>
+            )}
+            <textarea
+              ref={textareaRef}
+              className="h-full min-w-0 flex-1 resize-none overflow-auto bg-transparent p-3 font-mono text-editor outline-hidden"
+              value={text}
+              readOnly={readOnly}
+              wrap={showLineNumbers ? 'off' : undefined}
+              // 図や設定ファイルのキーに英語のスペルチェックの波線が付かないよう、Markdown だけ有効にする。
+              spellCheck={language === 'markdown'}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={onKeyDown}
+              onScroll={syncGutter}
+            />
+          </div>
         )}
-        {mode !== 'source' && (
+        {showPreview && (
           <div className="h-full flex-1 overflow-auto p-3">
-            <Markdown text={text} className="text-editor" />
+            {language === 'markdown' ? (
+              <Markdown text={text} className="text-editor" />
+            ) : language === 'mermaid' ? (
+              <MermaidDiagram code={mermaidCode} />
+            ) : highlighted !== null ? (
+              <div className="shiki-lines text-editor" dangerouslySetInnerHTML={{ __html: highlighted }} />
+            ) : null}
           </div>
         )}
       </div>
@@ -261,6 +390,16 @@ export function MarkdownEditor({
         lineEnding={meta.lineEnding}
         readOnly={readOnly}
         savedAt={savedAt}
+        problem={
+          jsonProblem && {
+            label:
+              jsonProblem.line === undefined
+                ? t('editor.jsonInvalid')
+                : t('editor.jsonInvalidAt', { line: jsonProblem.line, column: jsonProblem.column ?? 1 }),
+            detail: jsonProblem.message,
+            onClick: jsonProblem.line === undefined ? undefined : () => revealProblem(jsonProblem)
+          }
+        }
       />
     </div>
   )

@@ -17,6 +17,7 @@ import type { FileReadResult, FsEntry } from './types/filer'
 import type { CommandExit, CommandHistory, CommandOutputChunk } from './types/command'
 import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
+import type { NewFileKind } from './fileKinds'
 
 export const IpcChannel = {
   // renderer -> main (invoke/handle)
@@ -73,8 +74,7 @@ export const IpcChannel = {
   FsCopy: 'fs:copy',
   FsOpenInOS: 'fs:openInOS',
   FsMkdir: 'fs:mkdir',
-  FsCreateMarkdownFile: 'fs:createMarkdownFile',
-  FsCreateMermaidFile: 'fs:createMermaidFile',
+  FsCreateFile: 'fs:createFile',
   FsReadClipboardFiles: 'fs:readClipboardFiles',
   FsCopyExternal: 'fs:copyExternal',
 
@@ -253,8 +253,8 @@ export interface RendererApi {
     copy(projectId: string, relPath: string, destDirRelPath: string): Promise<string>
     openInOS(projectId: string, relPath: string): Promise<void>
     mkdir(projectId: string, parentRelPath: string): Promise<string>
-    createMarkdownFile(projectId: string, parentRelPath: string): Promise<string>
-    createMermaidFile(projectId: string, parentRelPath: string): Promise<string>
+    /** 「新規ファイル」。作ったファイルの相対パスを返す。 */
+    createFile(projectId: string, parentRelPath: string, kind: NewFileKind): Promise<string>
     /** OS のクリップボードにある「コピーされたファイル」の絶対パス（無ければ空）。 */
     readClipboardFiles(): Promise<string[]>
     /** アプリ外のファイル・フォルダをプロジェクト内へコピーする（移動はしない）。 */

@@ -8,7 +8,7 @@ import { Sidebar, type SidebarPanel } from './components/Sidebar'
 import { TabBar, type TabInfo } from './components/TabBar'
 import { SessionView } from './components/SessionView'
 import { FileViewer } from './components/FileViewer'
-import { MarkdownEditor } from './components/MarkdownEditor'
+import { TextFileEditor } from './components/TextFileEditor'
 import { Commands } from './components/Commands'
 import { HistoryView, type ReadOnlyKind } from './components/HistoryView'
 import { useSettings } from '../shared/useSettings'
@@ -25,9 +25,10 @@ import { discardSessionEvents } from './sessionEvents'
 import { ResizablePanel } from './components/ResizablePanel'
 import { cn } from '../shared/lib/utils'
 import { friendlyErrorMessage } from '../shared/friendlyError'
+import { editorLanguageFor, type EditorLanguage } from '@shared/fileKinds'
 
 const MAX_SESSION_TABS = 10
-/** チャットの右に添えた Markdown ペインの既定幅（px）。 */
+/** チャットの右に添えたファイルのペインの既定幅（px）。 */
 const ATTACHED_DEFAULT_WIDTH = 520
 /** コンソール（下部ドロワー）の既定の高さ（px）。 */
 const COMMANDS_DEFAULT_HEIGHT = 256
@@ -42,12 +43,12 @@ type Tab =
       meta: SessionMeta
       initialAttachments: string[]
       /**
-       * このチャットタブの右に添えた Markdown。添えている間はタブバーに出さず、タブ数にも数えない。
+       * このチャットタブの右に添えたファイル。添えている間はタブバーに出さず、タブ数にも数えない。
        * チャットタブを閉じると一緒に閉じる。
        */
-      attachedMarkdown?: string
+      attachedFile?: string
     }
-  | { kind: 'file'; sessionId: string; title: string; relPath: string; isMarkdown: boolean }
+  | { kind: 'file'; sessionId: string; title: string; relPath: string; editor: EditorLanguage | null }
   | {
       kind: 'history'
       sessionId: string
@@ -58,8 +59,8 @@ type Tab =
       recordTimestamp?: number
       /** `session/list` にだけあってローカル記録が無い行。`snapshot` は中身の無い仮のもの。 */
       agentOnly?: boolean
-      /** 右に添えた Markdown。再開後も引き継ぐ。 */
-      attachedMarkdown?: string
+      /** 右に添えたファイル。再開後も引き継ぐ。 */
+      attachedFile?: string
     }
 
 type ChatTab = Extract<Tab, { kind: 'session' | 'history' }>
@@ -191,10 +192,10 @@ export function App(): React.JSX.Element {
     await openNewTab()
   }
 
-  function openFile(relPath: string, isMarkdown: boolean): void {
+  function openFile(relPath: string): void {
     setLastOpenedFilePath(relPath)
     // チャットの横に添えてあるなら、そのチャットタブを前に出す。
-    const holder = tabs.find((tab) => isChatTab(tab) && tab.attachedMarkdown === relPath)
+    const holder = tabs.find((tab) => isChatTab(tab) && tab.attachedFile === relPath)
     if (holder) {
       setActiveSessionId(holder.sessionId)
       return
@@ -204,7 +205,16 @@ export function App(): React.JSX.Element {
     setTabs((prev) =>
       prev.some((tab) => tab.sessionId === id)
         ? prev
-        : [...prev, { kind: 'file', sessionId: id, title: relPath.split('/').pop() ?? relPath, relPath, isMarkdown }]
+        : [
+            ...prev,
+            {
+              kind: 'file',
+              sessionId: id,
+              title: relPath.split('/').pop() ?? relPath,
+              relPath,
+              editor: editorLanguageFor(relPath)
+            }
+          ]
     )
     setActiveSessionId(id)
   }
@@ -320,7 +330,7 @@ export function App(): React.JSX.Element {
               title: snapshot.title || t('history.untitled'),
               meta,
               initialAttachments: [],
-              attachedMarkdown: tab.kind === 'history' ? tab.attachedMarkdown : undefined
+              attachedFile: tab.kind === 'history' ? tab.attachedFile : undefined
             }
           : tab
       )
@@ -333,60 +343,61 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     void window.shovel.sidebar.getWidths().then((widths) => {
+      // 保存キーは Markdown だけを添えられた頃の名前のまま（記憶済みの幅を引き継ぐ）。
       if (widths.attachedMarkdown) setAttachedWidth(widths.attachedMarkdown)
       if (widths.commandsHeight) setCommandsHeight(widths.commandsHeight)
     })
   }, [])
 
   const chatTabs = tabs.filter(isChatTab)
-  const canAttachMarkdown = chatTabs.length > 0
+  const canAttachFile = chatTabs.length > 0
 
   /**
-   * Markdown をチャットタブの右に添える。添え先は、今のタブがチャットならそれ、
-   * チャットが1つしか無ければそれ。決まらなければ添え先を選ばせる。
+   * 編集できるファイル（Markdown / Mermaid / JSON / YAML / テキスト）をチャットタブの右に添える。
+   * 添え先は、今のタブがチャットならそれ、チャットが1つしか無ければそれ。決まらなければ添え先を選ばせる。
    */
-  function attachMarkdown(relPath: string): void {
+  function attachFile(relPath: string): void {
     const active = tabs.find((tab) => tab.sessionId === activeSessionId)
     const target = active && isChatTab(active) ? active : chatTabs.length === 1 ? chatTabs[0] : undefined
-    if (target) attachMarkdownTo(target.sessionId, relPath)
+    if (target) attachFileTo(target.sessionId, relPath)
     else if (chatTabs.length > 1) setAttachPickerPath(relPath)
   }
 
-  /** 同じファイルの独立したタブがあれば閉じ、既に別の Markdown を添えていれば置き換える。 */
-  function attachMarkdownTo(targetId: string, relPath: string): void {
+  /** 同じファイルの独立したタブがあれば閉じ、既に別のファイルを添えていれば置き換える。 */
+  function attachFileTo(targetId: string, relPath: string): void {
     setTabs((prev) =>
       prev
         .filter((tab) => tab.sessionId !== `file:${relPath}`)
-        .map((tab) => (tab.sessionId === targetId && isChatTab(tab) ? { ...tab, attachedMarkdown: relPath } : tab))
+        .map((tab) => (tab.sessionId === targetId && isChatTab(tab) ? { ...tab, attachedFile: relPath } : tab))
     )
     setActiveSessionId(targetId)
   }
 
-  function detachMarkdown(sessionId: string): void {
+  function detachFile(sessionId: string): void {
     setTabs((prev) =>
-      prev.map((tab) => (tab.sessionId === sessionId && isChatTab(tab) ? { ...tab, attachedMarkdown: undefined } : tab))
+      prev.map((tab) => (tab.sessionId === sessionId && isChatTab(tab) ? { ...tab, attachedFile: undefined } : tab))
     )
   }
 
   /**
-   * Cmd/Ctrl+数字で選んだタブだけを表示する。チャットの横に Markdown を添えていれば分割を解除し、
-   * Markdown はチャットのすぐ右の独立したタブに戻す。
+   * Cmd/Ctrl+数字で選んだタブだけを表示する。チャットの横にファイルを添えていれば分割を解除し、
+   * そのファイルはチャットのすぐ右の独立したタブに戻す。
    */
   function selectTabExclusively(id: string): void {
     setTabs((prev) => {
       const index = prev.findIndex((tab) => tab.sessionId === id)
       const tab = prev[index]
-      if (!tab || !isChatTab(tab) || !tab.attachedMarkdown) return prev
-      const relPath = tab.attachedMarkdown
+      if (!tab || !isChatTab(tab) || !tab.attachedFile) return prev
+      const relPath = tab.attachedFile
       const next = [...prev]
-      next[index] = { ...tab, attachedMarkdown: undefined }
+      next[index] = { ...tab, attachedFile: undefined }
       if (!next.some((t) => t.sessionId === `file:${relPath}`)) {
         next.splice(index + 1, 0, {
           kind: 'file',
           sessionId: `file:${relPath}`,
           title: relPath.split('/').pop() ?? relPath,
           relPath,
-          isMarkdown: true
+          editor: editorLanguageFor(relPath)
         })
       }
       return next
@@ -509,8 +520,8 @@ export function App(): React.JSX.Element {
           onRenameTab={renameTab}
           onCloseTab={(id) => void closeTab(id)}
           onAddToContext={addToContext}
-          onAttachMarkdown={attachMarkdown}
-          canAttachMarkdown={canAttachMarkdown}
+          onAttachFile={attachFile}
+          canAttachFile={canAttachFile}
         />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TabBar
@@ -543,15 +554,15 @@ export function App(): React.JSX.Element {
               >
                 {isChatTab(tab) ? (
                   <div className="flex flex-1 overflow-hidden">
-                    {/* チャットの最小幅を保ち、足りなければ Markdown 側が縮む。 */}
-                    <div className={cn('flex flex-1 flex-col overflow-hidden', tab.attachedMarkdown ? 'min-w-[320px]' : 'min-w-0')}>
+                    {/* チャットの最小幅を保ち、足りなければ添えたファイル側が縮む。 */}
+                    <div className={cn('flex flex-1 flex-col overflow-hidden', tab.attachedFile ? 'min-w-[320px]' : 'min-w-0')}>
                       {tab.kind === 'session' ? (
                         <SessionView
                           sessionId={tab.sessionId}
                           initialMeta={tab.meta}
                           initialAttachments={tab.initialAttachments}
                           sendKey={settings?.sendKey ?? 'enter'}
-                          onOpenFile={(relPath) => openFile(relPath, relPath.toLowerCase().endsWith('.md'))}
+                          onOpenFile={openFile}
                           onStatusChange={(status) => updateTabStatus(tab.sessionId, status)}
                           onRefreshed={(snapshotId) => handleRefreshed(tab.sessionId, snapshotId)}
                           onTitleChange={(title) => renameTab(tab.sessionId, title)}
@@ -564,11 +575,11 @@ export function App(): React.JSX.Element {
                           agentOnly={tab.agentOnly}
                           onResume={() => resumeHistory(tab.snapshot, tab.agentOnly)}
                           onStartNew={() => void openNewTab()}
-                          onOpenFile={(relPath) => openFile(relPath, relPath.toLowerCase().endsWith('.md'))}
+                          onOpenFile={openFile}
                         />
                       )}
                     </div>
-                    {tab.attachedMarkdown && (
+                    {tab.attachedFile && (
                       <ResizablePanel
                         edge="left"
                         shrinkable
@@ -580,22 +591,24 @@ export function App(): React.JSX.Element {
                           void window.shovel.sidebar.setWidth('attachedMarkdown', width)
                         }}
                       >
-                        <MarkdownEditor
-                          key={tab.attachedMarkdown}
+                        <TextFileEditor
+                          key={tab.attachedFile}
                           projectId={projectId}
-                          relPath={tab.attachedMarkdown}
+                          relPath={tab.attachedFile}
+                          language={editorLanguageFor(tab.attachedFile) ?? 'markdown'}
                           variant="attached"
-                          onClose={() => detachMarkdown(tab.sessionId)}
+                          onClose={() => detachFile(tab.sessionId)}
                         />
                       </ResizablePanel>
                     )}
                   </div>
-                ) : tab.isMarkdown ? (
-                  <MarkdownEditor
+                ) : tab.editor ? (
+                  <TextFileEditor
                     projectId={projectId}
                     relPath={tab.relPath}
-                    canAttachToChat={canAttachMarkdown}
-                    onAttachToChat={() => attachMarkdown(tab.relPath)}
+                    language={tab.editor}
+                    canAttachToChat={canAttachFile}
+                    onAttachToChat={() => attachFile(tab.relPath)}
                   />
                 ) : (
                   <FileViewer projectId={projectId} relPath={tab.relPath} />
@@ -642,7 +655,7 @@ export function App(): React.JSX.Element {
         relPath={attachPickerPath}
         chatTabs={chatTabs}
         onPick={(targetId) => {
-          if (attachPickerPath) attachMarkdownTo(targetId, attachPickerPath)
+          if (attachPickerPath) attachFileTo(targetId, attachPickerPath)
           setAttachPickerPath(null)
         }}
         onCancel={() => setAttachPickerPath(null)}

@@ -6,8 +6,12 @@ import {
   ClipboardCopy,
   ClipboardPaste,
   File,
+  FileBraces,
+  FileCog,
   FilePlus,
+  FilePlus2,
   FileText,
+  FileType,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -19,9 +23,10 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FsEntry } from '@shared/types/filer'
+import { editorLanguageFor, type NewFileKind } from '@shared/fileKinds'
 import { cn } from '../../shared/lib/utils'
 import { MERMAID_BRAND_COLOR, MermaidIcon } from '../../shared/components/icons/MermaidIcon'
-import { MenuItem } from './MenuItem'
+import { MenuItem, SubMenu } from './MenuItem'
 
 interface FsNode extends FsEntry {
   children?: FsNode[]
@@ -104,15 +109,15 @@ export function Filer({
   projectId,
   onOpenFile,
   onAddToContext,
-  onAttachMarkdown,
-  canAttachMarkdown
+  onAttachFile,
+  canAttachFile
 }: {
   projectId: string
-  onOpenFile: (relPath: string, isMarkdown: boolean) => void
+  onOpenFile: (relPath: string) => void
   onAddToContext: (relPath: string) => void
-  /** Markdown を今のチャットタブの右に添える。 */
-  onAttachMarkdown: (relPath: string) => void
-  canAttachMarkdown: boolean
+  /** 編集できるファイルを今のチャットタブの右に添える。 */
+  onAttachFile: (relPath: string) => void
+  canAttachFile: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [data, setDataState] = useState<FsNode[]>([])
@@ -203,7 +208,7 @@ export function Filer({
 
   function handleActivate(node: FsNode): void {
     if (node.isDir || node.placeholder) return
-    onOpenFile(node.relPath, node.name.toLowerCase().endsWith('.md'))
+    onOpenFile(node.relPath)
   }
 
   /**
@@ -259,13 +264,10 @@ export function Filer({
     if (created) setRenaming(created)
   }
 
-  async function handleNewFile(targetNode: FsNode | null, kind: 'markdown' | 'mermaid'): Promise<void> {
+  async function handleNewFile(targetNode: FsNode | null, kind: NewFileKind): Promise<void> {
     setMenu(null)
     const parent = targetDirFor(targetNode)
-    const newRelPath =
-      kind === 'markdown'
-        ? await window.shovel.fs.createMarkdownFile(projectId, parent)
-        : await window.shovel.fs.createMermaidFile(projectId, parent)
+    const newRelPath = await window.shovel.fs.createFile(projectId, parent, kind)
     const nodes = await revealDir(parent)
     const created = findNode(nodes, newRelPath)
     if (created) setRenaming(created)
@@ -434,12 +436,12 @@ export function Filer({
               {t('filer.addToContext')}
             </MenuItem>
           )}
-          {menu.node && !menu.node.isDir && menu.node.name.toLowerCase().endsWith('.md') && (
+          {menu.node && !menu.node.isDir && editorLanguageFor(menu.node.name) !== null && (
             <MenuItem
               icon={<PanelRight size={14} />}
-              disabled={!canAttachMarkdown}
+              disabled={!canAttachFile}
               onClick={() => {
-                onAttachMarkdown(menu.node!.relPath)
+                onAttachFile(menu.node!.relPath)
                 setMenu(null)
               }}
             >
@@ -455,19 +457,30 @@ export function Filer({
           <MenuItem icon={<FolderPlus size={14} />} onClick={() => void handleNewFolder(menu.node)}>
             {t('filer.newFolder')}
           </MenuItem>
-          <MenuItem icon={<FileText size={14} />} onClick={() => void handleNewFile(menu.node, 'markdown')}>
-            {t('filer.newMarkdownFile')}
-          </MenuItem>
-          <MenuItem
-            icon={
-              <span className="flex" style={{ color: MERMAID_BRAND_COLOR }}>
-                <MermaidIcon size={14} />
-              </span>
-            }
-            onClick={() => void handleNewFile(menu.node, 'mermaid')}
-          >
-            {t('filer.newMermaidFile')}
-          </MenuItem>
+          <SubMenu icon={<FilePlus2 size={14} />} label={t('filer.newFile')}>
+            <MenuItem icon={<FileText size={14} />} onClick={() => void handleNewFile(menu.node, 'markdown')}>
+              {t('filer.newMarkdownFile')}
+            </MenuItem>
+            <MenuItem icon={<FileType size={14} />} onClick={() => void handleNewFile(menu.node, 'text')}>
+              {t('filer.newTextFile')}
+            </MenuItem>
+            <MenuItem
+              icon={
+                <span className="flex" style={{ color: MERMAID_BRAND_COLOR }}>
+                  <MermaidIcon size={14} />
+                </span>
+              }
+              onClick={() => void handleNewFile(menu.node, 'mermaid')}
+            >
+              {t('filer.newMermaidFile')}
+            </MenuItem>
+            <MenuItem icon={<FileBraces size={14} />} onClick={() => void handleNewFile(menu.node, 'json')}>
+              {t('filer.newJsonFile')}
+            </MenuItem>
+            <MenuItem icon={<FileCog size={14} />} onClick={() => void handleNewFile(menu.node, 'yaml')}>
+              {t('filer.newYamlFile')}
+            </MenuItem>
+          </SubMenu>
           {menu.node && (
             <MenuItem icon={<ClipboardCopy size={14} />} onClick={() => handleCopy(menu.node!)}>
               {t('filer.copy')}
