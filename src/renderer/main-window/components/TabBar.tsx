@@ -117,7 +117,9 @@ export function TabBar({
               {tab.kind === 'file' && <File size={12} className="shrink-0" />}
               {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
               {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
-              <span className="truncate">{tab.title}</span>
+              <span className="truncate" title={tab.title}>
+                {tab.title}
+              </span>
             </button>
             <button
               className="opacity-60 hover:opacity-100"

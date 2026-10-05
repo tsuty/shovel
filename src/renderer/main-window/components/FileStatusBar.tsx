@@ -39,21 +39,24 @@ function StatusBarFrame({ items, children }: { items: string[]; children?: React
 
 /**
  * テキストファイル（閲覧・Markdown エディタ）の下端に出すステータスバー。
- * ファイルサイズ・文字コード・改行コードを示す。
+ * ファイルサイズ・文字コード・改行コードと、エディタなら最後に自動保存した時刻を示す。
  */
 export function FileStatusBar({
   size,
   encoding,
   lineEnding,
-  readOnly = false
+  readOnly = false,
+  savedAt = null
 }: {
   size: number
   encoding: TextEncoding
   lineEnding: LineEnding
   /** 書き戻せない文字コードのため編集できないとき。 */
   readOnly?: boolean
+  /** Markdown エディタ: 最後に自動保存が完了した時刻（まだ保存していなければ null）。 */
+  savedAt?: number | null
 }): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const items = [
     formatFileSize(size),
     encoding === 'unknown' ? t('fileStatus.encodingUnknown') : encoding,
@@ -62,6 +65,11 @@ export function FileStatusBar({
   return (
     <StatusBarFrame items={items}>
       {readOnly && <span className="mr-auto">{t('fileStatus.readOnly')}</span>}
+      {!readOnly && savedAt !== null && (
+        <span className="mr-auto">
+          {t('fileStatus.savedAt', { time: new Date(savedAt).toLocaleTimeString(i18n.language) })}
+        </span>
+      )}
     </StatusBarFrame>
   )
 }

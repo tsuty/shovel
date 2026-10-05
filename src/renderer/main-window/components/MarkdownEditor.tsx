@@ -60,6 +60,8 @@ export function MarkdownEditor({
   const [deleted, setDeleted] = useState(false)
   const [meta, setMeta] = useState<FileMeta>({ encoding: 'UTF-8', lineEnding: 'none' })
   const [diskSize, setDiskSize] = useState(0)
+  /** 最後に自動保存が完了した時刻。ファイルを開いてからまだ保存していなければ null。 */
+  const [savedAt, setSavedAt] = useState<number | null>(null)
   // UTF-8 以外のファイルは表示だけにする。
   const readOnly = !isWritableEncoding(meta.encoding)
 
@@ -128,6 +130,7 @@ export function MarkdownEditor({
             if (save && editorText !== savedTextRef.current) {
               await window.shovel.fs.writeTextFile(projectId, relPath, editorText)
               savedTextRef.current = editorText
+              setSavedAt(Date.now())
             }
             break
         }
@@ -257,6 +260,7 @@ export function MarkdownEditor({
         encoding={meta.encoding}
         lineEnding={meta.lineEnding}
         readOnly={readOnly}
+        savedAt={savedAt}
       />
     </div>
   )

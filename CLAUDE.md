@@ -47,7 +47,7 @@ bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports
 full-tab Mermaid diagram with a diagram/code toggle and a manual reload button, and can be created
 from the right-click menu as "新規図（Mermaid）" with a starter template (decisions.md N-3-2b); other binaries show an
 "open with default app" button rather than opening automatically; text views and the Markdown
-editor have a status bar with size/encoding/line ending — writes preserve the file's original
+editor have a status bar with size/encoding/line ending (plus the last autosave time in the editor) — writes preserve the file's original
 line ending and BOM, and non-UTF-8 files are view-only, see decisions.md N-3-2) and a split-view Markdown
 editor that can also be attached to the right of a chat tab or an un-resumed history tab
 (decisions.md G-1-9: bound to that tab, not in the tab bar, closes with it, carried over on

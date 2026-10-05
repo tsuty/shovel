@@ -103,7 +103,8 @@
     "encodingUnknown": "文字コード不明",
     "eolMixed": "改行混在",
     "eolNone": "改行なし",
-    "readOnly": "この文字コードは編集できません（表示のみ）"
+    "readOnly": "この文字コードは編集できません（表示のみ）",
+    "savedAt": "{{time}} に保存しました"
   },
   "codeBlock": {
     "expand": "すべて表示（{{count}}行）",

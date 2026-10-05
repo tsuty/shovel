@@ -103,7 +103,8 @@
     "encodingUnknown": "Unknown encoding",
     "eolMixed": "Mixed line endings",
     "eolNone": "No line breaks",
-    "readOnly": "Read-only: this encoding can't be edited"
+    "readOnly": "Read-only: this encoding can't be edited",
+    "savedAt": "Saved at {{time}}"
   },
   "codeBlock": {
     "expand_one": "Show all ({{count}} line)",

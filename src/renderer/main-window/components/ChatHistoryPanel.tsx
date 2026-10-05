@@ -182,7 +182,9 @@ export function ChatHistoryPanel({
                 }}
               >
                 <TabKindIcon kind={tab.kind} />
-                <span className="truncate">{tab.title}</span>
+                <span className="truncate" title={tab.title}>
+                  {tab.title}
+                </span>
               </button>
             )}
           </li>
@@ -253,6 +255,7 @@ export function ChatHistoryPanel({
                             })
                           }}
                           title={[
+                            entry.title || t('history.untitled'),
                             entry.updatedAt ? new Date(entry.updatedAt).toLocaleString(i18n.language) : '',
                             entry.state === 'localOnly' ? t('history.state.localOnly') : '',
                             entry.state === 'agentOnly' ? t('history.state.agentOnly') : ''
