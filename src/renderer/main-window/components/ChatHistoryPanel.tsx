@@ -393,6 +393,8 @@ function RenameInput({
       onChange={(e) => onChange(e.target.value)}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
+        // IME 変換中の Enter / Escape は無視する。
+        if (e.nativeEvent.isComposing) return
         if (e.key === 'Enter') onCommit()
         if (e.key === 'Escape') onCancel()
       }}

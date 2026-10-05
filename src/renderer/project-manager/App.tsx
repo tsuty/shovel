@@ -103,6 +103,8 @@ export function App(): React.JSX.Element {
                     onChange={(e) => setRenameValue(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => {
+                      // IME 変換中の Enter / Escape は無視する。
+                      if (e.nativeEvent.isComposing) return
                       if (e.key === 'Enter') void commitRename(project.id)
                       if (e.key === 'Escape') setRenamingId(null)
                     }}
