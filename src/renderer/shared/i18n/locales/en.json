@@ -262,5 +262,12 @@
     "noResults": "No matching sessions.",
     "backupDate": "Backup · {{date}}",
     "deletedDate": "Deleted · {{date}}"
+  },
+  "findBar": {
+    "placeholder": "Find in page",
+    "noMatches": "No results",
+    "previous": "Previous (Shift+Enter)",
+    "next": "Next (Enter)",
+    "close": "Close (Esc)"
   }
 }

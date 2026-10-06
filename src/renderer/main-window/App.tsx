@@ -28,6 +28,7 @@ import { friendlyErrorMessage } from '../shared/friendlyError'
 import { editorLanguageFor, type EditorLanguage } from '@shared/fileKinds'
 import { getAgentEntry } from '@shared/agentTable'
 import { ConnectingView, type ConnectingStepRecord } from './components/ConnectingView'
+import { FindBar } from './components/FindBar'
 
 const MAX_SESSION_TABS = 10
 /** チャットの右に添えたファイルのペインの既定幅（px）。 */
@@ -103,6 +104,7 @@ export function App(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [openPanels, setOpenPanels] = useState<Set<SidebarPanel>>(new Set(['tabs']))
   const [commandsOpen, setCommandsOpen] = useState(false)
+  const tabContentRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -608,7 +610,8 @@ export function App(): React.JSX.Element {
               <span className="flex-1">{error}</span>
             </div>
           )}
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div ref={tabContentRef} className="relative flex flex-1 flex-col overflow-hidden">
+            <FindBar root={tabContentRef} />
             {tabs.map((tab) => (
               <div
                 key={tab.sessionId}

@@ -260,5 +260,12 @@
     "noResults": "一致するセッションはありません。",
     "backupDate": "バックアップ・{{date}}",
     "deletedDate": "削除済み・{{date}}"
+  },
+  "findBar": {
+    "placeholder": "ページ内を検索",
+    "noMatches": "0 件",
+    "previous": "前へ（Shift+Enter）",
+    "next": "次へ（Enter）",
+    "close": "閉じる（Esc）"
   }
 }

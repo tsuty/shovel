@@ -375,9 +375,13 @@ React で実装し、`--ra-*` の CSS カスタムプロパティを shadcn の�
 
 ### トランスクリプト内検索
 
-✅ **解決済み**（[open-issues.md](./open-issues.md) V-5）。
-Electron の `webContents.findInPage()` をそのまま使う。renderer 全体が対象になる
-ため理屈上はサイドバーや入力欄もヒットしうるが、実用上許容範囲と判断した。
+✅ **解決済み**（[open-issues.md](./open-issues.md) V-5、decisions.md N-1-a）。
+Cmd/Ctrl+F でタブ領域の右上に検索バーを出す。Enter で次、Shift+Enter で前、Esc で閉じる。
+大文字小文字は区別しない。対象は**タブ領域（アクティブなタブ）の表示されているテキスト**で、
+サイドバー・非表示のタブ・折り畳まれた中身・textarea / input の中身は対象外。
+ヒット箇所は CSS Custom Highlight API で塗り、DOM は書き換えない
+（`src/renderer/main-window/components/FindBar.tsx`）。検索中に本文が変わったら
+（ストリーミング・タブ切り替え）照合し直す。
 
 これは「今見ている1つの会話の中を探す」ものであり、「どの会話だったか分から
 ないものをセッションをまたいで探す」ローカルセッション検索（C-6、チャット

@@ -255,3 +255,13 @@
 .animate-tab-pulse {
   animation: tab-pulse 1s ease-in-out infinite;
 }
+
+/* ページ内検索（FindBar）のヒット箇所。CSS Custom Highlight API で塗る。 */
+::highlight(shovel-find) {
+  background-color: rgb(250 204 21 / 0.45);
+  color: inherit;
+}
+::highlight(shovel-find-active) {
+  background-color: rgb(249 115 22 / 0.8);
+  color: inherit;
+}

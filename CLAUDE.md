@@ -60,7 +60,9 @@ editor (any editable file type, not just Markdown) that can also be attached to 
 Resume, source/preview only; if the target isn't obvious — active tab isn't a chat and there are
 several chat/history tabs — a picker dialog asks which one), a command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete), a
 session-history panel backed by local snapshots with rename/delete, a per-tab refresh action
-(↻, reuses the connection and sends a fresh `session/new`), Cmd/Ctrl+0-9 tab-switching shortcuts, a "connecting" tab shown immediately on "+" that lists
+(↻, reuses the connection and sends a fresh `session/new`), Cmd/Ctrl+0-9 tab-switching shortcuts, a Cmd/Ctrl+F find bar
+(`FindBar.tsx`: searches the visible text of the tab area via the CSS Custom Highlight API, not `webContents.findInPage()` —
+that matched the find box's own text and stole its focus, decisions.md N-1-a), a "connecting" tab shown immediately on "+" that lists
 each connect step (sign-in check → sandbox liveness → adapter start/`initialize` → `session/new`)
 with the command being run and elapsed time, swapped in place for the session tab on success
 (flows.md §3 接続中タブ; progress via `session:openProgress`),
