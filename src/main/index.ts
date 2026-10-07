@@ -14,8 +14,12 @@ if (!gotLock) {
 } else {
   registerRendererScheme()
 
+  // PATH の取り込みと IPC 登録が済むまでは、Dock クリックなどの `activate` でウィンドウを開かない。
+  let startupDone = false
+
   app.on('second-instance', () => {
     // 単一インスタンス。2 回目の起動要求ではプロジェクトマネージャを前面に出す。
+    if (!startupDone) return
     const existing = getProjectManagerWindow()
     if (existing) existing.focus()
     else openProjectManagerWindow()
@@ -34,6 +38,7 @@ if (!gotLock) {
     ])
     registerIpc()
     installAppMenu()
+    startupDone = true
     openProjectManagerWindow()
   }).catch((err: unknown) => console.error('[startup] failed', err))
 
@@ -47,6 +52,7 @@ if (!gotLock) {
   })
 
   app.on('activate', () => {
+    if (!startupDone) return
     if (!anyProjectWindowOpen() && !getProjectManagerWindow()) openProjectManagerWindow()
   })
 }

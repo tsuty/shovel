@@ -21,6 +21,7 @@ import { hostPathsEqual } from './pathTranslate'
 import { removeAllRecordsForProject, snapshotDir } from '../persistence/snapshot'
 import { pickDirectoryStore, projectsStore } from '../persistence/store'
 import { logsDir } from '../log'
+import { applyLoginShellPath } from '../shellPath'
 
 const SANDBOX_NAME_ALLOWED = /[^a-zA-Z0-9.+-]+/g
 
@@ -47,7 +48,7 @@ export async function listProjectsWithStatus(): Promise<ProjectListResult> {
   let sandboxes: SbxLsEntry[] | null = null
   let sbxProblem: SbxProblem | null = null
   try {
-    sandboxes = await sbxLs()
+    sandboxes = await sbxLsRetryingPath()
   } catch (err) {
     sbxProblem = isSbxNotFoundMessage(err instanceof Error ? err.message : String(err))
       ? 'notInstalled'
@@ -67,6 +68,20 @@ export async function listProjectsWithStatus(): Promise<ProjectListResult> {
       status: sandboxes ? resolveStatus(project, sandboxes) : 'unknown'
     })),
     sbxProblem
+  }
+}
+
+/**
+ * `sbx` が見つからなければ、ログインシェルの PATH を取り込み直してもう一度だけ試す。
+ * 起動時の取り込みが（rc ファイルの遅さなどで）失敗していても、「再確認」で回復できるようにする。
+ */
+async function sbxLsRetryingPath(): Promise<SbxLsEntry[]> {
+  try {
+    return await sbxLs()
+  } catch (err) {
+    if (!isSbxNotFoundMessage(err instanceof Error ? err.message : String(err))) throw err
+    await applyLoginShellPath()
+    return sbxLs()
   }
 }
 

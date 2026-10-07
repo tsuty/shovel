@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
-import { delimiter } from 'node:path'
-import { userInfo } from 'node:os'
+import path, { delimiter } from 'node:path'
+import { homedir, userInfo } from 'node:os'
 
 /**
  * Finder / Dock / デスクトップランチャーから起動した GUI アプリは、ログインシェルの PATH
@@ -11,7 +11,8 @@ import { userInfo } from 'node:os'
 
 const START_MARKER = '__SHOVEL_PATH_START__'
 const END_MARKER = '__SHOVEL_PATH_END__'
-const TIMEOUT_MS = 5000
+// rc ファイルで nvm などを読み込むと数秒かかることがあるので、余裕を持たせる。
+const TIMEOUT_MS = 10000
 
 /** シェルの出力から、マーカーに挟まれた PATH を取り出す。rc ファイルが出す余計な出力は無視する。 */
 export function extractMarkedPath(output: string): string | null {
@@ -60,12 +61,10 @@ function readLoginShellPath(): Promise<string | null> {
         env: { ...process.env, DISABLE_AUTO_UPDATE: 'true' }
       },
       (err, stdout) => {
-        if (err) {
-          console.warn('[startup] failed to read PATH from the login shell', err)
-          resolve(null)
-          return
-        }
-        resolve(extractMarkedPath(stdout))
+        // rc ファイル内のコマンドが失敗して非0で終わっても、PATH 自体は出力されていることがある。
+        const extracted = extractMarkedPath(stdout)
+        if (err && !extracted) console.warn('[startup] failed to read PATH from the login shell', err)
+        resolve(extracted)
       }
     )
     // 対話シェルが stdin を待って固まらないよう、すぐ閉じる。
@@ -73,10 +72,22 @@ function readLoginShellPath(): Promise<string | null> {
   })
 }
 
-/** ログインシェルの PATH を `process.env.PATH` に取り込む。失敗しても起動は止めない。 */
+/**
+ * ログインシェルから PATH を取れなかったときの保険。`sbx` がよく置かれる場所を現在の PATH の後ろに足す
+ * （存在しないディレクトリが混じっても害は無い）。
+ */
+function fallbackDirs(): string[] {
+  const home = homedir()
+  return ['/opt/homebrew/bin', '/usr/local/bin', path.join(home, '.local', 'bin'), path.join(home, '.docker', 'bin')]
+}
+
+/**
+ * ログインシェルの PATH を `process.env.PATH` に取り込む。失敗しても起動は止めない。
+ * 起動時のほか、`sbx` が見つからなかったときの再確認でも呼び直す。
+ */
 export async function applyLoginShellPath(): Promise<void> {
   if (process.platform === 'win32') return
   const shellPath = await readLoginShellPath()
-  if (!shellPath) return
-  process.env.PATH = mergePath(shellPath, process.env.PATH)
+  const withShell = shellPath ? mergePath(shellPath, process.env.PATH) : process.env.PATH
+  process.env.PATH = mergePath(withShell ?? '', fallbackDirs().join(delimiter))
 }
