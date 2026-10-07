@@ -1,4 +1,12 @@
-import { collapseContext, diffRowsFromTexts, type DiffRow } from '@shared/diff'
+import {
+  collapseContext,
+  diffRowsFromTexts,
+  inlineSpans,
+  toSplitRows,
+  withInlineChanges,
+  type DiffRow,
+  type DiffSpan
+} from '@shared/diff'
 
 const kinds = (rows: DiffRow[]): string => rows.map((r) => r.kind[0]).join('')
 
@@ -100,5 +108,78 @@ describe('collapseContext', () => {
   it('近い変更同士の間の文脈は畳まない', () => {
     const rows = collapseContext(diffRowsFromTexts('a\nb\nc\nd\ne', 'A\nb\nc\nd\nE'))
     expect(rows.some((r) => r.kind === 'gap')).toBe(false)
+  })
+})
+
+/** 変更部分を [] で囲んだ文字列にする。 */
+const marked = (spans: DiffSpan[]): string => spans.map((s) => (s.changed ? `[${s.text}]` : s.text)).join('')
+
+describe('inlineSpans', () => {
+  it('英語は単語単位で変更部分を示す', () => {
+    const spans = inlineSpans('I like cats very much', 'I like dogs very much')
+    expect(spans && marked(spans.old)).toBe('I like [cats] very much')
+    expect(spans && marked(spans.new)).toBe('I like [dogs] very much')
+  })
+
+  it('日本語も単語単位で変更部分を示す', () => {
+    const spans = inlineSpans('今日は良い天気です。', '明日は良い天気です。')
+    expect(spans && marked(spans.old)).toBe('[今日]は良い天気です。')
+    expect(spans && marked(spans.new)).toBe('[明日]は良い天気です。')
+  })
+
+  it('変更に挟まれた空白は変更側に寄せる', () => {
+    const spans = inlineSpans('a b c d e f g', 'a b X Y e f g')
+    expect(spans && marked(spans.new)).toBe('a b [X Y] e f g')
+  })
+
+  it('似ていない行には付けない', () => {
+    expect(inlineSpans('completely different', 'nothing in common here')).toBeNull()
+    expect(inlineSpans('', 'added')).toBeNull()
+  })
+
+  it('つなぎ直すと元の行に戻る', () => {
+    const spans = inlineSpans('const x = foo(1, 2)', 'const y = foo(1, 3)')
+    expect(spans?.old.map((s) => s.text).join('')).toBe('const x = foo(1, 2)')
+    expect(spans?.new.map((s) => s.text).join('')).toBe('const y = foo(1, 3)')
+  })
+})
+
+describe('withInlineChanges', () => {
+  it('変更のかたまりの中で i 番目の削除行と i 番目の追加行を対にする', () => {
+    const rows = withInlineChanges(diffRowsFromTexts('keep\nalpha one\nbeta two\n', 'keep\nalpha ONE\nbeta TWO\nextra\n'))
+    const changed = rows.filter((r) => r.kind !== 'context')
+    expect(changed.map((r) => [r.kind, r.spans ? marked(r.spans) : null])).toEqual([
+      ['remove', 'alpha [one]'],
+      ['remove', 'beta [two]'],
+      ['add', 'alpha [ONE]'],
+      ['add', 'beta [TWO]'],
+      ['add', null]
+    ])
+  })
+
+  it('元の行は書き換えない', () => {
+    const rows = diffRowsFromTexts('a b c', 'a b d')
+    withInlineChanges(rows)
+    expect(rows.every((r) => r.spans === undefined)).toBe(true)
+  })
+})
+
+describe('toSplitRows', () => {
+  it('文脈行は左右に同じ行、変更のかたまりは上から1対1で並べ、相手の無い側は null', () => {
+    const split = toSplitRows(diffRowsFromTexts('a\nb\nc\nz', 'a\nB\nC\nD\nz'))
+    expect(
+      split.map((r) => (r.kind === 'gap' ? 'gap' : `${r.left?.text ?? '-'}|${r.right?.text ?? '-'}`))
+    ).toEqual(['a|a', 'b|B', 'c|C', '-|D', 'z|z'])
+  })
+
+  it('削除の方が多ければ右側が空く', () => {
+    const split = toSplitRows(diffRowsFromTexts('a\nb\nc', 'X'))
+    expect(split.map((r) => (r.kind === 'pair' ? r.right?.text ?? null : 'gap'))).toEqual(['X', null, null])
+  })
+
+  it('gap はそのまま1行にする', () => {
+    const rows = collapseContext(diffRowsFromTexts('1\n2\n3\n4\n5\n6\n7\n8', '1\n2\n3\n4\n5\n6\n7\nX'))
+    const split = toSplitRows(rows)
+    expect(split[0]).toEqual({ kind: 'gap', row: { kind: 'gap', text: '', count: 4 } })
   })
 })

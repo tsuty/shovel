@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import { RotateCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SessionMeta } from '@shared/types/session'
+import type { DiffLayout } from '@shared/types/settings'
 import type { AttachmentChip } from '@shared/types/transcript'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
 import { flushAllEditors } from '../editorRegistry'
@@ -23,9 +24,11 @@ export function SessionView({
   onStatusChange,
   onRefreshed,
   onTitleChange,
-  sendKey
+  sendKey,
+  diffLayout
 }: {
   sendKey?: 'enter' | 'modEnter'
+  diffLayout?: DiffLayout
   sessionId: string
   initialMeta: SessionMeta
   initialAttachments?: string[]
@@ -127,6 +130,7 @@ export function SessionView({
         }
         onOpenFile={onOpenFile}
         onSubmitChoices={(markdown) => void send(markdown)}
+        diffLayout={diffLayout}
       />
       {state.liveThought && <LiveThoughtArea markdown={state.liveThought.markdown} />}
       <Composer

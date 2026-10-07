@@ -28,7 +28,8 @@ const defaults: StoreSchema = {
     autoAttachActiveFile: false,
     transcriptFontSize: 14,
     editorFontSize: 14,
-    sendKey: 'enter'
+    sendKey: 'enter',
+    diffLayout: 'split'
   },
   sessionTitleOverrides: {},
   commandHistory: {},

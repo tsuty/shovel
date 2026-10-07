@@ -165,7 +165,10 @@
     "autoAttachActiveFile": "開いているファイルを自動的に添付する",
     "sendKey": "送信キー",
     "sendKeyEnter": "Enter で送信（Shift+Enter で改行）",
-    "sendKeyModEnter": "{{mod}}+Enter で送信（Enter で改行）"
+    "sendKeyModEnter": "{{mod}}+Enter で送信（Enter で改行）",
+    "diffLayout": "差分の表示",
+    "diffLayoutSplit": "左右に並べる（Side by Side）",
+    "diffLayoutUnified": "1列（Unified）"
   },
   "history": {
     "title": "履歴",
@@ -256,7 +259,10 @@
   },
   "diff": {
     "empty": "表示する差分がありません。",
-    "hiddenLines": "… {{count}} 行"
+    "hiddenLines": "… {{count}} 行",
+    "split": "左右",
+    "unified": "1列",
+    "layout": "表示の切り替え"
   },
   "search": {
     "title": "セッションを検索",

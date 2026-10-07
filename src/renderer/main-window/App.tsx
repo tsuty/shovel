@@ -629,6 +629,7 @@ export function App(): React.JSX.Element {
                           initialMeta={tab.meta}
                           initialAttachments={tab.initialAttachments}
                           sendKey={settings?.sendKey ?? 'enter'}
+                          diffLayout={settings?.diffLayout}
                           onOpenFile={openFile}
                           onStatusChange={(status) => updateTabStatus(tab.sessionId, status)}
                           onRefreshed={(snapshotId) => handleRefreshed(tab.sessionId, snapshotId)}
@@ -643,6 +644,7 @@ export function App(): React.JSX.Element {
                           onResume={() => resumeHistory(tab.snapshot, tab.agentOnly)}
                           onStartNew={openNewTab}
                           onOpenFile={openFile}
+                          diffLayout={settings?.diffLayout}
                         />
                       )}
                     </div>

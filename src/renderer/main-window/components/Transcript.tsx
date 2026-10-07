@@ -21,6 +21,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import type { ToolCallPayload } from '@shared/types/transcript'
+import type { DiffLayout } from '@shared/types/settings'
 import type { RenderBlock, RenderChoice, RenderPermission, TranscriptState } from '../transcriptState'
 import { cn } from '../../shared/lib/utils'
 import { Markdown } from '../../shared/components/Markdown'
@@ -58,12 +59,15 @@ export function Transcript({
   state,
   onPermission,
   onOpenFile,
-  onSubmitChoices
+  onSubmitChoices,
+  diffLayout = 'split'
 }: {
   state: TranscriptState
   onPermission: (permissionId: string, optionId: string) => void
   onOpenFile: (relPath: string) => void
   onSubmitChoices: (markdown: string) => void
+  /** Diff ビューを開いたときの表示（設定の既定値）。 */
+  diffLayout?: DiffLayout
 }): React.JSX.Element {
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -168,7 +172,7 @@ export function Transcript({
           {t('transcript.jumpToLatest')}
         </button>
       )}
-      {diffToolCall && <DiffModal toolCall={diffToolCall} onClose={() => setDiffToolCall(null)} />}
+      {diffToolCall && <DiffModal toolCall={diffToolCall} initialLayout={diffLayout} onClose={() => setDiffToolCall(null)} />}
     </div>
   )
 }
@@ -553,20 +557,53 @@ function PermissionCard({
   )
 }
 
-/** ツールコールの diff の行数の増減を表示し、クリックで Diff ビューを開く。 */
-function DiffModal({ toolCall, onClose }: { toolCall: ToolCallPayload; onClose: () => void }): React.JSX.Element {
+/**
+ * ツールコールの diff の行数の増減を表示し、クリックで Diff ビューを開く。表示（左右／1列）の
+ * 既定値は設定から受け取り、見出しのトグルではこのモーダルを開いている間だけ切り替える。
+ * 左右のときは2列分の幅をとるため、モーダルを広げる。
+ */
+function DiffModal({
+  toolCall,
+  initialLayout,
+  onClose
+}: {
+  toolCall: ToolCallPayload
+  initialLayout: DiffLayout
+  onClose: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
+  const [layout, setLayout] = useState(initialLayout)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
-        className="flex max-h-[80vh] w-[80vw] max-w-3xl flex-col rounded-lg border bg-card p-4"
+        className={cn(
+          'flex max-h-[80vh] flex-col rounded-lg border bg-card p-4',
+          layout === 'split' ? 'w-[90vw] max-w-7xl' : 'w-[80vw] max-w-3xl'
+        )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex shrink-0 items-center justify-between">
+        <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
           <h3 className="truncate text-sm font-medium">{toolCall.title}</h3>
-          <button className="shrink-0 text-xs text-muted-foreground hover:underline" onClick={onClose}>
-            {t('common.dismiss')}
-          </button>
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="flex rounded-md border border-border p-0.5 text-xs" role="group" aria-label={t('diff.layout')}>
+              {(['split', 'unified'] as const).map((value) => (
+                <button
+                  key={value}
+                  className={cn(
+                    'rounded px-2 py-0.5',
+                    layout === value ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  aria-pressed={layout === value}
+                  onClick={() => setLayout(value)}
+                >
+                  {t(value === 'split' ? 'diff.split' : 'diff.unified')}
+                </button>
+              ))}
+            </div>
+            <button className="text-xs text-muted-foreground hover:underline" onClick={onClose}>
+              {t('common.dismiss')}
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {toolCall.diffs.map((diff, i) => (
@@ -580,6 +617,7 @@ function DiffModal({ toolCall, onClose }: { toolCall: ToolCallPayload; onClose: 
               <TextDiffView
                 oldText={diff.oldText ?? ''}
                 newText={diff.newText ?? ''}
+                layout={layout}
                 className="rounded border border-border py-1"
               />
             </div>

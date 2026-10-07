@@ -166,7 +166,10 @@
     "autoAttachActiveFile": "Automatically attach the active file",
     "sendKey": "Send key",
     "sendKeyEnter": "Enter to send (Shift+Enter for newline)",
-    "sendKeyModEnter": "{{mod}}+Enter to send (Enter for newline)"
+    "sendKeyModEnter": "{{mod}}+Enter to send (Enter for newline)",
+    "diffLayout": "Diff view",
+    "diffLayoutSplit": "Side by side",
+    "diffLayoutUnified": "Unified"
   },
   "history": {
     "title": "History",
@@ -258,7 +261,10 @@
   },
   "diff": {
     "empty": "No diff to show.",
-    "hiddenLines": "… {{count}} lines"
+    "hiddenLines": "… {{count}} lines",
+    "split": "Split",
+    "unified": "Unified",
+    "layout": "Diff layout"
   },
   "search": {
     "title": "Search sessions",

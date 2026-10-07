@@ -11,4 +11,11 @@ export interface AppSettings {
    * `modEnter`: Cmd/Ctrl+Enter で送信・Enter で改行。対象はプロンプトだけ。
    */
   sendKey: 'enter' | 'modEnter'
+  /**
+   * Diff ビューの既定の表示。`split`: 左右2列（Side by Side、既定）。`unified`: 1列。
+   * Diff ビュー内のトグルでは、そのとき開いている間だけ切り替わる。
+   */
+  diffLayout: DiffLayout
 }
+
+export type DiffLayout = 'split' | 'unified'

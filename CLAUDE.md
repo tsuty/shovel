@@ -76,7 +76,7 @@ sidebar panels, and a settings dialog (changes broadcast to every open window) f
 font size (drives `text-transcript*` sizes in the transcript and history views)/file-view font
 size (`editorFontSize` → `text-editor*`: viewer, Markdown editor source+preview, diff view; no
 font-family setting, decisions.md G-1-13)/send key (Enter vs Cmd/Ctrl+Enter,
-prompt input only)) — type-checks, lints, and
+prompt input only)/default diff layout (side-by-side vs unified, `diffLayout`)) — type-checks, lints, and
 builds cleanly, and the packaged app has been smoke-tested (boots, no renderer exceptions) under
 Xvfb.
 
@@ -141,8 +141,12 @@ Known, deliberate scope-narrowings worth knowing about before extending this cod
   architecture.md §5 for the full per-action breakdown and `sessionManager.ts`'s
   `dispatchTranscriptAction` for the (permanently unreached) rest of the switch.
 - The Diff viewer (`src/renderer/shared/components/DiffView.tsx` + `src/shared/diff.ts`) is
-  hand-written — no diff dependency was added. It renders unified (single-column) with both old and
-  new line-number gutters. Its only input now is a tool call's own before/after text
+  hand-written — no diff dependency was added. It renders either side-by-side (default; long lines
+  wrap, removes/adds in a change block paired top-to-bottom 1:1 via `toSplitRows`) or unified (both
+  line-number gutters, no wrap); the default comes from the `diffLayout` setting and the modal's
+  toggle only overrides it while that modal is open. Paired remove/add lines get word-level
+  highlights in both layouts (`withInlineChanges`, `Intl.Segmenter` words so Japanese works, skipped
+  for dissimilar lines) — decisions.md N-3-8 (revised 2026-10-07). Its only input now is a tool call's own before/after text
   (`TextDiffView`, LCS-computed, far context collapsed to `… N lines`) — the LCS falls back to a
   whole-block replace past ~4M cells so a huge file can't hang the renderer. It used to also render
   the "changes" sidebar's cumulative `git diff` via a second component (`UnifiedDiffView`); that

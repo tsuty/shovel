@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SessionSnapshot } from '@shared/types/session'
+import type { DiffLayout } from '@shared/types/settings'
 import { isRestoreUnsupportedMessage } from '@shared/restoreMarker'
 import { snapshotEntriesToEvents } from '@shared/snapshotEvents'
 import { Button } from '../../shared/components/ui/button'
@@ -23,7 +24,8 @@ export function HistoryView({
   agentOnly,
   onResume,
   onStartNew,
-  onOpenFile
+  onOpenFile,
+  diffLayout
 }: {
   snapshot: SessionSnapshot
   readOnlyKind?: ReadOnlyKind
@@ -34,6 +36,7 @@ export function HistoryView({
   onResume: () => Promise<void>
   onStartNew: () => void
   onOpenFile: (relPath: string) => void
+  diffLayout?: DiffLayout
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   // ライブのタブと同じ Transcript で描く。選択肢の「送信」は外し、通常のチェックボックスとして見せる。
@@ -92,7 +95,7 @@ export function HistoryView({
           {t(agentOnly ? 'history.agentOnlyEmpty' : 'history.empty')}
         </p>
       ) : (
-        <Transcript state={state} onPermission={() => {}} onOpenFile={onOpenFile} onSubmitChoices={() => {}} />
+        <Transcript state={state} onPermission={() => {}} onOpenFile={onOpenFile} onSubmitChoices={() => {}} diffLayout={diffLayout} />
       )}
     </div>
   )

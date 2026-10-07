@@ -77,6 +77,16 @@ export function SettingsDialog({
               </option>
             </select>
           </Field>
+          <Field label={t('settings.diffLayout')}>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+              value={settings.diffLayout}
+              onChange={(e) => onUpdate({ diffLayout: e.target.value as AppSettings['diffLayout'] })}
+            >
+              <option value="split">{t('settings.diffLayoutSplit')}</option>
+              <option value="unified">{t('settings.diffLayoutUnified')}</option>
+            </select>
+          </Field>
           <label className="flex items-center gap-2">
             <Checkbox
               checked={settings.autoAttachActiveFile}
