@@ -1,0 +1,38 @@
+/* 印刷用表示（decisions.md N-3-10）。画面でも印刷でも同じ折り返し・改ページの規則にする。 */
+
+@page {
+  margin: 15mm;
+}
+
+/* 用紙の端で切れないよう、コードブロックは横スクロールさせずに折り返す。 */
+.print-document pre {
+  overflow: visible !important;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 図・コードブロック・表・引用はページの途中で分けない（1ページに収まらないものは分かれる）。 */
+.print-document :where(pre, table, blockquote, .mermaid-figure) {
+  break-inside: avoid;
+}
+
+/* 見出しだけがページの末尾に取り残されないようにする。 */
+.print-document :where(h1, h2, h3, h4) {
+  break-after: avoid;
+}
+
+/* 図は用紙の幅に収める（MermaidDiagram が max-width: 100% を付ける）。 */
+.print-document .mermaid-figure svg {
+  max-height: 240mm;
+}
+
+/* 文書として読めるよう、見出しに大きさの差を付ける（通常のプレビューは本文と同じ大きさ）。 */
+.print-document h1 {
+  font-size: 1.6em;
+}
+.print-document h2 {
+  font-size: 1.3em;
+}
+.print-document h3 {
+  font-size: 1.1em;
+}

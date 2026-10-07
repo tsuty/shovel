@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Columns2, Eye, PanelRight, SquareCode, SquarePen, X } from 'lucide-react'
+import { Columns2, Eye, PanelRight, Printer, SquareCode, SquarePen, X } from 'lucide-react'
 import { Markdown } from '../../shared/components/Markdown'
 import { MermaidDiagram } from '../../shared/components/MermaidDiagram'
 import { Button } from '../../shared/components/ui/button'
@@ -299,6 +299,12 @@ export function TextFileEditor({
     [syncWithDisk]
   )
 
+  /** 印刷用表示はディスクから読むので、自動保存待ちの編集を書き出してから開く（decisions.md N-3-10）。 */
+  async function openPrintPreview(): Promise<void> {
+    await flush().catch((err: unknown) => console.warn('[editor] autosave failed', err))
+    await window.shovel.print.openPreview(projectId, relPath)
+  }
+
   if (!loaded) {
     return <div className="p-4 text-sm text-muted-foreground">{t('common.loading')}</div>
   }
@@ -333,6 +339,22 @@ export function TextFileEditor({
           )
         })}
         <div className="flex-1" />
+        {language === 'markdown' &&
+          (variant === 'attached' ? (
+            // チャットの横では幅が狭いので、アイコンだけにする。
+            <button
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+              title={t('editor.printPreview')}
+              onClick={() => void openPrintPreview()}
+            >
+              <Printer size={14} />
+            </button>
+          ) : (
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => void openPrintPreview()}>
+              <Printer size={14} />
+              {t('editor.printPreview')}
+            </Button>
+          ))}
         {variant === 'attached' ? (
           <>
             <span className="truncate text-xs text-muted-foreground" title={relPath}>

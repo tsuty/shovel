@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { renderMermaid } from '../lib/mermaid'
+import { usePendingRender } from '../lib/renderTracker'
 
 /** `<html>` の `dark` クラス（useSettings の applyTheme が付け外しする）を追う。 */
 function useDarkClass(): boolean {
@@ -15,7 +16,7 @@ function useDarkClass(): boolean {
 }
 
 /**
- * Mermaid のコードを図にして見せる（ポップアップと .mmd / .mermaid のタブで共通）。
+ * Mermaid のコードを図にして見せる（ポップアップ・.mmd / .mermaid のタブ・印刷用表示で共通）。
  * テーマが切り替わったら描き直す。文法エラーはエラー内容と元のコードを出す。
  * `mermaid.render` は body 直下の一時要素で寸法を測るので、非表示のタブで描いても崩れない。
  */
@@ -24,6 +25,7 @@ export function MermaidDiagram({ code }: { code: string }): React.JSX.Element {
   const dark = useDarkClass()
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  usePendingRender(svg === null && error === null)
 
   useEffect(() => {
     let cancelled = false

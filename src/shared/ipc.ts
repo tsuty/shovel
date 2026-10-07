@@ -87,6 +87,9 @@ export const IpcChannel = {
   CommandPin: 'command:pin',
   CommandUnpin: 'command:unpin',
 
+  PrintOpenPreview: 'print:openPreview',
+  PrintRun: 'print:run',
+
   // main -> renderer (send)
   TranscriptEvent: 'transcript:event',
   ProjectsProgress: 'projects:progress',
@@ -298,5 +301,11 @@ export interface RendererApi {
     unpin(projectId: string, command: string): Promise<CommandHistory>
     onOutput(cb: (chunk: CommandOutputChunk) => void): () => void
     onExit(cb: (exit: CommandExit) => void): () => void
+  }
+  print: {
+    /** Markdown ファイルの印刷用表示を別ウィンドウで開く（decisions.md N-3-10）。 */
+    openPreview(projectId: string, relPath: string): Promise<void>
+    /** 呼び出したウィンドウを OS の印刷ダイアログで印刷する。キャンセルされても resolve する。 */
+    run(): Promise<void>
   }
 }

@@ -28,6 +28,7 @@ import { openSandboxTerminal, openSbxLoginTerminal } from '../domain/terminal'
 import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authService'
 import { openProjectWindow, refreshProjectWindowTitle } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
+import { openPrintPreviewWindow } from '../windows/printPreviewWindow'
 import { installAppMenu } from '../windows/appMenu'
 import { projectsStore, settingsStore, sidebarStore } from '../persistence/store'
 import {
@@ -255,5 +256,21 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.CommandPin, (_event, projectId: string, command: string) => pinCommand(projectId, command))
   ipcMain.handle(IpcChannel.CommandUnpin, (_event, projectId: string, command: string) =>
     unpinCommand(projectId, command)
+  )
+
+  ipcMain.handle(IpcChannel.PrintOpenPreview, (_event, projectId: string, relPath: string) =>
+    openPrintPreviewWindow(projectId, relPath)
+  )
+  // PDF にするのも OS の印刷ダイアログに任せる（macOS の「PDF として保存」など）。
+  // 画面と同じ見た目で出すため、コードブロックの地の色などの背景も印刷する。
+  ipcMain.handle(
+    IpcChannel.PrintRun,
+    (event) =>
+      new Promise<void>((resolve) => {
+        event.sender.print({ printBackground: true }, (success, failureReason) => {
+          if (!success && failureReason !== 'cancelled') console.warn('[print] failed:', failureReason)
+          resolve()
+        })
+      })
   )
 }

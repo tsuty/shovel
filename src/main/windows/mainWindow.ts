@@ -1,6 +1,7 @@
 import { createSecureWindow } from './createSecureWindow'
 import { rendererPageUrl } from './rendererProtocol'
 import { openProjectManagerWindow } from './projectManagerWindow'
+import { closePrintPreviewWindows } from './printPreviewWindow'
 import {
   anyProjectWindowOpen,
   getProjectManagerWindow,
@@ -29,6 +30,7 @@ export function openProjectWindow(projectId: string): void {
   const webContents = win.webContents
   win.on('closed', () => {
     closeAllTabsForWindow(webContents)
+    closePrintPreviewWindows(projectId)
     // 最後のプロジェクトのウィンドウを閉じたら、入口のプロジェクトマネージャへ戻る。
     if (!isQuitting() && !anyProjectWindowOpen()) openProjectManagerWindow()
   })

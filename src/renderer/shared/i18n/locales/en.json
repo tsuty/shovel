@@ -143,7 +143,8 @@
     "attachTarget": {
       "title": "Which chat should it go beside?",
       "description": "Choose the chat to show {{path}} beside."
-    }
+    },
+    "printPreview": "Print view"
   },
   "acpUpdate": {
     "title": "Agent update available",
@@ -283,5 +284,12 @@
     "previous": "Previous (Shift+Enter)",
     "next": "Next (Enter)",
     "close": "Close (Esc)"
+  },
+  "printPreview": {
+    "windowTitle": "{{name}} — Print view",
+    "preparing": "Rendering diagrams…",
+    "reload": "Reload",
+    "print": "Print…",
+    "unreadable": "This file cannot be displayed."
   }
 }

@@ -1,15 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MermaidDialog } from './MermaidDialog'
+import { MermaidDiagram } from './MermaidDiagram'
 import { MERMAID_BRAND_COLOR, MermaidIcon } from './icons/MermaidIcon'
 import { highlightToHtml, langFromFence } from '../lib/shiki'
+import { usePendingRender } from '../lib/renderTracker'
 import { cn } from '../lib/utils'
 
 /**
- * Markdown エディタのプレビューとトランスクリプト共通のレンダラ（`react-markdown` + `remark-gfm`）。
+ * Markdown エディタのプレビュー・印刷用表示・トランスクリプト共通のレンダラ（`react-markdown` + `remark-gfm`）。
  *
  * `http(s)` / `mailto` は外部で開き、プロジェクト内の相対パスは `onOpenFileLink` で開く。
  * それ以外（`file://`・絶対パス・未知のスキーム）はリンクにせず、文字として見せる。
@@ -72,14 +74,21 @@ function scrollParent(el: HTMLElement | null): HTMLElement | null {
 function CodeBlock({
   node,
   collapsible = false,
+  forPrint = false,
   ...props
-}: React.ComponentPropsWithoutRef<'pre'> & { node?: HastNode; collapsible?: boolean }): React.JSX.Element {
+}: React.ComponentPropsWithoutRef<'pre'> & {
+  node?: HastNode
+  collapsible?: boolean
+  forPrint?: boolean
+}): React.JSX.Element {
   const code = node?.children?.find((c) => c.type === 'element' && c.tagName === 'code')
   const text = hastText(code).replace(/\n$/, '')
   const lang = fenceLanguage(code)
   const { t } = useTranslation()
   const isMermaid = lang?.toLowerCase() === 'mermaid'
   const [html, setHtml] = useState<string | null>(null)
+  const [highlightFailed, setHighlightFailed] = useState(false)
+  usePendingRender(!!lang && !isMermaid && html === null && !highlightFailed)
   const [copied, setCopied] = useState(false)
   const [diagramOpen, setDiagramOpen] = useState(false)
 
@@ -129,8 +138,13 @@ function CodeBlock({
   }
 
   useEffect(() => {
+    // 編集で中身が変わってもこのブロックは作り直されないので、前のハイライトの結果を引きずらない。
+    setHighlightFailed(false)
     // mermaid はコードのまま見せ、図はボタンから開くポップアップで描く。
-    if (!lang || isMermaid) return
+    if (!lang || isMermaid) {
+      setHtml(null)
+      return
+    }
     let cancelled = false
     void highlightToHtml(text, langFromFence(lang))
       .then((result) => {
@@ -138,6 +152,7 @@ function CodeBlock({
       })
       .catch(() => {
         // ハイライトできなければ素のコードのままにする。
+        if (!cancelled) setHighlightFailed(true)
       })
     return () => {
       cancelled = true
@@ -148,6 +163,19 @@ function CodeBlock({
     void navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 1200)
+  }
+
+  if (forPrint && isMermaid) {
+    // 印刷用表示では、図をその場に埋め込む（decisions.md N-3-10）。
+    return (
+      <figure className="mermaid-figure my-[0.5em]">
+        <MermaidDiagram code={text} />
+      </figure>
+    )
+  }
+  if (forPrint) {
+    // 印刷用表示にはコピーなどの操作を出さない。
+    return html ? <div dangerouslySetInnerHTML={{ __html: html }} /> : <pre {...props} />
   }
 
   return (
@@ -249,7 +277,8 @@ export function Markdown({
   text,
   className = 'text-sm',
   onOpenFileLink,
-  collapseCodeBlocks = false
+  collapseCodeBlocks = false,
+  forPrint = false
 }: {
   text: string
   className?: string
@@ -257,23 +286,31 @@ export function Markdown({
   onOpenFileLink?: (relPath: string) => void
   /** 長いコードブロックを畳む（トランスクリプト用。エディタのプレビューでは畳まない）。 */
   collapseCodeBlocks?: boolean
+  /** 印刷用表示: ```mermaid を図として埋め込み、コードブロックの操作ボタンを出さない。 */
+  forPrint?: boolean
 }): React.JSX.Element {
+  // 描画のたびに作り直すと、コードブロックが毎回作り直されて図やハイライトを描き直す
+  // （印刷用表示では描画完了の通知で親が描き直されるので、終わらなくなる）。
+  const components = useMemo<Components>(
+    () => ({
+      pre: ({ node, ...props }) => (
+        <CodeBlock node={node} collapsible={collapseCodeBlocks} forPrint={forPrint} {...props} />
+      ),
+      a: ({ href, children }) => (
+        <MarkdownLink href={href} onOpenFileLink={onOpenFileLink}>
+          {children}
+        </MarkdownLink>
+      )
+    }),
+    [collapseCodeBlocks, forPrint, onOpenFileLink]
+  )
   return (
     <div className={`markdown ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         // リンクの判定は MarkdownLink で行うので href は素通しにする。画像の src などは既定の無害化のまま。
         urlTransform={(uri, key) => (key === 'href' ? uri : defaultUrlTransform(uri))}
-        components={{
-          pre: ({ node, ...props }) => (
-            <CodeBlock node={node} collapsible={collapseCodeBlocks} {...props} />
-          ),
-          a: ({ href, children }) => (
-            <MarkdownLink href={href} onOpenFileLink={onOpenFileLink}>
-              {children}
-            </MarkdownLink>
-          )
-        }}
+        components={components}
       >
         {text}
       </ReactMarkdown>

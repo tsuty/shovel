@@ -4,9 +4,9 @@ import i18n from './i18n'
 
 /**
  * テーマ・文字サイズ・言語の設定を読み、DOM に反映する共有フック。
- * テーマは DOM に `dark` クラスを付け外しする。
+ * テーマは DOM に `dark` クラスを付け外しする。`followTheme: false` ならテーマは常にライト（印刷用表示）。
  */
-export function useSettings(): {
+export function useSettings({ followTheme = true }: { followTheme?: boolean } = {}): {
   settings: AppSettings | null
   update: (patch: Partial<AppSettings>) => Promise<void>
 } {
@@ -19,11 +19,11 @@ export function useSettings(): {
 
   useEffect(() => {
     if (!settings) return
-    applyTheme(settings.theme)
+    if (followTheme) applyTheme(settings.theme)
     void i18n.changeLanguage(settings.locale ?? navigatorLocale())
     document.documentElement.style.setProperty('--transcript-font-size', `${settings.transcriptFontSize}px`)
     document.documentElement.style.setProperty('--editor-font-size', `${settings.editorFontSize}px`)
-  }, [settings])
+  }, [settings, followTheme])
 
   async function update(patch: Partial<AppSettings>): Promise<void> {
     const next = await window.shovel.settings.update(patch)

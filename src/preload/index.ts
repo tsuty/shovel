@@ -131,6 +131,10 @@ const api: RendererApi = {
       ipcRenderer.on(IpcChannel.CommandExit, listener)
       return () => ipcRenderer.removeListener(IpcChannel.CommandExit, listener)
     }
+  },
+  print: {
+    openPreview: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.PrintOpenPreview, projectId, relPath),
+    run: () => ipcRenderer.invoke(IpcChannel.PrintRun)
   }
 }
 

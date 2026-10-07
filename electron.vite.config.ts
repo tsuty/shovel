@@ -43,7 +43,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           'project-manager': resolve(__dirname, 'src/renderer/project-manager.html'),
-          'main-window': resolve(__dirname, 'src/renderer/main-window.html')
+          'main-window': resolve(__dirname, 'src/renderer/main-window.html'),
+          'print-preview': resolve(__dirname, 'src/renderer/print-preview.html')
         }
       }
     },
