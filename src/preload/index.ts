@@ -41,6 +41,7 @@ const api: RendererApi = {
     diagnostics: (id) => ipcRenderer.invoke(IpcChannel.ProjectsDiagnostics, id),
     stop: (id) => ipcRenderer.invoke(IpcChannel.ProjectsStop, id),
     openTerminal: (id) => ipcRenderer.invoke(IpcChannel.ProjectsOpenTerminal, id),
+    openSbxLogin: () => ipcRenderer.invoke(IpcChannel.ProjectsOpenSbxLogin),
     openDataDir: (id, kind) => ipcRenderer.invoke(IpcChannel.ProjectsOpenDataDir, id, kind),
     onProgress: (cb) => {
       const listener = (_event: unknown, payload: ProjectProgress): void => cb(payload)

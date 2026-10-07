@@ -58,6 +58,26 @@ export async function sbxDiagnose(): Promise<string> {
   return parts.join('\n')
 }
 
+/** `sbx diagnose --json` の各チェック項目（使うものだけ）。 */
+export interface SbxDiagnoseCheck {
+  name: string
+  /** `pass` / `warn` / `fail` / `skip`。 */
+  status: string
+  message?: string
+}
+
+/** `sbx diagnose --json` のチェック項目。JSON として読めなければ null。 */
+export async function sbxDiagnoseChecks(): Promise<SbxDiagnoseCheck[] | null> {
+  // 失敗するチェックがあると非0で終わるので、終了コードは見ない。
+  const result = await run(['diagnose', '--json'])
+  try {
+    const parsed = JSON.parse(result.stdout) as { checks?: SbxDiagnoseCheck[] }
+    return Array.isArray(parsed.checks) ? parsed.checks : null
+  } catch {
+    return null
+  }
+}
+
 export interface SbxCreateOptions {
   sbxAgent: string
   hostPath: string

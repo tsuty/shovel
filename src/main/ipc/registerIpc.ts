@@ -24,7 +24,7 @@ import {
   renameProject,
   stopProject
 } from '../domain/projectService'
-import { openSandboxTerminal } from '../domain/terminal'
+import { openSandboxTerminal, openSbxLoginTerminal } from '../domain/terminal'
 import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authService'
 import { openProjectWindow, refreshProjectWindowTitle } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
@@ -126,6 +126,7 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.ProjectsDiagnostics, (_event, id: string) => getProjectDiagnostics(id))
   ipcMain.handle(IpcChannel.ProjectsStop, (_event, id: string) => stopProject(id))
   ipcMain.handle(IpcChannel.ProjectsOpenDataDir, (_event, id: string, kind: DataDirKind) => openDataDir(id, kind))
+  ipcMain.handle(IpcChannel.ProjectsOpenSbxLogin, () => openSbxLoginTerminal())
   ipcMain.handle(IpcChannel.ProjectsOpenTerminal, (_event, id: string) => {
     const project = projectsStore.list().find((p) => p.id === id)
     if (!project) throw new Error(`project not found: ${id}`)

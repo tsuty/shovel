@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderPlus, Settings } from 'lucide-react'
-import type { ProjectWithStatus, SandboxStatus } from '@shared/types/project'
+import { FolderPlus, Settings, AlertTriangle } from 'lucide-react'
+import type { ProjectWithStatus, SandboxStatus, SbxProblem } from '@shared/types/project'
 import { Button } from '../shared/components/ui/button'
 import { Badge } from '../shared/components/ui/badge'
 import { CreateProjectDialog } from './CreateProjectDialog'
@@ -14,6 +14,7 @@ import { cn } from '../shared/lib/utils'
 export function App(): React.JSX.Element {
   const { t } = useTranslation()
   const [projects, setProjects] = useState<ProjectWithStatus[] | null>(null)
+  const [sbxProblem, setSbxProblem] = useState<SbxProblem | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -22,12 +23,22 @@ export function App(): React.JSX.Element {
   const { settings, update: updateSettings } = useSettings()
 
   const refresh = useCallback(() => {
-    void window.shovel.projects.list().then(setProjects)
+    void window.shovel.projects.list().then((result) => {
+      setProjects(result.projects)
+      setSbxProblem(result.sbxProblem)
+    })
   }, [])
 
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // ターミナルでサインインして戻ってきたら確かめ直す。問題が無いときは `sbx diagnose` を走らせない。
+  useEffect(() => {
+    if (!sbxProblem) return
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [sbxProblem, refresh])
 
   async function open(id: string): Promise<void> {
     await window.shovel.projects.open(id)
@@ -70,6 +81,13 @@ export function App(): React.JSX.Element {
       </header>
 
       <main className="flex-1 overflow-y-auto p-6">
+        {sbxProblem && (
+          <SbxProblemBanner
+            problem={sbxProblem}
+            onSignIn={() => void window.shovel.projects.openSbxLogin()}
+            onRecheck={refresh}
+          />
+        )}
         {projects === null && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
         {projects?.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-4">
@@ -179,7 +197,8 @@ const STATUS_DOT_CLASSES: Record<SandboxStatus, string> = {
   running: 'bg-green-500 ring-green-500/15',
   stopped: 'bg-muted-foreground ring-muted-foreground/15',
   missing: 'bg-destructive ring-destructive/15',
-  workspace_missing: 'bg-destructive ring-destructive/15'
+  workspace_missing: 'bg-destructive ring-destructive/15',
+  unknown: 'bg-amber-500 ring-amber-500/15'
 }
 
 function StatusDot({ status }: { status: SandboxStatus }): React.JSX.Element {
@@ -188,8 +207,37 @@ function StatusDot({ status }: { status: SandboxStatus }): React.JSX.Element {
 
 function StatusBadge({ status }: { status: SandboxStatus }): React.JSX.Element | null {
   const { t } = useTranslation()
-  if (status === 'running' || status === 'stopped') {
+  if (status === 'running' || status === 'stopped' || status === 'unknown') {
     return <Badge variant="secondary">{t(`projectManager.status.${status}`)}</Badge>
   }
   return <Badge variant="destructive">{t(`projectManager.status.${status}`)}</Badge>
+}
+
+/** `sbx` 自体の問題で状態を確かめられないときの案内（未サインインならサインインへ誘導する）。 */
+function SbxProblemBanner({
+  problem,
+  onSignIn,
+  onRecheck
+}: {
+  problem: SbxProblem
+  onSignIn: () => void
+  onRecheck: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div className="mx-auto mb-4 flex max-w-3xl items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+      <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+      <p className="flex-1 select-text">{t(`projectManager.sbxProblem.${problem}`)}</p>
+      <div className="flex shrink-0 gap-2">
+        {problem === 'notSignedIn' && (
+          <Button size="sm" onClick={onSignIn}>
+            {t('projectManager.sbxProblem.signIn')}
+          </Button>
+        )}
+        <Button size="sm" variant="outline" onClick={onRecheck}>
+          {t('projectManager.sbxProblem.recheck')}
+        </Button>
+      </div>
+    </div>
+  )
 }

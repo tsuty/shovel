@@ -126,7 +126,7 @@ export function App(): React.JSX.Element {
    */
   function refreshProjects(): void {
     if (!projectId) return
-    void window.shovel.projects.list().then((projects) => {
+    void window.shovel.projects.list().then(({ projects }) => {
       setAllProjects(projects)
       setProject(projects.find((p) => p.id === projectId) ?? null)
     })

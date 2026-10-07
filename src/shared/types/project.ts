@@ -1,6 +1,7 @@
 /** ドメインモデル。main/renderer の双方から参照される、値のみの型定義。 */
 
-export type SandboxStatus = 'running' | 'stopped' | 'missing' | 'workspace_missing'
+/** `unknown` は `sbx ls` の結果を当てにできない（未サインイン・sbx が動かない等）とき。 */
+export type SandboxStatus = 'running' | 'stopped' | 'missing' | 'workspace_missing' | 'unknown'
 
 export interface Project {
   /** shovel が生成する UUID。displayName を変えても不変。 */
@@ -39,6 +40,20 @@ export interface AcpUpdateOffer {
 /** `sbx ls --json` と shovel の設定を突き合わせた結果。 */
 export interface ProjectWithStatus extends Project {
   status: SandboxStatus
+}
+
+/**
+ * `sbx` 自体の問題で、サンドボックスの状態を確かめられないこと。
+ * - `notInstalled`: `sbx` が PATH に無い
+ * - `notSignedIn`: Docker にサインインしていない（`sbx diagnose` の Authentication が fail）
+ * - `unavailable`: それ以外の理由で `sbx ls` が失敗した
+ */
+export type SbxProblem = 'notInstalled' | 'notSignedIn' | 'unavailable'
+
+export interface ProjectListResult {
+  projects: ProjectWithStatus[]
+  /** null なら各プロジェクトの `status` は `sbx ls` に基づく。 */
+  sbxProblem: SbxProblem | null
 }
 
 export type AuthMethod =

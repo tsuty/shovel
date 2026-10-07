@@ -49,7 +49,15 @@
       "running": "Running",
       "stopped": "Stopped",
       "missing": "Sandbox missing",
-      "workspace_missing": "Directory missing"
+      "workspace_missing": "Directory missing",
+      "unknown": "Unknown"
+    },
+    "sbxProblem": {
+      "notSignedIn": "You are not signed in to Docker, so sandbox status can't be checked. Run sbx login in a terminal to sign in.",
+      "notInstalled": "The \"sbx\" (Docker Sandboxes) command line tool was not found, so sandbox status can't be checked. Install it and try again: https://docs.docker.com/ai/sandboxes/",
+      "unavailable": "Couldn't list sandboxes. Check that Docker Sandboxes is running.",
+      "signIn": "Sign in…",
+      "recheck": "Check again"
     }
   },
   "createFlow": {

@@ -49,7 +49,15 @@
       "running": "実行中",
       "stopped": "停止中",
       "missing": "サンドボックスがありません",
-      "workspace_missing": "ディレクトリが見つかりません"
+      "workspace_missing": "ディレクトリが見つかりません",
+      "unknown": "状態不明"
+    },
+    "sbxProblem": {
+      "notSignedIn": "Docker にサインインしていないため、サンドボックスの状態を確認できません。ターミナルで sbx login を実行してサインインしてください。",
+      "notInstalled": "Docker Sandboxes の「sbx」コマンドが見つからないため、サンドボックスの状態を確認できません。インストールしてからもう一度お試しください: https://docs.docker.com/ai/sandboxes/",
+      "unavailable": "サンドボックスの一覧を取得できませんでした。Docker Sandboxes が動いているか確認してください。",
+      "signIn": "サインイン…",
+      "recheck": "再確認"
     }
   },
   "createFlow": {

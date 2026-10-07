@@ -5,7 +5,7 @@
  */
 
 import type { TranscriptAction, TranscriptEvent } from './types/transcript'
-import type { AcpUpdateOffer, AgentEntry, Project, ProjectWithStatus } from './types/project'
+import type { AcpUpdateOffer, AgentEntry, Project, ProjectListResult } from './types/project'
 import type {
   HistoryListing,
   LocalRecordSummary,
@@ -34,6 +34,7 @@ export const IpcChannel = {
   ProjectsDiagnostics: 'projects:diagnostics',
   ProjectsStop: 'projects:stop',
   ProjectsOpenTerminal: 'projects:openTerminal',
+  ProjectsOpenSbxLogin: 'projects:openSbxLogin',
   ProjectsOpenDataDir: 'projects:openDataDir',
   AppOpenProjectManager: 'app:openProjectManager',
   SettingsGet: 'settings:get',
@@ -196,7 +197,7 @@ export interface RendererApi {
     openLoginTerminal(projectId: string): Promise<void>
   }
   projects: {
-    list(): Promise<ProjectWithStatus[]>
+    list(): Promise<ProjectListResult>
     createNewDir(req: CreateNewDirRequest): Promise<Project>
     createExistingDir(req: CreateExistingDirRequest): Promise<Project>
     listImportable(): Promise<ImportableSandbox[]>
@@ -209,6 +210,8 @@ export interface RendererApi {
     diagnostics(id: string): Promise<ProjectDiagnostics>
     stop(id: string): Promise<void>
     openTerminal(id: string): Promise<void>
+    /** OS のターミナルで `sbx login`（Docker へのサインイン）を開く。 */
+    openSbxLogin(): Promise<void>
     /**
      * ログ／セッションキャッシュのディレクトリを OS のファイルマネージャーで開く。
      * このプロジェクトの最新のログファイルがあれば、それを選択した状態で開く。

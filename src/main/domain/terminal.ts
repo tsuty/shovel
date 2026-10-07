@@ -2,7 +2,17 @@ import { spawn } from 'node:child_process'
 
 /** OS のターミナルアプリを開き、サンドボックス内でコマンドを実行させる。 */
 export function openSandboxCommand(sandboxName: string, argv: string[]): void {
-  const command = ['sbx', 'exec', '-it', sandboxName, ...argv].map(shellQuote).join(' ')
+  openTerminalCommand(['sbx', 'exec', '-it', sandboxName, ...argv])
+}
+
+/** OS のターミナルアプリを開き、`sbx login`（Docker へのサインイン）を実行させる。 */
+export function openSbxLoginTerminal(): void {
+  openTerminalCommand(['sbx', 'login'])
+}
+
+/** OS のターミナルアプリを開き、ホストでコマンドを実行させる。 */
+function openTerminalCommand(argv: string[]): void {
+  const command = argv.map(shellQuote).join(' ')
 
   if (process.platform === 'darwin') {
     const script = `tell application "Terminal" to do script "${command.replace(/"/g, '\\"')}"`

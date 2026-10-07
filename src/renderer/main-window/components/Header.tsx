@@ -15,7 +15,8 @@ const STATUS_DOT_CLASSES: Record<SandboxStatus, string> = {
   running: 'bg-green-500',
   stopped: 'bg-muted-foreground',
   missing: 'bg-destructive',
-  workspace_missing: 'bg-destructive'
+  workspace_missing: 'bg-destructive',
+  unknown: 'bg-amber-500'
 }
 
 const MAX_RECENT = 5

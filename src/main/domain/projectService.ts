@@ -4,7 +4,9 @@ import path from 'node:path'
 import { dialog, shell } from 'electron'
 import { getAgentEntry } from '@shared/agentTable'
 import { acpAgentName } from './acpVersionService'
-import type { Project, ProjectWithStatus, SandboxStatus } from '@shared/types/project'
+import type { Project, ProjectListResult, SandboxStatus, SbxProblem } from '@shared/types/project'
+import type { SbxLsEntry } from '@shared/types/sbx'
+import { isSbxNotFoundMessage } from '@shared/sbxErrors'
 import type {
   CreateExistingDirRequest,
   CreateFromExistingRequest,
@@ -14,7 +16,7 @@ import type {
   ProjectDiagnostics,
   ProjectProgress
 } from '@shared/ipc'
-import { sbxCreate, sbxDiagnose, sbxLs, sbxMeasureSandboxPath, sbxRm, sbxStop } from '../sbx/cli'
+import { type SbxDiagnoseCheck, sbxCreate, sbxDiagnose, sbxDiagnoseChecks, sbxLs, sbxMeasureSandboxPath, sbxRm, sbxStop } from '../sbx/cli'
 import { hostPathsEqual } from './pathTranslate'
 import { removeAllRecordsForProject, snapshotDir } from '../persistence/snapshot'
 import { pickDirectoryStore, projectsStore } from '../persistence/store'
@@ -33,11 +35,49 @@ export function deriveSandboxName(seed: string, existingNames: ReadonlySet<strin
   return `${base}-${randomUUID().slice(0, 8)}`
 }
 
-/** shovel に登録されたプロジェクトと `sbx ls --json` を突き合わせた状態。 */
-export async function listProjectsWithStatus(): Promise<ProjectWithStatus[]> {
+/**
+ * shovel に登録されたプロジェクトと `sbx ls --json` を突き合わせた状態。
+ *
+ * Docker にサインインしていないと `sbx ls` は失敗する（あるいは一覧を返さない）ので、
+ * 失敗したとき・登録済みのサンドボックスが見当たらないときは `sbx diagnose --json` で原因を確かめる。
+ * 原因が sbx 側にあれば、「サンドボックスがありません」と誤って出さず `unknown` にする。
+ */
+export async function listProjectsWithStatus(): Promise<ProjectListResult> {
   const projects = projectsStore.list()
-  const sandboxes = await sbxLs().catch(() => [])
-  return projects.map((project) => ({ ...project, status: resolveStatus(project, sandboxes) }))
+  let sandboxes: SbxLsEntry[] | null = null
+  let sbxProblem: SbxProblem | null = null
+  try {
+    sandboxes = await sbxLs()
+  } catch (err) {
+    sbxProblem = isSbxNotFoundMessage(err instanceof Error ? err.message : String(err))
+      ? 'notInstalled'
+      : await diagnoseSbxProblem()
+  }
+  const listed = sandboxes
+  if (listed && projects.some((p) => !listed.some((s) => s.id === p.sandboxId))) {
+    // 見当たらないのが未サインインのせいなら、一覧は当てにならない。
+    if ((await diagnoseSbxProblem()) === 'notSignedIn') {
+      sandboxes = null
+      sbxProblem = 'notSignedIn'
+    }
+  }
+  return {
+    projects: projects.map((project) => ({
+      ...project,
+      status: sandboxes ? resolveStatus(project, sandboxes) : 'unknown'
+    })),
+    sbxProblem
+  }
+}
+
+/** `sbx diagnose --json` の結果から、`sbx ls` が当てにならない理由を決める。 */
+export function sbxProblemFromChecks(checks: SbxDiagnoseCheck[] | null): SbxProblem {
+  const auth = checks?.find((c) => c.name.toLowerCase() === 'authentication')
+  return auth?.status === 'fail' ? 'notSignedIn' : 'unavailable'
+}
+
+async function diagnoseSbxProblem(): Promise<SbxProblem> {
+  return sbxProblemFromChecks(await sbxDiagnoseChecks().catch(() => null))
 }
 
 function resolveStatus(
