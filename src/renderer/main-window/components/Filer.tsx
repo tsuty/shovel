@@ -27,6 +27,7 @@ import { editorLanguageFor, type NewFileKind } from '@shared/fileKinds'
 import { cn } from '../../shared/lib/utils'
 import { MERMAID_BRAND_COLOR, MermaidIcon } from '../../shared/components/icons/MermaidIcon'
 import { MenuItem, SubMenu } from './MenuItem'
+import { onTurnEnd } from '../turnEnd'
 
 interface FsNode extends FsEntry {
   children?: FsNode[]
@@ -194,6 +195,25 @@ export function Filer({
       setRefreshing(false)
     }
   }
+
+  /**
+   * ターン終了時の自動の読み直し（decisions.md N-3-6 (A)）。名前変更の入力中や読み直しの最中に
+   * 来たら、それが終わってから1回だけ読み直す（入力中の行や読み直し途中のツリーを崩さないため）。
+   */
+  const autoRefreshPendingRef = useRef(false)
+  const autoRefreshRef = useRef<() => void>(() => {})
+  autoRefreshRef.current = () => {
+    if (renaming || refreshing) {
+      autoRefreshPendingRef.current = true
+      return
+    }
+    autoRefreshPendingRef.current = false
+    void refreshAll()
+  }
+  useEffect(() => onTurnEnd(() => autoRefreshRef.current()), [])
+  useEffect(() => {
+    if (!renaming && !refreshing && autoRefreshPendingRef.current) autoRefreshRef.current()
+  }, [renaming, refreshing])
 
   useEffect(() => {
     setLoadedDirs(new Set())

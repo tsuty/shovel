@@ -5,6 +5,7 @@ import type { SessionMeta } from '@shared/types/session'
 import type { AttachmentChip } from '@shared/types/transcript'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
 import { flushAllEditors } from '../editorRegistry'
+import { notifyTurnEnd } from '../turnEnd'
 import { registerAttachHandler } from '../attachmentRegistry'
 import { subscribeSessionEvents } from '../sessionEvents'
 import { LiveThoughtArea, Transcript } from './Transcript'
@@ -89,6 +90,8 @@ export function SessionView({
       setAttachments([])
     } finally {
       setSending(false)
+      // 中断・失敗でも途中までの編集は残りうるので、成否に関わらず読み直させる。
+      notifyTurnEnd()
     }
   }
 

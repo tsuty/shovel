@@ -6,6 +6,7 @@ import { MermaidDiagram } from '../../shared/components/MermaidDiagram'
 import { Button } from '../../shared/components/ui/button'
 import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { registerFlush } from '../editorRegistry'
+import { onTurnEnd } from '../turnEnd'
 import { conflictPath, decideEditorSync } from '../editorSync'
 import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/types/filer'
 import { FileStatusBar } from './FileStatusBar'
@@ -288,6 +289,15 @@ export function TextFileEditor({
     }, EXTERNAL_CHECK_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [syncWithDisk])
+
+  // ターン終了時は、次のポーリングを待たずに読み直す（decisions.md N-3-6 (B)）。
+  useEffect(
+    () =>
+      onTurnEnd(() => {
+        syncWithDisk(false).catch((err: unknown) => console.warn('[editor] external change check failed', err))
+      }),
+    [syncWithDisk]
+  )
 
   if (!loaded) {
     return <div className="p-4 text-sm text-muted-foreground">{t('common.loading')}</div>

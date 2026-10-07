@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ExternalLink } from 'lucide-react'
 import type { FileReadResult } from '@shared/types/filer'
 import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { Button } from '../../shared/components/ui/button'
 import { FileStatusBar, ImageStatusBar } from './FileStatusBar'
+import { onTurnEnd } from '../turnEnd'
 
 /**
  * 画像が固有の幅×高さを持つか。SVG はルートに `width`/`height` が絶対値で両方あるときだけ持つ
@@ -21,6 +22,25 @@ function hasIntrinsicSize(dataUrl: string): boolean {
     return root.localName === 'svg' && isAbsolute(root.getAttribute('width')) && isAbsolute(root.getAttribute('height'))
   } catch {
     return false
+  }
+}
+
+/** 表示中の内容とディスクの内容が同じか（同じなら読み直しで描き直さない）。 */
+function sameContent(view: ViewState, disk: FileReadResult): boolean {
+  switch (disk.kind) {
+    case 'text':
+      return (
+        view.kind === 'text' &&
+        view.file.content === disk.content &&
+        view.file.size === disk.size &&
+        view.file.encoding === disk.encoding &&
+        view.file.lineEnding === disk.lineEnding
+      )
+    case 'image':
+      return view.kind === 'image' && view.dataUrl === disk.dataUrl
+    case 'binary':
+    case 'missing':
+      return view.kind === disk.kind
   }
 }
 
@@ -44,28 +64,47 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
   /** 画像の幅×高さ。読み込み前は `undefined`、取れなかった（寸法のない SVG など）ときは `null`。 */
   const [imageDims, setImageDims] = useState<{ width: number; height: number } | null | undefined>(undefined)
 
+  /** ターン終了ごとに増やす。読み直しのきっかけ（decisions.md N-3-6 (B)）。 */
+  const [revision, setRevision] = useState(0)
+  useEffect(() => onTurnEnd(() => setRevision((r) => r + 1)), [])
+  const viewRef = useRef(view)
+  viewRef.current = view
+  /** 最後に読み込んだファイル。同じファイルの読み直しは「読み込み中」を挟まず、変わったときだけ描き直す。 */
+  const loadedKeyRef = useRef<string | null>(null)
+
   useEffect(() => {
     const run = { cancelled: false }
-    setView({ kind: 'loading' })
-    setOpenError(null)
-    setImageDims(undefined)
+    const key = `${projectId}\0${relPath}`
+    const reloading = loadedKeyRef.current === key
+    loadedKeyRef.current = key
+    if (!reloading) {
+      setView({ kind: 'loading' })
+      setOpenError(null)
+      setImageDims(undefined)
+    }
+    // await をまたぐので、毎回読み直す（`run.cancelled` のままだと型の絞り込みが残る）。
+    const isCancelled = (): boolean => run.cancelled
     void (async () => {
       try {
         const result = await window.shovel.fs.readFile(projectId, relPath)
+        if (isCancelled() || (reloading && sameContent(viewRef.current, result))) return
         if (result.kind !== 'text') {
-          if (!run.cancelled) setView(result)
+          if (result.kind === 'image') setImageDims(undefined)
+          setView(result)
           return
         }
         const html = await highlightToHtml(result.content, langFromFilename(relPath))
-        if (!run.cancelled) setView({ kind: 'text', html, file: result })
+        if (!isCancelled()) setView({ kind: 'text', html, file: result })
       } catch (err) {
-        if (!run.cancelled) setView({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+        // 読み直しでの一時的な失敗では、表示中の内容を消さない。
+        if (reloading) console.warn('[viewer] reload failed', err)
+        else if (!isCancelled()) setView({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
       }
     })()
     return () => {
       run.cancelled = true
     }
-  }, [projectId, relPath])
+  }, [projectId, relPath, revision])
 
   async function openInOS(): Promise<void> {
     setOpenError(null)
