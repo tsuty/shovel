@@ -13,11 +13,11 @@
     "dev": "install-electron && electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.test.json",
-    "lint": "eslint .",
+    "lint": "eslint src test",
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "install-electron && electron-vite preview",
-    "pack": "electron-vite build && electron-builder --dir",
+    "pack": "electron-vite build && electron-builder --mac dir",
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {
