@@ -276,6 +276,18 @@
     "backupDate": "バックアップ・{{date}}",
     "deletedDate": "削除済み・{{date}}"
   },
+  "fileSearch": {
+    "title": "ファイルの中身を検索",
+    "open": "ファイルの中身を検索",
+    "inFolder": "このフォルダ内を検索",
+    "placeholder": "検索キーワード",
+    "scope": "範囲: {{path}}",
+    "clearScope": "プロジェクト全体を検索",
+    "excluded": "次のものは検索しません:\n・「.」で始まるフォルダ\n・node_modules\n・テキスト以外のファイル（画像など）、UTF-8 以外のテキスト、2MB を超えるファイル",
+    "noResults": "一致するファイルはありません。",
+    "lineAt": "{{line}} 行目",
+    "truncated": "先頭の {{count}} 件だけを表示しています。キーワードを絞り込んでください。"
+  },
   "findBar": {
     "placeholder": "ページ内を検索",
     "noMatches": "0 件",

@@ -3,11 +3,12 @@ import path from 'node:path'
 import { clipboard, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import ignore, { type Ignore } from 'ignore'
-import type { FileReadResult, FsEntry } from '@shared/types/filer'
+import type { FileReadResult, FileSearchResult, FsEntry } from '@shared/types/filer'
 import type { Project } from '@shared/types/project'
 import { isNewFileKind, type NewFileKind } from '@shared/fileKinds'
 import { projectsStore } from '../persistence/store'
 import { decodeText, encodeForWrite } from './textEncoding'
+import { searchDirectory } from './fileSearch'
 
 /**
  * ファイラーのバックエンド。ファイル操作はホスト側の Node `fs` で行い、
@@ -89,6 +90,23 @@ export async function listDir(projectId: string, relPath: string): Promise<FsEnt
   }
   result.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1))
   return result
+}
+
+/** 呼び出し元（webContents）ごとの中身検索の世代番号。追い越された検索は null を返す。 */
+const latestFileSearch = new Map<number, number>()
+
+/** ファイラーの中身検索。`scopeRelPath` が空ならプロジェクト全体。 */
+export async function searchFiles(
+  callerId: number,
+  projectId: string,
+  scopeRelPath: string,
+  query: string
+): Promise<FileSearchResult[] | null> {
+  const token = (latestFileSearch.get(callerId) ?? 0) + 1
+  latestFileSearch.set(callerId, token)
+  const project = requireProject(projectId)
+  resolveAbsolute(project, scopeRelPath)
+  return searchDirectory(project.hostPath, scopeRelPath, query, () => latestFileSearch.get(callerId) === token)
 }
 
 export async function readFileForViewer(projectId: string, relPath: string): Promise<FileReadResult> {

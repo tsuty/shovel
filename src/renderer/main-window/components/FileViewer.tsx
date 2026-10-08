@@ -6,6 +6,7 @@ import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { Button } from '../../shared/components/ui/button'
 import { FileStatusBar, ImageStatusBar } from './FileStatusBar'
 import { onTurnEnd } from '../turnEnd'
+import { revealInHighlightedCode, type FileReveal } from '../revealMatch'
 
 /**
  * 画像が固有の幅×高さを持つか。SVG はルートに `width`/`height` が絶対値で両方あるときだけ持つ
@@ -55,9 +56,17 @@ type ViewState =
 /**
  * アプリ内で編集できない（`TextFileEditor` で開かない）ファイルのビューア。テキストは shiki で
  * ハイライトし行番号を付けて表示する。画像はアプリ内でプレビューし、それ以外のバイナリは
- * OS の関連付けアプリで開くボタンを出す。
+ * OS の関連付けアプリで開くボタンを出す。`reveal` が来たら、その行へ移って一致箇所を塗る。
  */
-export function FileViewer({ projectId, relPath }: { projectId: string; relPath: string }): React.JSX.Element {
+export function FileViewer({
+  projectId,
+  relPath,
+  reveal
+}: {
+  projectId: string
+  relPath: string
+  reveal?: FileReveal
+}): React.JSX.Element {
   const { t } = useTranslation()
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [openError, setOpenError] = useState<string | null>(null)
@@ -105,6 +114,19 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
       run.cancelled = true
     }
   }, [projectId, relPath, revision])
+
+  /** まだ反映していない `reveal`。テキストを描き終えてから反映する。 */
+  const pendingRevealRef = useRef<FileReveal | null>(null)
+  const codeRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (reveal) pendingRevealRef.current = reveal
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal?.nonce])
+  useEffect(() => {
+    const pending = pendingRevealRef.current
+    if (!pending || view.kind !== 'text' || !codeRef.current) return
+    if (revealInHighlightedCode(codeRef.current, pending)) pendingRevealRef.current = null
+  })
 
   async function openInOS(): Promise<void> {
     setOpenError(null)
@@ -160,7 +182,7 @@ export function FileViewer({ projectId, relPath }: { projectId: string; relPath:
       return (
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 overflow-auto p-2">
-            <div className="shiki-lines text-editor" dangerouslySetInnerHTML={{ __html: view.html }} />
+            <div ref={codeRef} className="shiki-lines text-editor" dangerouslySetInnerHTML={{ __html: view.html }} />
           </div>
           <FileStatusBar size={view.file.size} encoding={view.file.encoding} lineEnding={view.file.lineEnding} />
         </div>

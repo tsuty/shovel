@@ -12,6 +12,7 @@ import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/
 import { FileStatusBar } from './FileStatusBar'
 import { computeIndent, findJsonProblem, lineNumbersText, offsetAt, type JsonProblem } from '../textEditing'
 import { usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
+import { revealInHighlightedCode, revealInTextarea, type FileReveal } from '../revealMatch'
 
 /**
  * 表示の切り替え。Markdown / Mermaid は「分割・ソース・プレビュー」、
@@ -62,6 +63,9 @@ const EXTERNAL_CHECK_INTERVAL_MS = 3000
  * あれば競合コピーを残してから最新へ切り替える。
  *
  * `variant: 'attached'` はチャットタブの右に添えたときで、「分割」は出さない。
+ *
+ * `reveal`（中身検索の一致箇所）が来たら、ソースが見えていればそこを選択し、「表示」ならその行へ移って
+ * 塗る。Markdown / Mermaid のプレビューだけのときは、ソースが見えるモードへ切り替えてから選択する。
  */
 export function TextFileEditor({
   projectId,
@@ -70,7 +74,8 @@ export function TextFileEditor({
   variant = 'tab',
   onAttachToChat,
   canAttachToChat = false,
-  onClose
+  onClose,
+  reveal
 }: {
   projectId: string
   relPath: string
@@ -81,6 +86,7 @@ export function TextFileEditor({
   canAttachToChat?: boolean
   /** チャットに添えているとき: 右ペインを閉じる。 */
   onClose?: () => void
+  reveal?: FileReveal
 }): React.JSX.Element {
   const { t } = useTranslation()
   const modes = modesFor(language, variant)
@@ -268,6 +274,10 @@ export function TextFileEditor({
 
   const mermaidCode = useDebouncedValue(text, MERMAID_PREVIEW_DELAY_MS)
 
+  /** まだ反映していない `reveal`。読み込みと、移り先（textarea か表示）の描画が済んでから反映する。 */
+  const pendingRevealRef = useRef<FileReveal | null>(null)
+  const highlightedRef = useRef<HTMLDivElement>(null)
+
   // JSON / YAML / テキストの表示は shiki で描く（テキストは色なしで行番号だけ。外部での変更を読み直したときも描き直す）。
   const [highlighted, setHighlighted] = useState<string | null>(null)
   const highlightsCode = usesViewEditModes(language) && showPreview
@@ -281,6 +291,25 @@ export function TextFileEditor({
       cancelled = true
     }
   }, [highlightsCode, text, relPath])
+
+  useEffect(() => {
+    if (!reveal) return
+    pendingRevealRef.current = reveal
+    if (!usesViewEditModes(language) && !showSource) setMode(modes[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal?.nonce])
+  useEffect(() => {
+    const pending = pendingRevealRef.current
+    if (!pending || !loaded || deleted) return
+    if (showSource) {
+      if (!textareaRef.current) return
+      pendingRevealRef.current = null
+      revealInTextarea(textareaRef.current, pending)
+    } else if (mode === 'view' && highlightedRef.current) {
+      // 読み込み前の空の内容を描いたものには行が無いので、本物が描かれるまで待つ。
+      if (revealInHighlightedCode(highlightedRef.current, pending)) pendingRevealRef.current = null
+    }
+  })
 
   // 開いている間はポーリングで外部変更を検知する。
   useEffect(() => {
@@ -411,7 +440,11 @@ export function TextFileEditor({
             ) : language === 'mermaid' ? (
               <MermaidDiagram code={mermaidCode} />
             ) : highlighted !== null ? (
-              <div className="shiki-lines text-editor" dangerouslySetInnerHTML={{ __html: highlighted }} />
+              <div
+                ref={highlightedRef}
+                className="shiki-lines text-editor"
+                dangerouslySetInnerHTML={{ __html: highlighted }}
+              />
             ) : null}
           </div>
         )}

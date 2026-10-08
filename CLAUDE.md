@@ -37,7 +37,12 @@ link, not a duplicate affordance on the card), Mode/Model selectors plus a token
 folder/Markdown file, rename, delete, move via drag & drop, and clipboard copy/paste, all from the
 right-click menu — including on empty space for root-level creation/paste — plus copy-in from the
 OS file manager by paste or drop (always a copy, never a move; `readClipboardFilePaths` reads
-Electron 44's `text/uri-list` clipboard format (+ `x-special/gnome-copied-files` on Linux), drops use `webUtils.getPathForFile`), a manual refresh button, and
+Electron 44's `text/uri-list` clipboard format (+ `x-special/gnome-copied-files` on Linux), drops use `webUtils.getPathForFile`), a manual refresh button, a
+file-*contents* search (🔎 in the Filer header, or a folder's right-click "search in this folder";
+`FileSearchDialog.tsx` remembers its query/scope/results per project across closes; host-side
+`src/main/domain/fileSearch.ts` skips `.`-prefixed folders, `node_modules`, binaries and non-UTF-8 files;
+clicking a result opens the file and jumps to the match via `openFile(relPath, at)` → `FileReveal`,
+`revealMatch.ts`, decisions.md N-3-11), and
 "Open in Finder/Explorer" for folders; `.git` is always hidden, the old toggle is gone; files open
 on double-click or Enter — single click/arrow keys only select, folders still toggle on single
 click (decisions.md N-3-4); a right-click "open with default app" for files was deliberately

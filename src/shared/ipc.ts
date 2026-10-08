@@ -13,7 +13,7 @@ import type {
   SessionMeta,
   SessionSnapshot
 } from './types/session'
-import type { FileReadResult, FsEntry } from './types/filer'
+import type { FileReadResult, FileSearchResult, FsEntry } from './types/filer'
 import type { CommandExit, CommandHistory, CommandOutputChunk } from './types/command'
 import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
@@ -78,6 +78,7 @@ export const IpcChannel = {
   FsCreateFile: 'fs:createFile',
   FsReadClipboardFiles: 'fs:readClipboardFiles',
   FsCopyExternal: 'fs:copyExternal',
+  FsSearch: 'fs:search',
 
   CommandRun: 'command:run',
   CommandSendInput: 'command:sendInput',
@@ -290,6 +291,8 @@ export interface RendererApi {
     copyExternal(projectId: string, absPaths: string[], destDirRelPath: string): Promise<string[]>
     /** ドロップされた `File` のホスト上の絶対パス（Electron の `webUtils.getPathForFile`）。 */
     pathForFile(file: File): string
+    /** 中身検索（`scopeRelPath` が空ならプロジェクト全体）。新しい検索に追い越されたときは null。 */
+    search(projectId: string, scopeRelPath: string, query: string): Promise<FileSearchResult[] | null>
   }
   command: {
     run(projectId: string, command: string): Promise<{ runId: string }>

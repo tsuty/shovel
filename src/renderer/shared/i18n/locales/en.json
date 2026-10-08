@@ -278,6 +278,18 @@
     "backupDate": "Backup · {{date}}",
     "deletedDate": "Deleted · {{date}}"
   },
+  "fileSearch": {
+    "title": "Search file contents",
+    "open": "Search file contents",
+    "inFolder": "Search in this folder",
+    "placeholder": "Search keywords",
+    "scope": "Scope: {{path}}",
+    "clearScope": "Search the whole project",
+    "excluded": "Not searched:\n• Folders starting with \".\"\n• node_modules\n• Non-text files (images etc.), non-UTF-8 text, and files over 2 MB",
+    "noResults": "No matching files.",
+    "lineAt": "line {{line}}",
+    "truncated": "Showing only the first {{count}} files. Try a more specific keyword."
+  },
   "findBar": {
     "placeholder": "Find in page",
     "noMatches": "No results",

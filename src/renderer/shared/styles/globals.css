@@ -265,3 +265,8 @@
   background-color: rgb(249 115 22 / 0.8);
   color: inherit;
 }
+/* ファイラーの中身検索から開いたときの一致箇所（revealMatch.ts）。 */
+::highlight(shovel-reveal) {
+  background-color: rgb(250 204 21 / 0.45);
+  color: inherit;
+}

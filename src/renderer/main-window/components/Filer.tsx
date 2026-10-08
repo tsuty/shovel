@@ -15,9 +15,11 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  FolderSearch,
   Link,
   PanelRight,
   RefreshCw,
+  Search,
   SquarePen,
   Trash2
 } from 'lucide-react'
@@ -28,6 +30,8 @@ import { cn } from '../../shared/lib/utils'
 import { MERMAID_BRAND_COLOR, MermaidIcon } from '../../shared/components/icons/MermaidIcon'
 import { MenuItem, SubMenu } from './MenuItem'
 import { onTurnEnd } from '../turnEnd'
+import type { FileReveal } from '../revealMatch'
+import { FileSearchDialog, setFileSearchScope } from './FileSearchDialog'
 
 interface FsNode extends FsEntry {
   children?: FsNode[]
@@ -105,6 +109,7 @@ function targetDirFor(node: FsNode | null): string {
 /**
  * `react-arborist` による遅延展開のファイルツリー。`.gitignore` 対象は薄く表示する。
  * 見出しの更新ボタンで展開中のフォルダを読み直す。アプリ外からの貼り付け・ドロップはコピーとして取り込む。
+ * 見出しの 🔎 とフォルダの右クリックから、ファイルの中身を検索する（decisions.md N-3-11）。
  */
 export function Filer({
   projectId,
@@ -114,7 +119,8 @@ export function Filer({
   canAttachFile
 }: {
   projectId: string
-  onOpenFile: (relPath: string) => void
+  /** `at` があれば、開いた後にその位置（中身検索の一致箇所）へ移る。 */
+  onOpenFile: (relPath: string, at?: Omit<FileReveal, 'nonce'>) => void
   onAddToContext: (relPath: string) => void
   /** 編集できるファイルを今のチャットタブの右に添える。 */
   onAttachFile: (relPath: string) => void
@@ -136,6 +142,7 @@ export function Filer({
   const [menu, setMenu] = useState<{ x: number; y: number; node: FsNode | null } | null>(null)
   const [renaming, setRenaming] = useState<FsNode | null>(null)
   const [clipboard, setClipboard] = useState<ClipboardEntry | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const treeRef = useRef<TreeApi<FsNode> | undefined>(undefined)
   const [containerHeight, setContainerHeight] = useState(400)
@@ -326,6 +333,13 @@ export function Filer({
     void window.shovel.fs.readClipboardFiles().then(setOsClipboardFiles)
   }
 
+  /** 右クリックの「このフォルダ内を検索」。 */
+  function searchInFolder(node: FsNode): void {
+    setMenu(null)
+    setFileSearchScope(projectId, node.relPath)
+    setSearchOpen(true)
+  }
+
   async function handleOpenInOS(node: FsNode | null): Promise<void> {
     setMenu(null)
     await window.shovel.fs.openInOS(projectId, node?.relPath ?? '')
@@ -356,14 +370,23 @@ export function Filer({
     <div className="flex h-full flex-col" onClick={() => setMenu(null)}>
       <div className="flex items-center justify-between border-b border-border px-2 py-1 text-xs">
         <span className="font-medium text-muted-foreground">{t('sidebar.filer')}</span>
-        <button
-          className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
-          title={t('filer.refresh')}
-          disabled={refreshing}
-          onClick={() => void refreshAll()}
-        >
-          <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+            title={t('fileSearch.open')}
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search size={13} />
+          </button>
+          <button
+            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+            title={t('filer.refresh')}
+            disabled={refreshing}
+            onClick={() => void refreshAll()}
+          >
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} />
+          </button>
+        </div>
       </div>
       <div
         ref={containerRef}
@@ -473,6 +496,11 @@ export function Filer({
               {t(openInOsLabelKey())}
             </MenuItem>
           )}
+          {menu.node?.isDir && (
+            <MenuItem icon={<FolderSearch size={14} />} onClick={() => searchInFolder(menu.node!)}>
+              {t('fileSearch.inFolder')}
+            </MenuItem>
+          )}
           <div className="my-1 border-t border-border" />
           <MenuItem icon={<FolderPlus size={14} />} onClick={() => void handleNewFolder(menu.node)}>
             {t('filer.newFolder')}
@@ -530,6 +558,14 @@ export function Filer({
           )}
         </div>
       )}
+      <FileSearchDialog
+        projectId={projectId}
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        onOpenResult={(result) =>
+          onOpenFile(result.relPath, { line: result.line, column: result.column, length: result.length })
+        }
+      />
     </div>
   )
 }

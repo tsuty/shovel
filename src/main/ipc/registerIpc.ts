@@ -58,6 +58,7 @@ import {
   readClipboardFilePaths,
   readFileForViewer,
   renameEntry,
+  searchFiles,
   writeTextFile
 } from '../domain/filerService'
 import {
@@ -199,6 +200,9 @@ export function registerIpc(): void {
     IpcChannel.FsCopyExternal,
     (_event, projectId: string, absPaths: string[], destDirRelPath: string) =>
       copyExternalEntries(projectId, absPaths, destDirRelPath)
+  )
+  ipcMain.handle(IpcChannel.FsSearch, (event, projectId: string, scopeRelPath: string, query: string) =>
+    searchFiles(event.sender.id, projectId, scopeRelPath, query)
   )
   ipcMain.handle(IpcChannel.FsReadFile, (_event, projectId: string, relPath: string) =>
     readFileForViewer(projectId, relPath)

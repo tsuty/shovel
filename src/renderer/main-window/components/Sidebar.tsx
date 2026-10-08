@@ -5,6 +5,7 @@ import type { HistoryEntry, LocalRecordSummary } from '@shared/types/session'
 import { cn } from '../../shared/lib/utils'
 import type { TabInfo } from './TabBar'
 import { Filer } from './Filer'
+import type { FileReveal } from '../revealMatch'
 import { ChatHistoryPanel } from './ChatHistoryPanel'
 import { ResizablePanel } from './ResizablePanel'
 
@@ -43,7 +44,7 @@ export function Sidebar({
   tabs: TabInfo[]
   activeSessionId: string | null
   onSelectTab: (sessionId: string) => void
-  onOpenFile: (relPath: string) => void
+  onOpenFile: (relPath: string, at?: Omit<FileReveal, 'nonce'>) => void
   onOpenHistory: (entry: HistoryEntry) => void
   onOpenLocalRecord: (record: LocalRecordSummary) => void
   onRenameTab: (sessionId: string, title: string) => void

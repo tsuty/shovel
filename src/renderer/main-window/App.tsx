@@ -29,6 +29,7 @@ import { editorLanguageFor, type EditorLanguage } from '@shared/fileKinds'
 import { getAgentEntry } from '@shared/agentTable'
 import { ConnectingView, type ConnectingStepRecord } from './components/ConnectingView'
 import { FindBar } from './components/FindBar'
+import type { FileReveal } from './revealMatch'
 
 const MAX_SESSION_TABS = 10
 /** チャットの右に添えたファイルのペインの既定幅（px）。 */
@@ -260,8 +261,18 @@ export function App(): React.JSX.Element {
     openNewTab()
   }
 
-  function openFile(relPath: string): void {
+  /** ファイラーの中身検索から開いたときの移り先。そのファイルを表示しているエディタ／ビューアだけに渡す。 */
+  const [reveal, setReveal] = useState<(FileReveal & { relPath: string }) | null>(null)
+  const revealNonceRef = useRef(0)
+  function revealFor(relPath: string): FileReveal | undefined {
+    return reveal?.relPath === relPath ? reveal : undefined
+  }
+
+  /** `at` があれば、開いた後にその位置（中身検索の一致箇所）へ移る。 */
+  function openFile(relPath: string, at?: Omit<FileReveal, 'nonce'>): void {
     setLastOpenedFilePath(relPath)
+    // 位置なしで開き直したときに、前の移り先へまた飛ばないよう消しておく。
+    setReveal(at ? { ...at, relPath, nonce: ++revealNonceRef.current } : null)
     // チャットの横に添えてあるなら、そのチャットタブを前に出す。
     const holder = tabs.find((tab) => isChatTab(tab) && tab.attachedFile === relPath)
     if (holder) {
@@ -667,6 +678,7 @@ export function App(): React.JSX.Element {
                           language={editorLanguageFor(tab.attachedFile) ?? 'markdown'}
                           variant="attached"
                           onClose={() => detachFile(tab.sessionId)}
+                          reveal={revealFor(tab.attachedFile)}
                         />
                       </ResizablePanel>
                     )}
@@ -686,9 +698,10 @@ export function App(): React.JSX.Element {
                     language={tab.editor}
                     canAttachToChat={canAttachFile}
                     onAttachToChat={() => attachFile(tab.relPath)}
+                    reveal={revealFor(tab.relPath)}
                   />
                 ) : (
-                  <FileViewer projectId={projectId} relPath={tab.relPath} />
+                  <FileViewer projectId={projectId} relPath={tab.relPath} reveal={revealFor(tab.relPath)} />
                 )}
               </div>
             ))}

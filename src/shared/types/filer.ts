@@ -39,6 +39,20 @@ export type FileReadResult =
   | { kind: 'binary' }
   | { kind: 'missing' }
 
+/** ファイラーの中身検索で返す最大件数。これに達したら打ち切る。 */
+export const FILE_SEARCH_MAX_RESULTS = 100
+
+/** ファイラーの中身検索の1件（1ファイルにつき最初の一致だけ）。 */
+export interface FileSearchResult {
+  relPath: string
+  /** 一致箇所。1 始まり。列は改行を LF に揃えた中身での文字（UTF-16）単位。 */
+  line: number
+  column: number
+  length: number
+  /** 一致を含む行（長ければ前後を「…」で切る）。`match` を太字にする。 */
+  snippet: { before: string; match: string; after: string }
+}
+
 export interface FsMutationRequest {
   projectId: string
   relPath: string

@@ -111,7 +111,8 @@ const api: RendererApi = {
     readClipboardFiles: () => ipcRenderer.invoke(IpcChannel.FsReadClipboardFiles),
     copyExternal: (projectId, absPaths, destDirRelPath) =>
       ipcRenderer.invoke(IpcChannel.FsCopyExternal, projectId, absPaths, destDirRelPath),
-    pathForFile: (file) => webUtils.getPathForFile(file)
+    pathForFile: (file) => webUtils.getPathForFile(file),
+    search: (projectId, scopeRelPath, query) => ipcRenderer.invoke(IpcChannel.FsSearch, projectId, scopeRelPath, query)
   },
   command: {
     run: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandRun, projectId, command),
