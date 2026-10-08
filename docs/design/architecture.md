@@ -80,6 +80,7 @@ OS のリソースとプロセスを扱うものはすべてここに置く。
 | Markdown | `react-markdown` + `remark-gfm` |
 | シンタックスハイライト | `shiki` |
 | ファイルツリー | `react-arborist` |
+| コマンド実行の TTY モード | `@xterm/xterm` + `@xterm/addon-fit`（表示のみ。PTY はサンドボックス内） |
 
 ### セキュリティ設定
 
@@ -92,6 +93,7 @@ OS のリソースとプロセスを扱うものはすべてここに置く。
 ### ネイティブモジュールをゼロにする
 
 `node-pty`（ターミナル）も `better-sqlite3`（DB）も使わない。
+TTY が要るコマンドは、PTY をサンドボックスの中で作って動かす（decisions.md N-4「TTY モード」）。
 
 macOS のコード署名ではネイティブモジュールが個別に署名対象になり、Windows でも
 Electron バージョン × OS × CPU アーキテクチャごとのビルドが必要になる。
@@ -352,6 +354,6 @@ shovel は Docker Sandboxes 専用であり、以下のコマンドに依存す�
 | **Vercel AI SDK** | ACP の表現力（思考ログ、plan、tool_call の kind/locations/diffs、権限要求、modes、configOptions、session/list、session/load）を LanguageModel / HarnessAgent の抽象に通すと失われる。ハーネス層は**エージェントを隠蔽する**ための抽象であり、shovel は**エージェントの挙動を見せる**アプリなので方向が逆 |
 | **`@ai-sdk/harness-acp`** | サンドボックス内にブリッジを置き WebSocket で通信する方式で、**ポート公開が必須**。Docker Sandboxes でのポート公開はホストでの CLI 実行を要し、非エンジニア向けの前提と両立しない |
 | **Monaco / CodeMirror** | 編集できるのは Markdown と設定ファイル（JSON / YAML）だけで、他は閲覧のみ（コードを書くのは AI であって人間ではない）。重量級エディタは目的に対して過剰 |
-| **`node-pty` / xterm.js** | ネイティブモジュールを増やし、配布と署名を複雑にする。TTY を諦めても `sbx exec -i` で対話プロンプトには答えられる |
+| **`node-pty`** | ネイティブモジュールを増やし、配布と署名を複雑にする。TTY が要る場面は、PTY をサンドボックス内の `python3` で作って代える（decisions.md N-4「TTY モード」）。xterm.js は純 JS なので、その表示にだけ使う |
 | **`better-sqlite3`** | ネイティブモジュール。保存する量に対して `electron-store` で足りる |
 | **memfs + unionfs** | Node プロセス内の `fs` を差し替える仕組みであり、別プロセス・コンテナ内のエージェントには届かない |

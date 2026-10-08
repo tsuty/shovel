@@ -63,7 +63,9 @@ line ending and BOM, and non-UTF-8 files are view-only, see decisions.md N-3-2) 
 editor (any editable file type, not just Markdown) that can also be attached to the right of a chat tab or an un-resumed history tab
 (decisions.md G-1-9: bound to that tab, not in the tab bar, closes with it, carried over on
 Resume, source/preview only; if the target isn't obvious — active tab isn't a chat and there are
-several chat/history tabs — a picker dialog asks which one), a command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete), a
+several chat/history tabs — a picker dialog asks which one), a command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete, and a
+per-run "TTY" toggle that swaps the output for an `@xterm/xterm` terminal backed by a PTY created inside the sandbox by
+`src/main/sbx/ptyWrapper.ts` — needs `python3` there, decisions.md N-4「TTY モード」), a
 session-history panel backed by local snapshots with rename/delete, a per-tab refresh action
 (↻, reuses the connection and sends a fresh `session/new`), Cmd/Ctrl+0-9 tab-switching shortcuts, a Cmd/Ctrl+F find bar
 (`FindBar.tsx`: searches the visible text of the tab area via the CSS Custom Highlight API, not `webContents.findInPage()` —
@@ -273,7 +275,10 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
 - **Zero native modules.** Do not add `node-pty`, `better-sqlite3`, or anything requiring
   per-OS/per-arch native builds — this is a deliberate constraint to keep code-signing and
   distribution simple (see `decisions.md` F-2b). Terminal needs are met via `sbx exec -i`
-  (no TTY) plus handing off to the OS terminal; persistence uses `electron-store` (JSON).
+  (no TTY), a "TTY mode" that creates the PTY *inside the sandbox* (a base64-embedded
+  `python3` `pty.fork()` wrapper; host side stays plain pipes, rendered with pure-JS
+  `@xterm/xterm` — decisions.md N-4「TTY モード」), plus handing off to the OS terminal;
+  persistence uses `electron-store` (JSON).
 - **Secrets live in the sandbox, not the host.** Agent credentials go through `sbx secret`; never
   write them into this repo, `.env`, or host-side config.
 - **Never assume the host has git or any specific agent installed.** Minimizing host
@@ -282,5 +287,5 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   through `shell.trashItem()` (OS trash), not `fs.rm`; edit conflicts produce a conflict copy
   rather than overwriting; `git clean` is not used programmatically.
 - Do not introduce libraries already rejected in `decisions.md` (Vercel AI SDK,
-  `@ai-sdk/harness-acp`, Monaco/CodeMirror, `node-pty`/xterm.js, `better-sqlite3`,
+  `@ai-sdk/harness-acp`, Monaco/CodeMirror, `node-pty`, `better-sqlite3`,
   memfs+unionfs) without re-reading why they were rejected first.

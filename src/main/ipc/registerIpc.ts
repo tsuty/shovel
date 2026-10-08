@@ -66,7 +66,9 @@ import {
   commandHistory,
   pinCommand,
   removeCommandHistory,
+  resizeTty,
   runCommand,
+  runTtyCommand,
   sendInput,
   unpinCommand
 } from '../domain/commandService'
@@ -251,6 +253,22 @@ export function registerIpc(): void {
     })
     return { runId }
   })
+  ipcMain.handle(IpcChannel.CommandRunTty, (event, projectId: string, command: string, cols: number, rows: number) => {
+    const runId = runTtyCommand(projectId, command, { cols, rows }, {
+      onData: (data) => {
+        if (event.sender.isDestroyed()) return
+        event.sender.send(IpcChannel.CommandTtyOutput, { runId, data })
+      },
+      onExit: (code, ttyUnavailable) => {
+        if (event.sender.isDestroyed()) return
+        event.sender.send(IpcChannel.CommandExit, { runId, code, ttyUnavailable })
+      }
+    })
+    return { runId }
+  })
+  ipcMain.handle(IpcChannel.CommandResizeTty, (_event, runId: string, cols: number, rows: number) =>
+    resizeTty(runId, cols, rows)
+  )
   ipcMain.handle(IpcChannel.CommandSendInput, (_event, runId: string, text: string) => sendInput(runId, text))
   ipcMain.handle(IpcChannel.CommandCancel, (_event, runId: string) => cancelRun(runId))
   ipcMain.handle(IpcChannel.CommandHistory, (_event, projectId: string) => commandHistory(projectId))

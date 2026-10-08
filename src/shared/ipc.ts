@@ -14,7 +14,7 @@ import type {
   SessionSnapshot
 } from './types/session'
 import type { FileReadResult, FileSearchResult, FsEntry } from './types/filer'
-import type { CommandExit, CommandHistory, CommandOutputChunk } from './types/command'
+import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput } from './types/command'
 import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
 import type { NewFileKind } from './fileKinds'
@@ -81,7 +81,9 @@ export const IpcChannel = {
   FsSearch: 'fs:search',
 
   CommandRun: 'command:run',
+  CommandRunTty: 'command:runTty',
   CommandSendInput: 'command:sendInput',
+  CommandResizeTty: 'command:resizeTty',
   CommandCancel: 'command:cancel',
   CommandHistory: 'command:history',
   CommandRemoveHistory: 'command:removeHistory',
@@ -96,6 +98,7 @@ export const IpcChannel = {
   ProjectsProgress: 'projects:progress',
   SandboxStatusChanged: 'sandbox:statusChanged',
   CommandOutput: 'command:output',
+  CommandTtyOutput: 'command:ttyOutput',
   CommandExit: 'command:exit',
   SessionLocalRecordsChanged: 'session:localRecordsChanged',
   SessionOpenProgress: 'session:openProgress'
@@ -296,13 +299,17 @@ export interface RendererApi {
   }
   command: {
     run(projectId: string, command: string): Promise<{ runId: string }>
+    /** TTY モードで実行する（サンドボックス内に PTY を作る）。`cols`/`rows` は端末の初期サイズ。 */
+    runTty(projectId: string, command: string, cols: number, rows: number): Promise<{ runId: string }>
     sendInput(runId: string, text: string): Promise<void>
+    resizeTty(runId: string, cols: number, rows: number): Promise<void>
     cancel(runId: string): Promise<void>
     history(projectId: string): Promise<CommandHistory>
     removeHistory(projectId: string, command: string): Promise<CommandHistory>
     pin(projectId: string, command: string): Promise<CommandHistory>
     unpin(projectId: string, command: string): Promise<CommandHistory>
     onOutput(cb: (chunk: CommandOutputChunk) => void): () => void
+    onTtyOutput(cb: (chunk: CommandTtyOutput) => void): () => void
     onExit(cb: (exit: CommandExit) => void): () => void
   }
   print: {

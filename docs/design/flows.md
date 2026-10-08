@@ -365,7 +365,31 @@ Markdown エディタは **autosave**（入力が止まって数百ms〜1秒。�
   └─ 中断ボタンは常に押せる
 ```
 
-`vim` や `top` のような全画面アプリは動かない。必要な場合は
+### TTY モード
+
+カーソルで選ぶ・スペースで選ぶような TUI は、上の流れでは動かない。
+実行前に TTY モードに切り替えると、次の流れになる（decisions.md N-4「TTY モード」）。
+
+```
+[TTY モードをオンにしてコマンドを実行]
+  │
+  ├─ xterm.js の面をドロワーに出し、その列数・行数を測る
+  │
+  ├─ sbx exec -i -w <sandboxPath> <sandboxName> /bin/sh -c '<python3 の確認と exec>' \
+  │      <ラッパー（base64）> <列> <行> /bin/sh -lc <command>
+  │    ├─ python3 が無い → stderr の目印で判別 →「このサンドボックスでは TTY モードを使えません」
+  │    └─ ラッパーが PTY を作り、TERM=xterm-256color でコマンドを動かす
+  │
+  ├─ 出力のバイト列をそのまま xterm.js に流す（ANSI は除去しない）
+  ├─ キー入力は xterm.js が作ったバイト列をそのまま stdin へ（Ctrl+C も \x03 のまま）
+  ├─ 面の大きさが変わったら、stdin に ESC ] 777;shovel-resize;<列>;<行> BEL を送る
+  │
+  ├─ 中断ボタン（実行中にドロワーを閉じた場合も）: stdin を閉じる → ラッパーが子に SIGHUP。終わらなければ kill
+  │
+  └─ 終了: 終了コードを表示。面は次の実行かドロワーを閉じるまで残す（保存はしない）
+```
+
+`vim` などの全画面アプリも TTY モードで動く。サンドボックスに `python3` が無い場合は、
 **「プロジェクトの詳細」から OS のターミナルアプリを開く**
 （`sbx exec -it <sandbox> /bin/bash -l` を渡す）。
 

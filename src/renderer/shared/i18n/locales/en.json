@@ -202,7 +202,7 @@
     "pin": "Pin",
     "unpin": "Unpin",
     "pinLimit": "You can pin up to {{count}} commands",
-    "hint": "Prompts like [Y/n] can be answered, but full-screen apps such as vim will not work.",
+    "hint": "Prompts like [Y/n] can be answered. Use TTY mode for cursor-driven screens or full-screen apps such as vim.",
     "placeholder": "Run a command… (↑↓ for history)",
     "run": "Run",
     "cancel": "Cancel",
@@ -210,7 +210,11 @@
     "sendInput": "Send",
     "history": "History",
     "historyEmpty": "No history yet.",
-    "historyHint": "Click to insert (won't run yet)"
+    "historyHint": "Click to insert (won't run yet)",
+    "ttyModeHint": "TTY mode: turn on for screens where you pick with arrow keys / Space, or full-screen apps such as vim (requires python3 in the sandbox)",
+    "ttyRunning": "Type directly into the terminal (Ctrl+C to interrupt)",
+    "ttyUnavailable": "TTY mode isn't available in this sandbox (python3 not found).",
+    "openOsTerminal": "Open in OS terminal"
   },
   "transcript": {
     "you": "You",

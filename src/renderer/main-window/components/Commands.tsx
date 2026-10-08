@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { History, Info, Pin, SquareTerminal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { CommandExit, CommandHistory, CommandOutputChunk } from '@shared/types/command'
+import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput } from '@shared/types/command'
 import { cn } from '../../shared/lib/utils'
+import { TtyTerminal, type TtyTerminalHandle } from './TtyTerminal'
+
+type RunEvent = CommandOutputChunk | CommandTtyOutput | CommandExit
 
 const MAX_LINES = 2000
 /** 履歴の表示件数。 */
@@ -10,7 +13,10 @@ const HISTORY_LIMIT = 20
 /** ピン留めの上限（main の `PINNED_COMMAND_LIMIT` と揃える）。 */
 const PINNED_LIMIT = 10
 
-/** コマンド実行パネル。`\r` で上書きされる進捗行は1行として畳み、出力行数には上限を設ける。 */
+/**
+ * コマンド実行パネル。`\r` で上書きされる進捗行は1行として畳み、出力行数には上限を設ける。
+ * TTY モードの実行は、出力の面を端末（`TtyTerminal`）に替えて表示する。
+ */
 export function Commands({ projectId, onClose }: { projectId: string; onClose: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   const [command, setCommand] = useState('')
@@ -19,6 +25,21 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
   const [lines, setLines] = useState<string[]>([])
   const [stdin, setStdin] = useState('')
   const [historyOpen, setHistoryOpen] = useState(true)
+  /** 次の実行を TTY モードにするか。 */
+  const [ttyMode, setTtyMode] = useState(false)
+  /** 出力の面に何を出しているか。端末は次の実行かパネルを閉じるまで残す。 */
+  const [view, setView] = useState<'log' | 'tty'>('log')
+  /** TTY モードの実行ごとに端末を作り直すためのキー。 */
+  const [ttyKey, setTtyKey] = useState(0)
+  /** TTY モードで、端末の準備を待っている間 true。 */
+  const [starting, setStarting] = useState(false)
+  /** サンドボックスに python3 が無く、TTY モードを始められなかった。 */
+  const [ttyUnavailable, setTtyUnavailable] = useState(false)
+  const termRef = useRef<TtyTerminalHandle>(null)
+  /** 端末の準備ができたら実行するコマンド。 */
+  const pendingTtyCommandRef = useRef<string | null>(null)
+  /** 実行中のものが TTY モードか。 */
+  const runIsTtyRef = useRef(false)
   const pendingRef = useRef('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -29,24 +50,35 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
   /** 実行中の runId。出力・終了の購読側は state ではなくこちらを見る。 */
   const runIdRef = useRef<string | null>(null)
   /** runId が分かる前に届いた出力・終了。分かった時点で流し込む。 */
-  const earlyRef = useRef(new Map<string, Array<CommandOutputChunk | CommandExit>>())
+  const earlyRef = useRef(new Map<string, RunEvent[]>())
 
   useEffect(() => {
     void window.shovel.command.history(projectId).then(setHistory)
   }, [projectId])
 
-  function handleRunEvent(event: CommandOutputChunk | CommandExit): void {
+  function handleRunEvent(event: RunEvent): void {
     if ('text' in event) {
       appendText(event.text)
       return
     }
-    setLines((prev) => [...prev, `[exit ${event.code ?? '?'}]`])
+    if ('data' in event) {
+      termRef.current?.write(event.data)
+      return
+    }
+    const exitLine = `[exit ${event.code ?? '?'}]`
+    setLines((prev) => [...prev, exitLine])
+    if (runIsTtyRef.current) {
+      // 終わった端末にはもう入力できないので、カーソルを隠す。
+      termRef.current?.write(`\r\n${exitLine}\r\n\x1b[?25l`)
+      if (event.ttyUnavailable) setTtyUnavailable(true)
+    }
     runIdRef.current = null
+    runIsTtyRef.current = false
     setRunId(null)
   }
 
   useEffect(() => {
-    const route = (event: CommandOutputChunk | CommandExit): void => {
+    const route = (event: RunEvent): void => {
       if (event.runId === runIdRef.current) {
         handleRunEvent(event)
         return
@@ -57,10 +89,14 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
       earlyRef.current.set(event.runId, early)
     }
     const offOutput = window.shovel.command.onOutput(route)
+    const offTtyOutput = window.shovel.command.onTtyOutput(route)
     const offExit = window.shovel.command.onExit(route)
     return () => {
       offOutput()
+      offTtyOutput()
       offExit()
+      // 端末が無くなると TTY モードの実行は操作できなくなるので、パネルを閉じたら中断する。
+      if (runIdRef.current && runIsTtyRef.current) void window.shovel.command.cancel(runIdRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -69,9 +105,10 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [lines])
 
-  // 実行の開始・終了で入力欄にフォーカスを移し直す。
+  // 実行の開始・終了で入力欄（TTY モードの実行中は端末）にフォーカスを移し直す。
   useEffect(() => {
-    inputRef.current?.focus()
+    if (runId && runIsTtyRef.current) termRef.current?.focus()
+    else inputRef.current?.focus()
   }, [runId])
 
   function appendText(text: string): void {
@@ -98,15 +135,22 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
 
   async function run(): Promise<void> {
     const trimmed = command.trim()
-    if (!trimmed || runId) return
-    setLines((prev) => [...prev, `$ ${trimmed}`])
+    if (!trimmed || runId || starting) return
     pendingRef.current = ''
-    const { runId: newRunId } = await window.shovel.command.run(projectId, trimmed)
-    runIdRef.current = newRunId
-    setRunId(newRunId)
-    const early = earlyRef.current.get(newRunId) ?? []
-    earlyRef.current.clear()
-    for (const event of early) handleRunEvent(event)
+    setTtyUnavailable(false)
+    if (ttyMode) {
+      setLines((prev) => [...prev, `$ ${trimmed}  (TTY)`])
+      // 端末の大きさが分かってから実行する（`startTty`）。
+      pendingTtyCommandRef.current = trimmed
+      setStarting(true)
+      setView('tty')
+      setTtyKey((k) => k + 1)
+    } else {
+      setLines((prev) => [...prev, `$ ${trimmed}`])
+      setView('log')
+      const { runId: newRunId } = await window.shovel.command.run(projectId, trimmed)
+      beginRun(newRunId, false)
+    }
     // ピン留め済みのコマンドはピン側の位置のまま動かさない（main の push と同じ規則）。
     setHistory((prev) =>
       prev.pinned.includes(trimmed)
@@ -115,6 +159,35 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
     )
     setCommand('')
     historyIndexRef.current = -1
+  }
+
+  function beginRun(newRunId: string, tty: boolean): void {
+    runIdRef.current = newRunId
+    runIsTtyRef.current = tty
+    setRunId(newRunId)
+    const early = earlyRef.current.get(newRunId) ?? []
+    earlyRef.current.clear()
+    for (const event of early) handleRunEvent(event)
+  }
+
+  async function startTty(cols: number, rows: number): Promise<void> {
+    const pending = pendingTtyCommandRef.current
+    pendingTtyCommandRef.current = null
+    if (!pending) return
+    try {
+      const { runId: newRunId } = await window.shovel.command.runTty(projectId, pending, cols, rows)
+      beginRun(newRunId, true)
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  function sendTtyInput(data: string): void {
+    if (runIdRef.current && runIsTtyRef.current) void window.shovel.command.sendInput(runIdRef.current, data)
+  }
+
+  function resizeTty(cols: number, rows: number): void {
+    if (runIdRef.current && runIsTtyRef.current) void window.shovel.command.resizeTty(runIdRef.current, cols, rows)
   }
 
   /** 履歴のコマンドを入力欄に差し込む。 */
@@ -207,43 +280,92 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
             if (!window.getSelection()?.toString() && e.target === e.currentTarget) inputRef.current?.focus()
           }}
         >
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2">
-            {lines.map((line, i) => (
-              <div key={i} className="whitespace-pre-wrap">
-                {line}
+          {view === 'tty' ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              {ttyUnavailable && (
+                <div className="flex shrink-0 items-center gap-2 border-b border-white/15 px-2 py-1.5 font-sans">
+                  <span className="min-w-0 flex-1">{t('commands.ttyUnavailable')}</span>
+                  <button
+                    className="shrink-0 rounded-md border border-white/30 px-2 py-0.5 hover:bg-white/10"
+                    onClick={() => void window.shovel.projects.openTerminal(projectId)}
+                  >
+                    {t('commands.openOsTerminal')}
+                  </button>
+                </div>
+              )}
+              <div className="min-h-0 flex-1 px-2 pt-2">
+                <TtyTerminal
+                  key={ttyKey}
+                  ref={termRef}
+                  onReady={(cols, rows) => void startTty(cols, rows)}
+                  onData={sendTtyInput}
+                  onResize={resizeTty}
+                />
               </div>
-            ))}
-            <div ref={bottomRef} />
-          </div>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2">
+              {lines.map((line, i) => (
+                <div key={i} className="whitespace-pre-wrap">
+                  {line}
+                </div>
+              ))}
+              <div ref={bottomRef} />
+            </div>
+          )}
           {/* 入力フォーム */}
           <div className="flex shrink-0 items-center gap-2 border-t border-white/15 p-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-white/20 bg-white/5 px-2 py-1.5 focus-within:border-white/50">
-              <span className="select-none text-terminal-muted">{runId ? '>' : '$'}</span>
-              {runId ? (
-                <input
-                  ref={inputRef}
-                  className="min-w-0 flex-1 bg-transparent outline-hidden placeholder:text-terminal-muted"
-                  value={stdin}
-                  placeholder={t('commands.stdinPlaceholder')}
-                  onChange={(e) => setStdin(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) void sendStdin()
-                  }}
-                />
-              ) : (
-                <input
-                  ref={inputRef}
-                  className="min-w-0 flex-1 bg-transparent outline-hidden placeholder:text-terminal-muted"
-                  value={command}
-                  placeholder={t('commands.placeholder')}
-                  onChange={(e) => {
-                    historyIndexRef.current = -1
-                    setCommand(e.target.value)
-                  }}
-                  onKeyDown={handleCommandKeyDown}
-                />
-              )}
-            </div>
+            {runId && runIsTtyRef.current ? (
+              <div className="min-w-0 flex-1 truncate px-2 py-1.5 font-sans text-terminal-muted">
+                {t('commands.ttyRunning')}
+              </div>
+            ) : (
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-white/20 bg-white/5 px-2 py-1.5 focus-within:border-white/50">
+                <span className="select-none text-terminal-muted">{runId ? '>' : '$'}</span>
+                {runId ? (
+                  <input
+                    ref={inputRef}
+                    className="min-w-0 flex-1 bg-transparent outline-hidden placeholder:text-terminal-muted"
+                    value={stdin}
+                    placeholder={t('commands.stdinPlaceholder')}
+                    onChange={(e) => setStdin(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) void sendStdin()
+                    }}
+                  />
+                ) : (
+                  <input
+                    ref={inputRef}
+                    className="min-w-0 flex-1 bg-transparent outline-hidden placeholder:text-terminal-muted"
+                    value={command}
+                    placeholder={t('commands.placeholder')}
+                    onChange={(e) => {
+                      historyIndexRef.current = -1
+                      setCommand(e.target.value)
+                    }}
+                    onKeyDown={handleCommandKeyDown}
+                  />
+                )}
+              </div>
+            )}
+            {!runId && (
+              <button
+                className={cn(
+                  'shrink-0 rounded-md border px-2 py-1.5 font-sans',
+                  ttyMode
+                    ? 'border-terminal-foreground bg-terminal-foreground/15 text-terminal-foreground'
+                    : 'border-white/20 text-terminal-muted hover:text-terminal-foreground'
+                )}
+                title={t('commands.ttyModeHint')}
+                aria-pressed={ttyMode}
+                onClick={() => {
+                  setTtyMode((v) => !v)
+                  inputRef.current?.focus()
+                }}
+              >
+                TTY
+              </button>
+            )}
             {runId ? (
               <button
                 className="shrink-0 rounded-md bg-destructive px-3 py-1.5 font-sans text-destructive-foreground hover:bg-destructive/90"
@@ -254,7 +376,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
             ) : (
               <button
                 className="shrink-0 rounded-md bg-terminal-foreground px-3 py-1.5 font-sans text-terminal hover:bg-terminal-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!command.trim()}
+                disabled={!command.trim() || starting}
                 onClick={() => void run()}
               >
                 {t('commands.run')}

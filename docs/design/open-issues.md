@@ -29,6 +29,9 @@
 | ~~**V-19**~~ | ~~`@agentclientprotocol/claude-agent-acp` は `agent_message_chunk` に ACP v1 の任意フィールド `messageId` を実際に付けて送ってくるか~~ | ✅ **検証済み（2026-09-30）。送ってくる。** decisions.md C-4 の `messageId` 比較は shovel の主対象エージェントで実際に機能する前提で進めてよい |
 | **V-20** | 日本語・空白を含むファイル名を添付したとき、claude-agent-acp 経由でエージェントが正しく Read できるか。shovel は `resource_link` の URI を `file://` ＋ 生のパスで組み立てており、パーセントエンコードしていない（RFC 上は誤り）。エンコードすると、モデルが `%E3%…` のまま Read しようとするおそれがある | `connection.ts` の `prompt()` で URI をエンコードするかどうか。変える場合は `translate.ts` の `chipFromUri`（replay 時のチップ復元）も合わせて直す（decisions.md G-1-5a） |
 | **V-21** | Markdown の印刷用表示（decisions.md N-3-10）から OS の印刷ダイアログを出し、PDF に保存したときの仕上がり（図の大きさ・改ページ・コードブロックの地の色）。開発用サンドボックスには印刷系が無く、ダイアログも PDF 出力も確かめられていない（画面の描画・描画完了待ち・ウィンドウの開閉は確認済み） | `print.css` の改ページ・図の最大高さ・余白の調整が要るか |
+| **V-22** | TTY モード（decisions.md N-4）のバイト列が `sbx exec -i` のパイプを通っても欠けず・変わらずに届くか。特に Windows の `sbx.exe` 経由（改行の変換、`\x03` や ESC の扱い、base64 の長い引数）。試作は `sbx exec` を通さずに確認しただけ | TTY モードを Windows でも出すか。ラッパーの起動方法を変える必要があるか |
+| **V-23** | 対応表の各エージェントのテンプレート（claude 以外も含む）に `python3` が入っているか | TTY モードを使えないテンプレートがどれだけあるか。代替（`script` など）を再検討するか |
+| **V-24** | 実際に TUI を求めるツール（MCP の設定・認証など）が TTY モードで最後まで操作できるか（矢印キーの方式、Space での複数選択、ブラウザを開く OAuth との組み合わせ） | xterm.js の設定やラッパーに追加が要るか |
 
 ---
 

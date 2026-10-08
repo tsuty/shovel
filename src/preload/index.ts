@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IpcChannel, type ProjectProgress, type RendererApi, type SessionEnvelope, type SessionOpenProgress } from '@shared/ipc'
-import type { CommandExit, CommandOutputChunk } from '@shared/types/command'
+import type { CommandExit, CommandOutputChunk, CommandTtyOutput } from '@shared/types/command'
 import type { AppSettings } from '@shared/types/settings'
 
 /** `contextBridge` で型付き API を renderer に公開する。 */
@@ -116,7 +116,10 @@ const api: RendererApi = {
   },
   command: {
     run: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandRun, projectId, command),
+    runTty: (projectId, command, cols, rows) =>
+      ipcRenderer.invoke(IpcChannel.CommandRunTty, projectId, command, cols, rows),
     sendInput: (runId, text) => ipcRenderer.invoke(IpcChannel.CommandSendInput, runId, text),
+    resizeTty: (runId, cols, rows) => ipcRenderer.invoke(IpcChannel.CommandResizeTty, runId, cols, rows),
     cancel: (runId) => ipcRenderer.invoke(IpcChannel.CommandCancel, runId),
     history: (projectId) => ipcRenderer.invoke(IpcChannel.CommandHistory, projectId),
     removeHistory: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandRemoveHistory, projectId, command),
@@ -126,6 +129,11 @@ const api: RendererApi = {
       const listener = (_event: unknown, payload: CommandOutputChunk): void => cb(payload)
       ipcRenderer.on(IpcChannel.CommandOutput, listener)
       return () => ipcRenderer.removeListener(IpcChannel.CommandOutput, listener)
+    },
+    onTtyOutput: (cb) => {
+      const listener = (_event: unknown, payload: CommandTtyOutput): void => cb(payload)
+      ipcRenderer.on(IpcChannel.CommandTtyOutput, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.CommandTtyOutput, listener)
     },
     onExit: (cb) => {
       const listener = (_event: unknown, payload: CommandExit): void => cb(payload)

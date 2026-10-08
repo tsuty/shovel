@@ -201,7 +201,7 @@
     "pin": "ピン留め",
     "unpin": "ピン留めを外す",
     "pinLimit": "ピン留めは {{count}} 件までです",
-    "hint": "[Y/n] のような入力には応答できますが、vim などの全画面アプリは動きません。",
+    "hint": "[Y/n] のような入力には応答できます。カーソルで選ぶ画面や vim などは TTY モードで実行してください。",
     "placeholder": "コマンドを実行…（↑↓ で履歴）",
     "run": "実行",
     "cancel": "中断",
@@ -209,7 +209,11 @@
     "sendInput": "送信",
     "history": "履歴",
     "historyEmpty": "まだ履歴はありません。",
-    "historyHint": "クリックで入力欄へ（すぐには実行しません）"
+    "historyHint": "クリックで入力欄へ（すぐには実行しません）",
+    "ttyModeHint": "TTY モード：カーソルで選ぶ・スペースで選ぶ画面や vim などを動かすときにオンにします（サンドボックスに python3 が必要）",
+    "ttyRunning": "端末に直接入力できます（Ctrl+C で割り込み）",
+    "ttyUnavailable": "このサンドボックスでは TTY モードを使えません（python3 がありません）。",
+    "openOsTerminal": "OS のターミナルで開く"
   },
   "transcript": {
     "you": "あなた",
