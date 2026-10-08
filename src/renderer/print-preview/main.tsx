@@ -4,9 +4,11 @@ import '../shared/i18n'
 import '../shared/styles/globals.css'
 import './print.css'
 import { App } from './App'
+import { TooltipLayer } from '../shared/components/TooltipLayer'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
+    <TooltipLayer />
   </React.StrictMode>
 )

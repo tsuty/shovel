@@ -268,6 +268,9 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
 - **Specs live in Markdown, not in code comments.** Behavior specs, design rationale, and
   references like `decisions.md N-x-y` belong in `docs/design/*.md`. Code comments are limited to
   explaining what the code does and describing variables, constants, and fields.
+- **Tooltips: just write `title`.** Native tooltips are never shown — `TooltipLayer` (mounted once
+  per window in each `main.tsx`) moves `title` to `data-tip` on hover and draws its own popup
+  (decisions.md G-1-15). For an ⓘ-only hint use `InfoTip`. Don't add per-component tooltip code.
 - **`dependencies` = only what main/preload `require` at runtime** (`@agentclientprotocol/sdk`,
   `zod`, `ignore`). Renderer libraries and anything main should bundle (e.g. ESM-only
   `electron-store`) go in `devDependencies` — electron-builder ships every `dependencies` entry

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { History, Info, Pin, SquareTerminal, X } from 'lucide-react'
+import { History, Pin, SquareTerminal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput } from '@shared/types/command'
 import { cn } from '../../shared/lib/utils'
+import { InfoTip } from '../../shared/components/InfoTip'
 import { TtyTerminal, type TtyTerminalHandle } from './TtyTerminal'
 
 type RunEvent = CommandOutputChunk | CommandTtyOutput | CommandExit
@@ -248,9 +249,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
         <span className="font-medium" title={t('commands.hint')}>
           {t('commands.title')}
         </span>
-        <span title={t('commands.hint')} className="text-muted-foreground">
-          <Info size={12} />
-        </span>
+        <InfoTip text={t('commands.hint')} />
         <div className="flex-1" />
         <button
           className={cn(
