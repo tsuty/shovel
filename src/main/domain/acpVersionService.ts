@@ -5,7 +5,7 @@ import type { AcpUpdateOffer, AgentEntry, Project } from '@shared/types/project'
 import { acpRegistryStore, projectsStore } from '../persistence/store'
 
 /**
- * ACP アダプタのバージョン管理（decisions.md N-2-5b）。
+ * ACP アダプタのバージョン管理。
  *   1. プロジェクトマネージャを開いたとき、ACP レジストリから最新版を読んで控える。
  *   2. セッション開始時、エージェントが `initialize` で告げた版をプロジェクトに記録する。
  *   3. プロジェクトのウィンドウを開いたとき、控えた最新版が記録より新しければ更新するか尋ねる。
@@ -28,10 +28,7 @@ export async function refreshLatestAcpVersions(): Promise<void> {
   }
 }
 
-/**
- * `npx -y` に渡すパッケージ指定。プロジェクトに記録した版、無ければ控えた最新版、
- * それも無ければ `@latest`（バージョン無しだと npx がキャッシュの古い版を使い続けるため）。
- */
+/** `npx -y` に渡すパッケージ指定。プロジェクトに記録した版、無ければ控えた最新版、それも無ければ `@latest`。 */
 export function acpPackageSpec(project: Project, agent: AgentEntry): string {
   const version = project.acpVersion ?? acpRegistryStore.get(agent.acpPackage)?.version
   return `${agent.acpPackage}@${version ?? 'latest'}`

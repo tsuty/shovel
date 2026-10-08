@@ -61,15 +61,7 @@ function HistoryStateIcon({ entry, hasBackups }: { entry: HistoryEntry; hasBacku
   return <Clock3 size={14} className="shrink-0" />
 }
 
-/**
- * サイドバーの「チャット」パネル。開いているタブと過去のセッションを並べる。
- *   - 過去セッションをクリックすると読み取り専用の `HistoryView` で開く。
- *   - 右クリックで名前変更・削除。
- *   - バックアップを持つ行には展開キャレットを付け、`{日時} {サイズ}` のサブリストを出す。
- *   - 「削除済みを表示」トグルで削除済みセクションを出す。
- *   - 見出しの右にローカル検索の入口（🔎）を置く。
- *   - バックアップ／削除済みの行はクリックで Read Only タブとして開く。
- */
+/** サイドバーの「チャット」パネル。開いているタブと、過去のセッション・バックアップ・削除済みの記録を並べる。 */
 export function ChatHistoryPanel({
   projectId,
   tabs,

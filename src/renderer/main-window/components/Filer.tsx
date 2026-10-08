@@ -106,11 +106,7 @@ function targetDirFor(node: FsNode | null): string {
   return node.relPath.includes('/') ? node.relPath.slice(0, node.relPath.lastIndexOf('/')) : ''
 }
 
-/**
- * `react-arborist` による遅延展開のファイルツリー。`.gitignore` 対象は薄く表示する。
- * 見出しの更新ボタンで展開中のフォルダを読み直す。アプリ外からの貼り付け・ドロップはコピーとして取り込む。
- * 見出しの 🔎 とフォルダの右クリックから、ファイルの中身を検索する（decisions.md N-3-11）。
- */
+/** `react-arborist` による遅延展開のファイルツリー。 */
 export function Filer({
   projectId,
   onOpenFile,
@@ -203,10 +199,7 @@ export function Filer({
     }
   }
 
-  /**
-   * ターン終了時の自動の読み直し（decisions.md N-3-6 (A)）。名前変更の入力中や読み直しの最中に
-   * 来たら、それが終わってから1回だけ読み直す（入力中の行や読み直し途中のツリーを崩さないため）。
-   */
+  /** 名前変更の入力中や読み直しの最中に来たターン終了。それが終わってから1回だけ読み直す。 */
   const autoRefreshPendingRef = useRef(false)
   const autoRefreshRef = useRef<() => void>(() => {})
   autoRefreshRef.current = () => {

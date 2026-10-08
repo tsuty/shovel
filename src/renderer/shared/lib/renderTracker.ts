@@ -2,7 +2,6 @@ import { createContext, useContext, useLayoutEffect } from 'react'
 
 /**
  * 非同期の描画（Mermaid の図・shiki のハイライト）が終わったかを数える。
- * 印刷用表示は、すべて終わるまで印刷ボタンを押せないようにする（図が空白のまま印刷されないように）。
  * Provider が無い画面（通常のプレビュー・トランスクリプト）では何もしない。
  */
 export interface RenderTracker {

@@ -73,7 +73,7 @@ export function FileViewer({
   /** 画像の幅×高さ。読み込み前は `undefined`、取れなかった（寸法のない SVG など）ときは `null`。 */
   const [imageDims, setImageDims] = useState<{ width: number; height: number } | null | undefined>(undefined)
 
-  /** ターン終了ごとに増やす。読み直しのきっかけ（decisions.md N-3-6 (B)）。 */
+  /** ターン終了ごとに増やす。読み直しのきっかけ。 */
   const [revision, setRevision] = useState(0)
   useEffect(() => onTurnEnd(() => setRevision((r) => r + 1)), [])
   const viewRef = useRef(view)

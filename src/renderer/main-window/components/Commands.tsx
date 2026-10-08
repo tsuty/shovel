@@ -10,11 +10,7 @@ const HISTORY_LIMIT = 20
 /** ピン留めの上限（main の `PINNED_COMMAND_LIMIT` と揃える）。 */
 const PINNED_LIMIT = 10
 
-/**
- * コマンド実行パネル。`\r` で上書きされる進捗行は1行として畳み、出力行数には上限を設ける。
- * 履歴は ↑↓キーと右側の一覧から入力欄に呼び戻す（実行はしない）。
- * ピン留めは一覧の上部に固定され、↑↓キーでは辿らない。
- */
+/** コマンド実行パネル。`\r` で上書きされる進捗行は1行として畳み、出力行数には上限を設ける。 */
 export function Commands({ projectId, onClose }: { projectId: string; onClose: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   const [command, setCommand] = useState('')

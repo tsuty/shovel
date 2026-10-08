@@ -265,8 +265,7 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.PrintOpenPreview, (_event, projectId: string, relPath: string) =>
     openPrintPreviewWindow(projectId, relPath)
   )
-  // PDF にするのも OS の印刷ダイアログに任せる（macOS の「PDF として保存」など）。
-  // 画面と同じ見た目で出すため、コードブロックの地の色などの背景も印刷する。
+  // コードブロックの地の色などの背景も印刷する。
   ipcMain.handle(
     IpcChannel.PrintRun,
     (event) =>

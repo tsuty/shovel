@@ -10,10 +10,7 @@ import {
 } from '../../shared/components/ui/dialog'
 import { Button } from '../../shared/components/ui/button'
 
-/**
- * ACP アダプタの新しい版が出ているとき、更新するか今の版のままにするかを尋ねる
- * （decisions.md N-2-5b）。答えずに閉じたときは今回だけ今の版で開き、次回また尋ねる。
- */
+/** ACP アダプタの新しい版が出ているとき、更新するか今の版のままにするかを尋ねる。 */
 export function AcpUpdateDialog({
   offer,
   onAnswer,

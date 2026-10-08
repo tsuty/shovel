@@ -3,11 +3,8 @@ import path from 'node:path'
 import { protocol } from 'electron'
 
 /**
- * ビルド済みの renderer を `file://` ではなく `app://renderer/...` で読み込む。
- * Electron 44 の `file://` は、多数のモジュールを同時に動的 import すると一部が
- * `net::ERR_FAILED` で失敗する（shiki の言語定義や Mermaid の図の遅延読み込みが壊れる）。
- * メインプロセスが `fs` で読んで返せば起きない（decisions.md F-1b）。
- * 開発時（`ELECTRON_RENDERER_URL`）は Vite の開発サーバーから読むので使わない。
+ * ビルド済みの renderer を `app://renderer/...` で配信する。メインプロセスが `out/renderer` 配下を
+ * `fs` で読んで返す。開発時（`ELECTRON_RENDERER_URL`）は Vite の開発サーバーから読むので使わない。
  */
 
 const SCHEME = 'app'

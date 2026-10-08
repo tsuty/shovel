@@ -5,12 +5,8 @@ import { FILE_SEARCH_MAX_RESULTS, type FileSearchResult } from '@shared/types/fi
 import { decodeText } from './textEncoding'
 
 /**
- * ファイラーの中身検索（decisions.md N-3-11）。ホスト側の Node `fs` でフォルダをたどり、
+ * ファイラーの中身検索。ホスト側の Node `fs` でフォルダを浅い階層から順にたどり、
  * UTF-8 のテキストファイルの中身に大文字小文字を無視した部分一致をかける。
- *
- * - `.` で始まるフォルダと `node_modules` は、どの深さでも中に入らない（範囲として直接選んだフォルダは除く）。
- * - バイナリ・UTF-8 以外・大きすぎるファイル・シンボリックリンクは読まない。
- * - 浅い階層のファイルから順に探し、ファイルごとに最初の一致だけを返す。上限に達したら打ち切る。
  */
 
 /** これより大きいファイルは読まない（ログやデータのダンプで固まらないように）。 */
@@ -61,7 +57,7 @@ export async function searchDirectory(
     try {
       entries = await readdir(path.join(rootAbs, dirRel), { withFileTypes: true })
     } catch {
-      // 読めないフォルダは黙って飛ばす（ファイラーの「…」と同じ扱い、decisions.md N-3-9）。
+      // 読めないフォルダは飛ばす。
       continue
     }
     if (!isLatest()) return null

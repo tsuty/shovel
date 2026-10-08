@@ -22,7 +22,7 @@ type ViewMode = 'split' | 'source' | 'preview' | 'view' | 'edit'
 
 const MODE_ICONS = { split: Columns2, source: SquareCode, preview: Eye, view: Eye, edit: SquarePen } as const
 
-/** 先頭が既定のモード。チャットの横に添えたときは「分割」を出さない（decisions.md G-1-9）。 */
+/** 種類と表示場所ごとに選べるモード。先頭が既定。 */
 function modesFor(language: EditorLanguage, variant: 'tab' | 'attached'): [ViewMode, ...ViewMode[]] {
   if (usesViewEditModes(language)) return ['view', 'edit']
   return variant === 'attached' ? ['source', 'preview'] : ['split', 'source', 'preview']
@@ -56,13 +56,7 @@ function savedByteSize(text: string, meta: FileMeta): number {
 const EXTERNAL_CHECK_INTERVAL_MS = 3000
 
 /**
- * アプリ内で編集できるテキストファイル（Markdown / Mermaid / JSON / YAML / .txt、decisions.md N-3-1）の
- * エディタ。Markdown / Mermaid は分割ビュー（ソース/プレビュー）と、どちらか単独の表示を切り替える。
- * JSON / YAML / テキストは編集したい場面の方が少ないので、ハイライトした表示を既定にし、「編集」で書き換えられる。
- * 編集は自動保存する。外部での変更は、未保存編集がなければ黙って再読込し、
- * あれば競合コピーを残してから最新へ切り替える。
- *
- * `variant: 'attached'` はチャットタブの右に添えたときで、「分割」は出さない。
+ * アプリ内で編集できるテキストファイルのエディタ。`variant: 'attached'` はチャットタブの右に添えたとき。
  *
  * `reveal`（中身検索の一致箇所）が来たら、ソースが見えていればそこを選択し、「表示」ならその行へ移って
  * 塗る。Markdown / Mermaid のプレビューだけのときは、ソースが見えるモードへ切り替えてから選択する。
@@ -242,8 +236,7 @@ export function TextFileEditor({
     area.setSelectionRange(edit.selectionStart, edit.selectionEnd)
   }
 
-  // 行番号は折り返しと両立しないので、図と設定ファイルだけに付けて折り返さない。
-  // Markdown は文章なので、折り返しを優先して行番号を付けない。
+  // 行番号を付けるときは折り返さない（Markdown は折り返して行番号を付けない）。
   const showLineNumbers = language !== 'markdown'
   const lineNumbers = useMemo(() => (showLineNumbers ? lineNumbersText(text) : ''), [showLineNumbers, text])
   function syncGutter(): void {
@@ -319,7 +312,7 @@ export function TextFileEditor({
     return () => clearInterval(interval)
   }, [syncWithDisk])
 
-  // ターン終了時は、次のポーリングを待たずに読み直す（decisions.md N-3-6 (B)）。
+  // ターン終了時は、次のポーリングを待たずに読み直す。
   useEffect(
     () =>
       onTurnEnd(() => {
@@ -328,7 +321,7 @@ export function TextFileEditor({
     [syncWithDisk]
   )
 
-  /** 印刷用表示はディスクから読むので、自動保存待ちの編集を書き出してから開く（decisions.md N-3-10）。 */
+  /** 印刷用表示はディスクから読むので、自動保存待ちの編集を書き出してから開く。 */
   async function openPrintPreview(): Promise<void> {
     await flush().catch((err: unknown) => console.warn('[editor] autosave failed', err))
     await window.shovel.print.openPreview(projectId, relPath)

@@ -2,10 +2,7 @@ import type { BrowserWindow } from 'electron'
 import { createSecureWindow } from './createSecureWindow'
 import { rendererPageUrl } from './rendererProtocol'
 
-/**
- * Markdown の印刷用表示（decisions.md N-3-10）。ファイルごとに1枚のウィンドウを開き、
- * 中身は renderer がディスクから読んで描く。```mermaid は図として埋め込む。
- */
+/** 開いている印刷用表示のウィンドウ（ファイルごとに1枚）。中身は renderer がディスクから読んで描く。 */
 const windowsByKey = new Map<string, { projectId: string; win: BrowserWindow }>()
 
 function keyOf(projectId: string, relPath: string): string {

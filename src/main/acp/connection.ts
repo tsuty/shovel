@@ -288,13 +288,8 @@ export async function openAcpSession(
   }
 
   /**
-   * 過去のセッションを復元して開く。
-   *   | ローカル記録 | capability  | 振る舞い                                        |
-   *   | あり         | load        | 記録を即座に描き、load の replay は描かずに比較 |
-   *   | あり         | resume のみ | 記録を描き resume（比較しない）                 |
-   *   | 無し／空     | load        | load のライブ replay を描き、完了後に保存       |
-   *   | 無し／空     | resume のみ | resume（描けるものは無い）                      |
-   *   | どちらでも   | 非対応      | RESTORE_UNSUPPORTED                             |
+   * 過去のセッションを復元して開く。ローカル記録の有無とエージェントの capability に応じて
+   * `session/load` か `session/resume` を呼び、どちらも無ければ RESTORE_UNSUPPORTED で失敗する。
    */
   async function startRestoredSession(
     ctx: ClientContext,
@@ -444,7 +439,7 @@ export async function openAcpSession(
           )
 
           capabilities = readCapabilities(initResponse)
-          // 実際に動いている版をプロジェクトに記録する（decisions.md N-2-5b）。
+          // 実際に動いている版をプロジェクトに記録する。
           recordAcpVersion(project.id, (initResponse as InitializeResponse | undefined)?.agentInfo?.version)
           callbacks.onProgress?.(
             'session',

@@ -1,8 +1,4 @@
-/**
- * ファイラーの「新規ファイル」で作れるファイルの種類と、アプリ内エディタで編集できるファイル。
- * 編集できるのは Markdown / Mermaid / プレーンテキスト（.txt）と、MCP などの設定に使う JSON / YAML だけ
- * （decisions.md N-3-1）。
- */
+/** ファイラーの「新規ファイル」で作れるファイルの種類と、アプリ内エディタで編集できるファイルの判定。 */
 
 export const NEW_FILE_KINDS = ['markdown', 'text', 'mermaid', 'json', 'yaml'] as const
 export type NewFileKind = (typeof NEW_FILE_KINDS)[number]

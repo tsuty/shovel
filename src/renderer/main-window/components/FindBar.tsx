@@ -9,12 +9,8 @@ const HIGHLIGHT_ACTIVE = 'shovel-find-active'
 const RESCAN_DEBOUNCE_MS = 150
 
 /**
- * ページ内検索バー（Cmd/Ctrl+F）。`root` の中の、いま見えているテキストを探す。
- * Enter で次、Shift+Enter で前、Esc で閉じる。
- *
+ * ページ内検索バー（Cmd/Ctrl+F）。`root` の中の、いま見えているテキスト（textarea / input の中身は除く）を探す。
  * ヒット箇所は CSS Custom Highlight API で塗る（DOM を書き換えないので React の描画と衝突しない）。
- * `webContents.findInPage()` は検索欄自身の文字までヒットし、入力欄のフォーカスも奪うため使わない
- * （decisions.md N-1-a）。textarea / input の中身は検索対象外。
  */
 export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> }): React.JSX.Element | null {
   const { t } = useTranslation()

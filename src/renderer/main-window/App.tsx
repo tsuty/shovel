@@ -237,7 +237,7 @@ export function App(): React.JSX.Element {
   }
 
   // StrictMode の二重発火でセッションが2つ開かないよう、ref で一度だけに絞る。
-  // ACP アダプタの新しい版が出ていれば、最初のタブを開く前に更新するか尋ねる（decisions.md N-2-5b）。
+  // ACP アダプタの新しい版が出ていれば、最初のタブを開く前に更新するか尋ねる。
   const didOpenInitialTabRef = useRef(false)
   useEffect(() => {
     if (projectId && !didOpenInitialTabRef.current) {

@@ -166,7 +166,7 @@ function CodeBlock({
   }
 
   if (forPrint && isMermaid) {
-    // 印刷用表示では、図をその場に埋め込む（decisions.md N-3-10）。
+    // 印刷用表示では、図をその場に埋め込む。
     return (
       <figure className="mermaid-figure my-[0.5em]">
         <MermaidDiagram code={text} />

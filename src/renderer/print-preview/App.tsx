@@ -8,11 +8,7 @@ import { useSettings } from '../shared/useSettings'
 
 type Content = { kind: 'loading' } | { kind: 'text'; text: string } | { kind: 'unreadable' }
 
-/**
- * Markdown の印刷用表示（decisions.md N-3-10）。開いた時点のディスクの内容を、```mermaid を図として
- * 埋め込んで描く。テーマは常にライト、文字サイズは設定に依らず固定。図とハイライトがすべて
- * 描き終わってから印刷できる。PDF にするのは OS の印刷ダイアログに任せる。
- */
+/** Markdown の印刷用表示。開いた時点のディスクの内容を、```mermaid を図として埋め込んで描く。 */
 export function App(): React.JSX.Element {
   const { t } = useTranslation()
   // 言語の設定だけを使う。テーマは追わない。

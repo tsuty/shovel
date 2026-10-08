@@ -1,7 +1,4 @@
-/**
- * エディタの textarea を補う純粋関数（Tab でのインデントと JSON の文法チェック）。
- * 本格的なエディタは入れない（decisions.md N-3-1）ので、設定ファイルを直すのに要る分だけ持つ。
- */
+/** エディタの textarea を補う純粋関数（Tab でのインデントと JSON の文法チェック）。 */
 
 export const INDENT = '  '
 

@@ -1,7 +1,4 @@
-/**
- * ACP アダプタのバージョンまわりの純粋なロジック（decisions.md N-2-5b）。
- * ACP レジストリ（registry.json）の読み取りと、バージョン文字列の比較。
- */
+/** ACP レジストリ（registry.json）の読み取りと、バージョン文字列の比較。 */
 
 /** ACP レジストリの URL。 */
 export const ACP_REGISTRY_URL = 'https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json'

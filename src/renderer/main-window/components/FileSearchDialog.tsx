@@ -16,10 +16,7 @@ interface SearchMemory {
   lastOpened: string | null
 }
 
-/**
- * プロジェクトごとの前回の検索。ダイアログを閉じても、ファイラーを閉じても残す（ウィンドウを閉じるまで）。
- * 当たったファイルを1つずつ開いて見ていく使い方のため（decisions.md N-3-11）。
- */
+/** プロジェクトごとの前回の検索。ウィンドウを閉じるまで残る。 */
 const memories = new Map<string, SearchMemory>()
 
 function memoryFor(projectId: string): SearchMemory {
@@ -39,11 +36,8 @@ function splitPath(relPath: string): { name: string; dir: string } {
 }
 
 /**
- * ファイラーの中身検索（decisions.md N-3-11）。見た目と操作はローカルセッション検索（`LocalSearchDialog`）に
- * 揃える: 約200msデバウンスし、新しいクエリが来たら前の検索は捨てる。結果行はファイル名＋一致を含む行
- * （一致だけ太字）＋右寄せのフォルダと行番号。行を押すとそのファイルを開き、一致箇所へ移る。
- *
- * 開き直したときは前回の結果をすぐ出し、裏で検索し直して差し替える（その間にファイルが変わっているかもしれないため）。
+ * ファイラーの中身検索ダイアログ。入力を約200msデバウンスし、新しいクエリが来たら前の検索は捨てる。
+ * 開き直したときは前回の結果をすぐ出し、裏で検索し直して差し替える。
  */
 export function FileSearchDialog({
   projectId,

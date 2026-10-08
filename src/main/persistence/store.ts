@@ -91,9 +91,9 @@ export const sessionTitleStore = {
   }
 }
 
-/** コマンド履歴。プロジェクト単位・コマンド文字列のみ・MRU・最新20件。 */
+/** プロジェクトごとのコマンド履歴（MRU）の保持件数。 */
 export const COMMAND_HISTORY_LIMIT = 20
-/** ピン留めの上限。ピン留めは `COMMAND_HISTORY_LIMIT` の外で、押し出されない。 */
+/** ピン留めの上限。ピン留めは `COMMAND_HISTORY_LIMIT` に数えない。 */
 export const PINNED_COMMAND_LIMIT = 10
 
 export const commandHistoryStore = {
@@ -168,7 +168,7 @@ export const pickDirectoryStore = {
   }
 }
 
-/** ACP レジストリで見た表示名と最新バージョンの控え（decisions.md N-2-5b）。 */
+/** ACP レジストリで見た表示名と最新バージョンの控え。 */
 export const acpRegistryStore = {
   get(packageName: string): AcpRegistryEntry | undefined {
     return store.get('acpRegistryEntries')[packageName]

@@ -225,7 +225,7 @@ export interface RendererApi {
   }
   agents: {
     list(): Promise<AgentEntry[]>
-    /** ACP アダプタの更新を尋ねるべきなら、その内容（decisions.md N-2-5b）。 */
+    /** ACP アダプタの更新を尋ねるべきなら、その内容。 */
     acpUpdateOffer(projectId: string): Promise<AcpUpdateOffer | null>
     /** 更新の確認への答え（true: 最新版にする、false: 今の版のまま）。 */
     resolveAcpUpdate(projectId: string, update: boolean): Promise<void>
@@ -306,7 +306,7 @@ export interface RendererApi {
     onExit(cb: (exit: CommandExit) => void): () => void
   }
   print: {
-    /** Markdown ファイルの印刷用表示を別ウィンドウで開く（decisions.md N-3-10）。 */
+    /** Markdown ファイルの印刷用表示を別ウィンドウで開く。 */
     openPreview(projectId: string, relPath: string): Promise<void>
     /** 呼び出したウィンドウを OS の印刷ダイアログで印刷する。キャンセルされても resolve する。 */
     run(): Promise<void>

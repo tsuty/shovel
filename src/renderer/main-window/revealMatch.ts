@@ -1,7 +1,7 @@
 import { offsetAt } from './textEditing'
 
 /**
- * ファイルを開いたときに、指定の位置（中身検索で当たった箇所）へ移る指示（decisions.md N-3-11）。
+ * ファイルを開いたときに、指定の位置（中身検索で当たった箇所）へ移る指示。
  * `nonce` は同じ位置へもう一度移るときにも効かせるための通し番号。
  */
 export interface FileReveal {
