@@ -5,6 +5,7 @@ import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput 
 import { cn } from '../../shared/lib/utils'
 import { InfoTip } from '../../shared/components/InfoTip'
 import { TtyTerminal, type TtyTerminalHandle } from './TtyTerminal'
+import { ResizablePanel } from './ResizablePanel'
 
 type RunEvent = CommandOutputChunk | CommandTtyOutput | CommandExit
 
@@ -13,6 +14,10 @@ const MAX_LINES = 2000
 const HISTORY_LIMIT = 20
 /** ピン留めの上限（main の `PINNED_COMMAND_LIMIT` と揃える）。 */
 const PINNED_LIMIT = 10
+/** 履歴の一覧の幅（既定・最小・最大）。 */
+const HISTORY_DEFAULT_WIDTH = 224
+const HISTORY_MIN_WIDTH = 160
+const HISTORY_MAX_WIDTH = 560
 
 /**
  * コマンド実行パネル。`\r` で上書きされる進捗行は1行として畳み、出力行数には上限を設ける。
@@ -26,6 +31,7 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
   const [lines, setLines] = useState<string[]>([])
   const [stdin, setStdin] = useState('')
   const [historyOpen, setHistoryOpen] = useState(true)
+  const [historyWidth, setHistoryWidth] = useState(HISTORY_DEFAULT_WIDTH)
   /** 次の実行を TTY モードにするか。 */
   const [ttyMode, setTtyMode] = useState(false)
   /** 出力の面に何を出しているか。端末は次の実行かパネルを閉じるまで残す。 */
@@ -56,6 +62,12 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
   useEffect(() => {
     void window.shovel.command.history(projectId).then(setHistory)
   }, [projectId])
+
+  useEffect(() => {
+    void window.shovel.sidebar.getWidths().then((widths) => {
+      if (widths.commandsHistory) setHistoryWidth(widths.commandsHistory)
+    })
+  }, [])
 
   function handleRunEvent(event: RunEvent): void {
     if ('text' in event) {
@@ -384,66 +396,77 @@ export function Commands({ projectId, onClose }: { projectId: string; onClose: (
           </div>
         </div>
         {historyOpen && (
-          <div className="flex w-56 shrink-0 flex-col border-l border-border">
-            <div className="truncate border-b border-border px-2 py-1 text-[11px] text-muted-foreground">
-              {t('commands.historyHint')}
+          <ResizablePanel
+            edge="left"
+            width={historyWidth}
+            minWidth={HISTORY_MIN_WIDTH}
+            maxWidth={HISTORY_MAX_WIDTH}
+            onResizeEnd={(width) => {
+              setHistoryWidth(width)
+              void window.shovel.sidebar.setWidth('commandsHistory', width)
+            }}
+          >
+            <div className="flex h-full flex-col">
+              <div className="border-b border-border px-2 py-1 text-[11px] text-muted-foreground">
+                {t('commands.historyHint')}
+              </div>
+              <ul className="flex-1 overflow-y-auto p-1">
+                {pinned.map((entry) => (
+                  <li key={`pinned:${entry}`} className="flex items-center rounded hover:bg-accent">
+                    <button
+                      className="min-w-0 flex-1 truncate px-1.5 py-0.5 text-left font-mono text-xs"
+                      title={entry}
+                      onClick={() => insertFromHistory(entry)}
+                    >
+                      {entry}
+                    </button>
+                    {/* ピン留め中は削除させず、外すだけ（外すと履歴の先頭に戻る）。 */}
+                    <button
+                      className="mr-1 shrink-0 rounded p-0.5 text-foreground hover:text-muted-foreground"
+                      title={t('commands.unpin')}
+                      aria-label={t('commands.unpin')}
+                      onClick={() => void unpinEntry(entry)}
+                    >
+                      <Pin size={12} className="fill-current" />
+                    </button>
+                  </li>
+                ))}
+                {pinned.length > 0 && <li role="separator" className="mx-1 my-1 border-t border-border" />}
+                {history.map((entry) => (
+                  <li key={entry} className="group/history flex items-center rounded hover:bg-accent">
+                    <button
+                      className="min-w-0 flex-1 truncate px-1.5 py-0.5 text-left font-mono text-xs"
+                      title={entry}
+                      onClick={() => insertFromHistory(entry)}
+                    >
+                      {entry}
+                    </button>
+                    <button
+                      className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-0 disabled:hover:text-muted-foreground group-hover/history:opacity-100 group-hover/history:disabled:opacity-40"
+                      title={pinned.length >= PINNED_LIMIT ? t('commands.pinLimit', { count: PINNED_LIMIT }) : t('commands.pin')}
+                      aria-label={t('commands.pin')}
+                      disabled={pinned.length >= PINNED_LIMIT}
+                      onClick={() => void pinEntry(entry)}
+                    >
+                      <Pin size={12} />
+                    </button>
+                    {/* 確認なしで即座に消す。 */}
+                    <button
+                      className="mr-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/history:opacity-100"
+                      title={t('commands.removeHistory')}
+                      aria-label={t('commands.removeHistory')}
+                      onClick={() => void removeFromHistory(entry)}
+                    >
+                      <X size={12} />
+                    </button>
+                  </li>
+                ))}
+                {history.length === 0 && pinned.length === 0 && (
+                  <li className="px-1.5 py-0.5 text-xs text-muted-foreground">{t('commands.historyEmpty')}</li>
+                )}
+              </ul>
             </div>
-            <ul className="flex-1 overflow-y-auto p-1">
-              {pinned.map((entry) => (
-                <li key={`pinned:${entry}`} className="flex items-center rounded hover:bg-accent">
-                  <button
-                    className="min-w-0 flex-1 truncate px-1.5 py-0.5 text-left font-mono text-xs"
-                    title={entry}
-                    onClick={() => insertFromHistory(entry)}
-                  >
-                    {entry}
-                  </button>
-                  {/* ピン留め中は削除させず、外すだけ（外すと履歴の先頭に戻る）。 */}
-                  <button
-                    className="mr-1 shrink-0 rounded p-0.5 text-foreground hover:text-muted-foreground"
-                    title={t('commands.unpin')}
-                    aria-label={t('commands.unpin')}
-                    onClick={() => void unpinEntry(entry)}
-                  >
-                    <Pin size={12} className="fill-current" />
-                  </button>
-                </li>
-              ))}
-              {pinned.length > 0 && <li role="separator" className="mx-1 my-1 border-t border-border" />}
-              {history.map((entry) => (
-                <li key={entry} className="group/history flex items-center rounded hover:bg-accent">
-                  <button
-                    className="min-w-0 flex-1 truncate px-1.5 py-0.5 text-left font-mono text-xs"
-                    title={entry}
-                    onClick={() => insertFromHistory(entry)}
-                  >
-                    {entry}
-                  </button>
-                  <button
-                    className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-0 disabled:hover:text-muted-foreground group-hover/history:opacity-100 group-hover/history:disabled:opacity-40"
-                    title={pinned.length >= PINNED_LIMIT ? t('commands.pinLimit', { count: PINNED_LIMIT }) : t('commands.pin')}
-                    aria-label={t('commands.pin')}
-                    disabled={pinned.length >= PINNED_LIMIT}
-                    onClick={() => void pinEntry(entry)}
-                  >
-                    <Pin size={12} />
-                  </button>
-                  {/* 確認なしで即座に消す。 */}
-                  <button
-                    className="mr-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/history:opacity-100"
-                    title={t('commands.removeHistory')}
-                    aria-label={t('commands.removeHistory')}
-                    onClick={() => void removeFromHistory(entry)}
-                  >
-                    <X size={12} />
-                  </button>
-                </li>
-              ))}
-              {history.length === 0 && pinned.length === 0 && (
-                <li className="px-1.5 py-0.5 text-xs text-muted-foreground">{t('commands.historyEmpty')}</li>
-              )}
-            </ul>
-          </div>
+          </ResizablePanel>
         )}
       </div>
     </div>
