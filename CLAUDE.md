@@ -50,12 +50,12 @@ rejected because `shell.openPath` can execute agent-written scripts on the host)
 read-only syntax-highlighted viewer (images previewed in-app with a size + width×height status
 bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those. Editable text files all
 open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in
-`src/shared/fileKinds.ts`): Markdown and Mermaid get split/source/preview (Mermaid's preview is the diagram, debounced),
+`src/shared/fileKinds.ts`): Markdown, Mermaid and HTML get split/source/preview (Mermaid's preview is the diagram, debounced; HTML renders in a script-less `sandbox="allow-popups"` srcdoc iframe — `HtmlPreview.tsx`, links go out via `<base target="_blank">` → `setWindowOpenHandler`),
 JSON/YAML (and plain `.txt`, uncoloured) get a highlighted "表示" view by default plus an "編集" toggle (`usesViewEditModes`). The editing
 surface is still a plain textarea, plus Tab/Shift+Tab indent (via `execCommand('insertText')` so undo works), a
 line-number gutter with no wrapping for everything but Markdown (Markdown keeps wrapping, no gutter), and a clickable
 "JSON の書式に誤り（N 行目 M 列目）" status-bar entry (`src/renderer/main-window/textEditing.ts`). The Filer's
-creation items live under a "新規ファイル ▸" submenu (Markdown / Text / Mermaid / JSON / YAML; JSON starts as `{}`, Mermaid
+creation items live under a "新規ファイル ▸" submenu (Markdown / Text / Mermaid / HTML / JSON / YAML; JSON starts as `{}`, Mermaid
 with a starter template); other binaries show an
 "open with default app" button rather than opening automatically; text views and the Markdown
 editor have a status bar with size/encoding/line ending (plus the last autosave time in the editor) — writes preserve the file's original

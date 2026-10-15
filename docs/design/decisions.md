@@ -485,7 +485,7 @@ VFS リフレッシュ、ファイル関連付け起動、レクサー）を sho
 
 | 方式 | 対象 | 切り替え | 既定 |
 | :--- | :--- | :--- | :--- |
-| 分割・ソース・プレビュー | Markdown / **Mermaid** | 「分割」「ソース」「プレビュー」 | 分割（チャットの横ではソース） |
+| 分割・ソース・プレビュー | Markdown / **Mermaid** / **HTML** | 「分割」「ソース」「プレビュー」 | 分割（チャットの横ではソース） |
 | 表示・編集 | JSON / YAML / テキスト（.txt） | 「表示」（shiki でハイライト。テキストは色なしで行番号だけ）「編集」 | 表示 |
 
 - **Mermaid も編集できる**ようにした。プレビューは図（`MermaidDiagram`）。打鍵ごとに描き直すと
@@ -501,6 +501,23 @@ VFS リフレッシュ、ファイル関連付け起動、レクサー）を sho
 - **テキスト（.txt、2026-10-05 追記）**: 「新規メモ（Text）」で作れる。整形の要らない短いメモ用で、
   UI は JSON / YAML と同じ（表示が既定・行番号・折り返さない）。種類の追加が JSON / YAML と同じ
   経路で済むよう、「表示・編集」方式かどうかは `fileKinds.ts` の `usesViewEditModes` で決める。
+- **HTML（.html / .htm、2026-10-15 追記）**: 「新規ページ（HTML）」（アイコン `file-code`）で、
+  最小限の雛形（DOCTYPE・`<meta charset>`・`<title>`・空の `<body>`）を書いた `Untitled.html` を作れる。
+  プレビューは描いたページそのもの（`HtmlPreview`）で、Mermaid と同じく 400ms 待ってから描き直す。
+  AI が書いた HTML をそのまま描くので、閉じ込め方を次のように決めた。
+  - `<iframe sandbox="allow-popups" srcdoc>` に流し込む。スクリプト・フォーム・親ウィンドウの遷移は
+    動かず、アプリ本体とは別の（不透明な）origin になる。
+  - `srcdoc` の iframe は親ページの CSP を引き継ぐので、外部の画像・CSS・フォントは読み込まれない
+    （外への通信が起きない）。インラインの `<style>` / `style` 属性と `data:` の画像は効く。
+  - リンクは、先頭（DOCTYPE の直後）に `<base target="_blank">` を差し込んで新しいウィンドウとして
+    開かせ、既存の `setWindowOpenHandler` が http(s) / mailto だけを外部ブラウザへ渡す
+    （`allow-popups` はこのため）。iframe の中で遷移させると、親の CSP（`frame-src` は
+    `default-src 'self'` に落ちる）で塞がれてエラー画面になるだけで、`will-frame-navigate` も発火しない
+    ことを確かめた。ページ内リンク（`#id`）もこの扱いになるため、プレビュー内ではスクロールしない。
+  - 相対パスの画像・CSS（`./img.png` など）は解決できない（`srcdoc` の基準 URL は `about:srcdoc`）。
+    プロジェクトのファイルを配信する仕組みを足すことになるので見送る。
+  - 背景は白に固定する（ブラウザで開いたときと同じ見え方にするため、テーマには合わせない）。
+  - 印刷用表示（N-3-10）は Markdown のみのまま。
 
 **編集の補助（2026-10-05 追記）**: エディタは素の textarea のまま（CodeMirror などは入れない）で、
 設定ファイルを直すのに要る分だけ足す（`src/renderer/main-window/textEditing.ts`）。
@@ -1659,6 +1676,7 @@ IME 合成中の Enter で送信しない規則はどちらでも同じ。
 - ファイラーの右クリックのアイコン: パスをコピー `link` / コンテキストに追加
   `file-plus` / 新規フォルダ `folder-plus` / 新規ファイル `file-plus-2`（サブメニュー:
   新規メモ（Markdown）`file-text` / 新規メモ（Text）`file-type` / 新規図（Mermaid）Mermaid のロゴ（ブランド色 `#FF3670`）/
+  新規ページ（HTML）`file-code` /
   新規設定（JSON）`file-braces` / 新規設定（YAML）`file-cog`）/
   コピー `clipboard-copy` / 貼り付け `clipboard-paste` / 名前を変更 `square-pen` /
   削除 `trash-2` / Finder で開く `folder-open`。削除のアイコンはアプリ内で

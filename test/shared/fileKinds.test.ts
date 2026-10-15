@@ -10,6 +10,8 @@ describe('editorLanguageFor', () => {
     expect(editorLanguageFor('flow.mmd')).toBe('mermaid')
     expect(editorLanguageFor('notes/Memo.TXT')).toBe('text')
     expect(editorLanguageFor('docs/Flow.Mermaid')).toBe('mermaid')
+    expect(editorLanguageFor('site/index.html')).toBe('html')
+    expect(editorLanguageFor('Page.HTM')).toBe('html')
   })
 
   it('leaves other files to the read-only viewer', () => {
@@ -22,6 +24,7 @@ describe('editorLanguageFor', () => {
 describe('isNewFileKind', () => {
   it('accepts only the known kinds', () => {
     expect(isNewFileKind('yaml')).toBe(true)
+    expect(isNewFileKind('html')).toBe(true)
     expect(isNewFileKind('toml')).toBe(false)
     expect(isNewFileKind(undefined)).toBe(false)
   })

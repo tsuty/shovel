@@ -148,14 +148,27 @@ export async function createDirectory(projectId: string, parentRelPath: string):
   return parentRelPath ? `${parentRelPath}/${name}` : name
 }
 
+const HTML_TEMPLATE = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Untitled</title>
+</head>
+<body>
+
+</body>
+</html>
+`
+
 /**
  * 「新規ファイル」の種類ごとの拡張子と初期内容。Mermaid は開いてすぐ図が見えるように小さな見本を
- * 書いておく（空だと文法エラーになる）。JSON も空だと不正なので `{}` にしておく。
+ * 書いておく（空だと文法エラーになる）。JSON も空だと不正なので `{}` にしておく。HTML は最小限の雛形を書いておく。
  */
 const NEW_FILE_SPECS: Record<NewFileKind, { ext: string; content: string }> = {
   markdown: { ext: '.md', content: '' },
   text: { ext: '.txt', content: '' },
   mermaid: { ext: '.mmd', content: 'flowchart TD\n  A[Start] --> B[End]\n' },
+  html: { ext: '.html', content: HTML_TEMPLATE },
   json: { ext: '.json', content: '{}\n' },
   yaml: { ext: '.yaml', content: '' }
 }

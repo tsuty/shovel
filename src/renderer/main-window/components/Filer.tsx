@@ -7,6 +7,7 @@ import {
   ClipboardPaste,
   File,
   FileBraces,
+  FileCode,
   FileCog,
   FilePlus,
   FilePlus2,
@@ -514,6 +515,9 @@ export function Filer({
               onClick={() => void handleNewFile(menu.node, 'mermaid')}
             >
               {t('filer.newMermaidFile')}
+            </MenuItem>
+            <MenuItem icon={<FileCode size={14} />} onClick={() => void handleNewFile(menu.node, 'html')}>
+              {t('filer.newHtmlFile')}
             </MenuItem>
             <MenuItem icon={<FileBraces size={14} />} onClick={() => void handleNewFile(menu.node, 'json')}>
               {t('filer.newJsonFile')}

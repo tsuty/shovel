@@ -432,7 +432,7 @@ export function App(): React.JSX.Element {
   const canAttachFile = chatTabs.length > 0
 
   /**
-   * 編集できるファイル（Markdown / Mermaid / JSON / YAML / テキスト）をチャットタブの右に添える。
+   * 編集できるファイル（Markdown / Mermaid / HTML / JSON / YAML / テキスト）をチャットタブの右に添える。
    * 添え先は、今のタブがチャットならそれ、チャットが1つしか無ければそれ。決まらなければ添え先を選ばせる。
    */
   function attachFile(relPath: string): void {

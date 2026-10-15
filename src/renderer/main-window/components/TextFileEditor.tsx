@@ -10,12 +10,14 @@ import { onTurnEnd } from '../turnEnd'
 import { conflictPath, decideEditorSync } from '../editorSync'
 import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/types/filer'
 import { FileStatusBar } from './FileStatusBar'
+import { HtmlPreview } from './HtmlPreview'
+import { cn } from '../../shared/lib/utils'
 import { computeIndent, findJsonProblem, lineNumbersText, offsetAt, type JsonProblem } from '../textEditing'
 import { usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
 import { revealInHighlightedCode, revealInTextarea, type FileReveal } from '../revealMatch'
 
 /**
- * 表示の切り替え。Markdown / Mermaid は「分割・ソース・プレビュー」、
+ * 表示の切り替え。Markdown / Mermaid / HTML は「分割・ソース・プレビュー」、
  * JSON / YAML / テキストは「表示（ハイライト、既定）・編集」。
  */
 type ViewMode = 'split' | 'source' | 'preview' | 'view' | 'edit'
@@ -28,8 +30,11 @@ function modesFor(language: EditorLanguage, variant: 'tab' | 'attached'): [ViewM
   return variant === 'attached' ? ['source', 'preview'] : ['split', 'source', 'preview']
 }
 
-/** Mermaid の図は打鍵ごとに描き直すと重く、書きかけの文法エラーでちらつくので、少し待ってから描く。 */
-const MERMAID_PREVIEW_DELAY_MS = 400
+/**
+ * Mermaid の図と HTML のページは打鍵ごとに描き直すと重く、書きかけの内容でちらつく
+ * （HTML はスクロール位置も戻る）ので、少し待ってから描く。
+ */
+const RENDERED_PREVIEW_DELAY_MS = 400
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -59,7 +64,7 @@ const EXTERNAL_CHECK_INTERVAL_MS = 3000
  * アプリ内で編集できるテキストファイルのエディタ。`variant: 'attached'` はチャットタブの右に添えたとき。
  *
  * `reveal`（中身検索の一致箇所）が来たら、ソースが見えていればそこを選択し、「表示」ならその行へ移って
- * 塗る。Markdown / Mermaid のプレビューだけのときは、ソースが見えるモードへ切り替えてから選択する。
+ * 塗る。Markdown / Mermaid / HTML のプレビューだけのときは、ソースが見えるモードへ切り替えてから選択する。
  */
 export function TextFileEditor({
   projectId,
@@ -265,7 +270,7 @@ export function TextFileEditor({
     if (showSource) placePendingCaret()
   })
 
-  const mermaidCode = useDebouncedValue(text, MERMAID_PREVIEW_DELAY_MS)
+  const renderedSource = useDebouncedValue(text, RENDERED_PREVIEW_DELAY_MS)
 
   /** まだ反映していない `reveal`。読み込みと、移り先（textarea か表示）の描画が済んでから反映する。 */
   const pendingRevealRef = useRef<FileReveal | null>(null)
@@ -427,11 +432,13 @@ export function TextFileEditor({
           </div>
         )}
         {showPreview && (
-          <div className="h-full flex-1 overflow-auto p-3">
+          <div className={cn('h-full flex-1 overflow-auto', language !== 'html' && 'p-3')}>
             {language === 'markdown' ? (
               <Markdown text={text} className="text-editor" />
             ) : language === 'mermaid' ? (
-              <MermaidDiagram code={mermaidCode} />
+              <MermaidDiagram code={renderedSource} />
+            ) : language === 'html' ? (
+              <HtmlPreview html={renderedSource} title={relPath} />
             ) : highlighted !== null ? (
               <div
                 ref={highlightedRef}

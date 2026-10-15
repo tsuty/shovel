@@ -97,6 +97,7 @@
     "fileDeleted": "This file has been deleted.",
     "newFolder": "New folder",
     "newMermaidFile": "New diagram (Mermaid)",
+    "newHtmlFile": "New page (HTML)",
     "newMarkdownFile": "New note (Markdown)",
     "newFile": "New file",
     "newTextFile": "New note (Text)",
