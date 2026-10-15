@@ -163,6 +163,23 @@ export function sbxSpawnInteractive(
   return child
 }
 
+/** `sbx policy log <sandbox> --json` の出力（JSON をそのまま）。 */
+export async function sbxPolicyLog(sandboxName: string): Promise<unknown> {
+  const result = await runOk(['policy', 'log', sandboxName, '--type', 'network', '--json'])
+  return JSON.parse(result.stdout) as unknown
+}
+
+/** `sbx policy ls --json` の出力（JSON をそのまま）。 */
+export async function sbxPolicyLs(): Promise<unknown> {
+  const result = await runOk(['policy', 'ls', '--json'])
+  return JSON.parse(result.stdout) as unknown
+}
+
+/** 指定したサンドボックスだけに効く、ネットワークの許可ルールを足す。 */
+export async function sbxPolicyAllowNetwork(sandboxName: string, resource: string): Promise<void> {
+  await runOk(['policy', 'allow', 'network', '--sandbox', sandboxName, resource])
+}
+
 export async function sbxSecretSet(service: string, value: string): Promise<void> {
   await runOk(['secret', 'set', service], { input: value })
 }

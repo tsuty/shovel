@@ -17,6 +17,7 @@ import type { FileReadResult, FileSearchResult, FsEntry } from './types/filer'
 import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput } from './types/command'
 import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
+import type { NetworkBlocks } from './types/network'
 import type { NewFileKind } from './fileKinds'
 
 export const IpcChannel = {
@@ -36,6 +37,9 @@ export const IpcChannel = {
   ProjectsOpenTerminal: 'projects:openTerminal',
   ProjectsOpenSbxLogin: 'projects:openSbxLogin',
   ProjectsOpenDataDir: 'projects:openDataDir',
+  ProjectsNetworkBlocks: 'projects:networkBlocks',
+  ProjectsAllowNetworkHost: 'projects:allowNetworkHost',
+  ProjectsSetNetworkHostIgnored: 'projects:setNetworkHostIgnored',
   AppOpenProjectManager: 'app:openProjectManager',
   SettingsGet: 'settings:get',
   SettingsUpdate: 'settings:update',
@@ -225,6 +229,12 @@ export interface RendererApi {
      * このプロジェクトの最新のログファイルがあれば、それを選択した状態で開く。
      */
     openDataDir(id: string, kind: DataDirKind): Promise<void>
+    /** `sbx policy log` で拒否された通信のうち、いまのルールでもまだ通らないもの。 */
+    networkBlocks(id: string): Promise<NetworkBlocks>
+    /** 宛先 `host:port` への通信を、このプロジェクトのサンドボックスだけに許可する（`sbx policy allow network --sandbox`）。 */
+    allowNetworkHost(id: string, host: string): Promise<void>
+    /** 宛先をプロジェクトの無視リストに入れる／外す。 */
+    setNetworkHostIgnored(id: string, host: string, ignored: boolean): Promise<void>
     onProgress(cb: (p: ProjectProgress) => void): () => void
   }
   agents: {

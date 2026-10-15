@@ -288,6 +288,9 @@ main は **`sessionId → webContents` のマップ**を持ち、イベントを
 普段使っている git で行える。ツールコール単体の diff 表示（トランスクリプトの
 Diff ビューア）はこの廃止と無関係にそのまま残る（decisions.md N-3-8）。
 
+① の通信の隔離は、利用者がプロジェクトの詳細の「ネットワーク」欄から宛先単位で緩められる。
+範囲はそのサンドボックスの、その宛先とポートだけに留める（decisions.md N-2-8）。
+
 shovel は Permission の方針を発明しない。`session/new` が返す `modes` から
 セレクタを構成し、`session/set_mode` を送る。`session/request_permission` が
 来たら常に承認カードを表示する。
@@ -308,6 +311,8 @@ shovel は Docker Sandboxes 専用であり、以下のコマンドに依存す�
 | `sbx secret set <service>` | 認証情報の設定（値は stdin で渡す） |
 | `sbx secret ls` / `import` | 既存の確認、ホスト環境変数からの取り込み |
 | `sbx diagnose` | 前提条件チェック |
+| `sbx policy log <name> --type network --json` / `sbx policy ls --json` | 拒否された通信の一覧と、いまのルールとの照合（decisions.md N-2-8） |
+| `sbx policy allow network --sandbox <name> <host:port>` | 拒否された宛先をこのサンドボックスだけに許可 |
 
 ### 存在しないもの
 

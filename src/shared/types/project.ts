@@ -27,6 +27,8 @@ export interface Project {
   acpVersion?: string
   /** 更新の確認で「今のまま」を選んだ版。これより新しい版が出るまでは再び尋ねない。 */
   skippedAcpVersion?: string
+  /** 拒否された通信のうち、ユーザーが「無視」にした宛先（`host:port`）。 */
+  ignoredNetworkHosts?: string[]
 }
 
 /** プロジェクトのウィンドウを開いたときに尋ねる、ACP アダプタの更新。 */

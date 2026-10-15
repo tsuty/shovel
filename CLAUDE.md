@@ -21,7 +21,10 @@ scaffold (Electron + electron-vite + React + TypeScript + Tailwind), main-proces
 (sbx CLI wrapper, path translation, project persistence, ACP connection/translation, filer,
 one-shot command execution, sign-in status check/guidance),
 the IPC contract, and the renderer (Project Manager window with all three creation flows plus a
-per-project details/diagnostics dialog; main window with tabs (right-click menu: close / close
+per-project details/diagnostics dialog (including a "network" section listing hosts the sandbox's
+proxy blocked per `sbx policy log`, with per-sandbox Allow (confirm first; only for default-deny
+blocks) / Ignore (persisted in `Project.ignoredNetworkHosts`), already-allowed hosts filtered out by
+re-implementing the policy pattern syntax in `src/main/domain/networkPolicy.ts` — decisions.md N-2-8); main window with tabs (right-click menu: close / close
 other files / close all files — the bulk actions never close chat or history tabs, decisions.md
 G-1-12), transcript rendering (per-message
 copy, clickable tool-call locations/diffs, clickable attachment chips, code-block copy buttons and shiki highlighting of fenced code blocks (finalized blocks only),

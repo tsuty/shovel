@@ -43,6 +43,10 @@ const api: RendererApi = {
     openTerminal: (id) => ipcRenderer.invoke(IpcChannel.ProjectsOpenTerminal, id),
     openSbxLogin: () => ipcRenderer.invoke(IpcChannel.ProjectsOpenSbxLogin),
     openDataDir: (id, kind) => ipcRenderer.invoke(IpcChannel.ProjectsOpenDataDir, id, kind),
+    networkBlocks: (id) => ipcRenderer.invoke(IpcChannel.ProjectsNetworkBlocks, id),
+    allowNetworkHost: (id, host) => ipcRenderer.invoke(IpcChannel.ProjectsAllowNetworkHost, id, host),
+    setNetworkHostIgnored: (id, host, ignored) =>
+      ipcRenderer.invoke(IpcChannel.ProjectsSetNetworkHostIgnored, id, host, ignored),
     onProgress: (cb) => {
       const listener = (_event: unknown, payload: ProjectProgress): void => cb(payload)
       ipcRenderer.on(IpcChannel.ProjectsProgress, listener)

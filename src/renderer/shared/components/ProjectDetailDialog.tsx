@@ -9,12 +9,13 @@ import {
   DialogTitle
 } from './ui/dialog'
 import { Button } from './ui/button'
+import { NetworkBlocksSection } from './NetworkBlocksSection'
 
 /**
  * プロジェクトの詳細ダイアログ。基本情報・操作（停止/OSターミナル）・診断情報（`sbx diagnose` 出力、
  * ACP トラフィックログ、エージェントの stderr、`sbx ls --json` の該当エントリ）をまとめ、
  * 丸ごとクリップボードにコピーできる。ログは最後に開いたセッションのログファイルから読み、
- * 無ければその節は表示しない。
+ * 無ければその節は表示しない。拒否された通信は「ネットワーク」欄（`NetworkBlocksSection`）に出す。
  */
 export function ProjectDetailDialog({
   projectId,
@@ -115,6 +116,8 @@ export function ProjectDetailDialog({
                 {t('detail.stop')}
               </Button>
             </div>
+
+            <NetworkBlocksSection projectId={diagnostics.project.id} sandboxName={diagnostics.project.sandboxName} />
 
             <div>
               <div className="mb-1 text-xs font-medium text-muted-foreground">{t('detail.diagnostics')}</div>

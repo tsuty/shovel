@@ -25,6 +25,22 @@
     "copyAll": "Copy all",
     "copied": "Copied"
   },
+  "network": {
+    "title": "Network (blocked connections)",
+    "info": "Connections from inside the sandbox only reach allowed destinations. When the agent's work fails with network errors, the blocked destinations show up here. Only allow destinations you recognize.",
+    "refresh": "Refresh",
+    "empty": "No blocked connections",
+    "allow": "Allow",
+    "allowing": "Allowing…",
+    "ignore": "Ignore",
+    "unignore": "Stop ignoring",
+    "ignoredList": "Ignored destinations ({{count}})",
+    "count_one": "{{count}} time",
+    "count_other": "{{count}} times",
+    "lastSeen": "last {{time}}",
+    "notAllowable": "Not blocked for lack of an allow rule, so it can't be allowed from here ({{reason}})",
+    "confirmAllow": "Allow connections to {{host}}?\n\n• Applies only to this project's sandbox ({{sandbox}})\n• Once allowed, the agent can send data to this destination\n• If you don't recognize the destination, don't allow it\n• This can't be undone here (use sbx policy rm to remove it)"
+  },
   "auth": {
     "title": "Sign in required",
     "description": "The agent needs you to sign in before it can connect. shovel does not handle the browser sign-in itself — it hands off to the sandbox's own terminal flow.",

@@ -20,6 +20,7 @@ type Project = {
   agentId:     string   // エージェント対応表のキー
   acpVersion?:        string  // 使う ACP アダプタの版。セッション開始時に initialize の agentInfo.version を記録
   skippedAcpVersion?: string  // 更新の確認で「今のまま」を選んだ版（decisions.md N-2-5b）
+  ignoredNetworkHosts?: string[]  // 拒否された通信のうち「無視」にした宛先 host:port（decisions.md N-2-8）
 }
 ```
 
