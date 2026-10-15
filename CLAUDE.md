@@ -239,8 +239,11 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   reported as `false` — the agent always reads/writes files itself inside the sandbox. This is
   the load-bearing assumption behind the safety model (§6 of `architecture.md`): shovel never
   intermediates file operations, so there is no enforcement point to bypass.
-- Renderer: React + Tailwind + shadcn/ui, `react-markdown` + `remark-gfm` for Markdown (no
-  `rehype-raw` — raw HTML in Markdown is never rendered), `shiki` for syntax highlighting,
+- Renderer: React + Tailwind + shadcn/ui, `react-markdown` + `remark-gfm` + `remark-gemoji`
+  (`:shortcode:` emoji) for Markdown (no `rehype-raw` — raw HTML in Markdown is shown as text; the
+  one exception is `<details>`/`<summary>`, turned into elements by our own `remarkDetails` plugin,
+  only in Markdown *file* views (editor preview / print view, `allowDetails`), never in the
+  transcript — decisions.md D-5 追記), `shiki` for syntax highlighting,
   `react-arborist` for the file tree. preload uses `contextBridge` only — never expose Node APIs
   directly to renderer (`contextIsolation: true`, `nodeIntegration: false`).
   Built renderer pages load from `app://renderer/...` (served by main from `out/renderer` via

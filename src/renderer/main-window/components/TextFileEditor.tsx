@@ -434,7 +434,7 @@ export function TextFileEditor({
         {showPreview && (
           <div className={cn('h-full flex-1 overflow-auto', language !== 'html' && 'p-3')}>
             {language === 'markdown' ? (
-              <Markdown text={text} className="text-editor" />
+              <Markdown text={text} className="text-editor" allowDetails />
             ) : language === 'mermaid' ? (
               <MermaidDiagram code={renderedSource} />
             ) : language === 'html' ? (

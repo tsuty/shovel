@@ -95,7 +95,7 @@ export function App(): React.JSX.Element {
         {content.kind === 'unreadable' && <p className="text-sm text-muted-foreground">{t('printPreview.unreadable')}</p>}
         {content.kind === 'text' && (
           <RenderTrackerContext.Provider value={tracker}>
-            <Markdown key={loadCount} text={content.text} className="text-[10.5pt]" forPrint />
+            <Markdown key={loadCount} text={content.text} className="text-[10.5pt]" forPrint allowDetails />
           </RenderTrackerContext.Provider>
         )}
       </div>

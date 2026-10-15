@@ -77,7 +77,7 @@ OS のリソースとプロセスを扱うものはすべてここに置く。
 | :--- | :--- |
 | UI 全般 | React + Tailwind CSS + shadcn/ui |
 | トランスクリプト描画 | React |
-| Markdown | `react-markdown` + `remark-gfm` |
+| Markdown | `react-markdown` + `remark-gfm` + `remark-gemoji` |
 | シンタックスハイライト | `shiki` |
 | ファイルツリー | `react-arborist` |
 | コマンド実行の TTY モード | `@xterm/xterm` + `@xterm/addon-fit`（表示のみ。PTY はサンドボックス内） |
@@ -89,6 +89,8 @@ OS のリソースとプロセスを扱うものはすべてここに置く。
 - CSP を設定する
 - `will-navigate` と `setWindowOpenHandler` を塞ぐ。リンクは外部ブラウザへ渡す
 - Markdown 中の生 HTML を通さない（`rehype-raw` を使わない）
+  - 例外: Markdown ファイルの表示（エディタのプレビュー・印刷用表示）に限り、`<details>` / `<summary>` だけを
+    自前の remark プラグインで要素にする。トランスクリプトには適用しない（decisions.md D-5 追記）
 
 ### ネイティブモジュールをゼロにする
 
@@ -330,7 +332,7 @@ shovel は Docker Sandboxes 専用であり、以下のコマンドに依存す�
 | アプリ基盤 | Electron |
 | UI | React + Tailwind CSS + shadcn/ui |
 | ACP | `@agentclientprotocol/sdk`（公式 TypeScript SDK、v1） |
-| Markdown | `react-markdown` + `remark-gfm` |
+| Markdown | `react-markdown` + `remark-gfm` + `remark-gemoji` |
 | ハイライト | `shiki` |
 | ファイルツリー | `react-arborist` |
 | `.gitignore` 判定 | `ignore`（npm。git コマンドを呼ばない） |

@@ -155,6 +155,7 @@ UI は renderer。両者は IPC でしか通信できない。イベント語彙
 
 - `react-markdown` は `rehype-raw` を入れない限り Markdown 中の生 HTML を
   一切通さないため、HTML サニタイズの問題が**構造的に発生しなくなる**。
+  （例外: Markdown ファイルの表示に限り `<details>` / `<summary>` だけを要素にする。D-5 追記）
 - ナビゲーション禁止は Electron の `will-navigate` と `setWindowOpenHandler`
   で塞ぐ。リンクは外部ブラウザへ。
 - renderer は `contextIsolation: true` / `nodeIntegration: false` を前提とする。
@@ -195,6 +196,28 @@ webContents に分ける必要があり重い。(c) は依存追加なしで両�
 **理由**
 
 renderer 側で npm のライブラリを使う方が自然で、かつ生 HTML を通さない分だけ安全。
+
+**追記（2026-10-15）: GitHub の絵文字と `<details>` / `<summary>`**
+
+- **絵文字**: `remark-gemoji` を加え、`:smile:` などのショートコードを Unicode の絵文字に置き換える。
+  トランスクリプトと Markdown ファイルの両方に効く。コード中は置き換えない。
+  GitHub 独自の画像絵文字（`:octocat:` など Unicode にないもの）は対象外で、見た目は OS の絵文字フォントに依る。
+- **`<details>` / `<summary>`**: **Markdown ファイルの表示（エディタのプレビュー・印刷用表示）に限って**折り畳みとして描く。
+  トランスクリプト（エージェントの返答・許可カード）では従来どおり文字として出す。
+  - 実装は自前の remark プラグイン（`remarkDetails`）。`rehype-raw` は入れない。
+    `<details>`・`<summary>…</summary>`・`</details>` のタグだけを拾って要素にし、それ以外の生 HTML は従来どおり文字として出す。
+  - 属性は `open` だけを読む。`summary` の中身はタグを除いた文字列として扱う。
+  - 書き方は GitHub と同じ（`<summary>` の後に空行を入れないと、中身は Markdown として解釈されない。
+    空行なしで続けた文は文字のまま `details` の中に出す）。入れ子にでき、閉じ忘れは文書の終わりまでを中身とする。
+  - 印刷用表示では常に開く（閉じたままだと中身が印刷されない）。
+  - ページ内検索（N-1-a）は閉じた `details` の中身も探し、ヒットに移るときにその `details` を開く。
+
+**採らなかった案**:
+- **`rehype-raw` + `rehype-sanitize` の許可リスト**: 生 HTML を一度すべて通してから削る方式になり、
+  「構造的に安全」が「サニタイズの設定が正しければ安全」に変わる。設定を誤ればエージェントの出力から HTML が混入しうる。
+- **トランスクリプトでも描く**: エージェントの出力が折り畳みで内容を隠せることになるため、Markdown ファイルに限った。
+  Markdown ファイルもエージェントが書きうるが、作るのは属性なし（`open` を除く）の2要素だけで、
+  コードの実行や外部への通信にはつながらない。
 
 ---
 

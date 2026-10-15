@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown'
+import remarkGemoji from 'remark-gemoji'
 import remarkGfm from 'remark-gfm'
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -9,9 +10,10 @@ import { MERMAID_BRAND_COLOR, MermaidIcon } from './icons/MermaidIcon'
 import { highlightToHtml, langFromFence } from '../lib/shiki'
 import { usePendingRender } from '../lib/renderTracker'
 import { cn } from '../lib/utils'
+import { remarkDetails } from '../remarkDetails'
 
 /**
- * Markdown エディタのプレビュー・印刷用表示・トランスクリプト共通のレンダラ（`react-markdown` + `remark-gfm`）。
+ * Markdown エディタのプレビュー・印刷用表示・トランスクリプト共通のレンダラ（`react-markdown` + `remark-gfm` + `remark-gemoji`）。
  *
  * `http(s)` / `mailto` は外部で開き、プロジェクト内の相対パスは `onOpenFileLink` で開く。
  * それ以外（`file://`・絶対パス・未知のスキーム）はリンクにせず、文字として見せる。
@@ -80,6 +82,8 @@ function CodeBlock({
   node?: HastNode
   collapsible?: boolean
   forPrint?: boolean
+  /** `<details>` / `<summary>` を折り畳みとして描く（Markdown ファイルの表示用）。印刷用表示では常に開く。 */
+  allowDetails?: boolean
 }): React.JSX.Element {
   const code = node?.children?.find((c) => c.type === 'element' && c.tagName === 'code')
   const text = hastText(code).replace(/\n$/, '')
@@ -273,12 +277,17 @@ function MarkdownLink({
   )
 }
 
+const DEFAULT_PLUGINS = [remarkGfm, remarkGemoji]
+// remarkDetails を先に通して、summary の文字列にも絵文字の置き換えが効くようにする。
+const DETAILS_PLUGINS = [remarkGfm, remarkDetails, remarkGemoji]
+
 export function Markdown({
   text,
   className = 'text-sm',
   onOpenFileLink,
   collapseCodeBlocks = false,
-  forPrint = false
+  forPrint = false,
+  allowDetails = false
 }: {
   text: string
   className?: string
@@ -288,6 +297,8 @@ export function Markdown({
   collapseCodeBlocks?: boolean
   /** 印刷用表示: ```mermaid を図として埋め込み、コードブロックの操作ボタンを出さない。 */
   forPrint?: boolean
+  /** `<details>` / `<summary>` を折り畳みとして描く（Markdown ファイルの表示用）。印刷用表示では常に開く。 */
+  allowDetails?: boolean
 }): React.JSX.Element {
   // 描画のたびに作り直すと、コードブロックが毎回作り直されて図やハイライトを描き直す
   // （印刷用表示では描画完了の通知で親が描き直されるので、終わらなくなる）。
@@ -300,14 +311,15 @@ export function Markdown({
         <MarkdownLink href={href} onOpenFileLink={onOpenFileLink}>
           {children}
         </MarkdownLink>
-      )
+      ),
+      ...(forPrint && { details: ({ node: _node, ...props }) => <details {...props} open /> })
     }),
     [collapseCodeBlocks, forPrint, onOpenFileLink]
   )
   return (
     <div className={`markdown ${className}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={allowDetails ? DETAILS_PLUGINS : DEFAULT_PLUGINS}
         // リンクの判定は MarkdownLink で行うので href は素通しにする。画像の src などは既定の無害化のまま。
         urlTransform={(uri, key) => (key === 'href' ? uri : defaultUrlTransform(uri))}
         components={components}

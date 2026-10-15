@@ -62,7 +62,7 @@ export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> })
     const found = scan()
     setRanges(found)
     setActive(0)
-    if (found[0]) scrollToRange(found[0])
+    if (found[0]) revealRange(found[0])
   }, [open, scan])
 
   // 開いている間は、本文の変化（ストリーミング・タブ切り替え・折り畳み）に合わせて照合し直す。
@@ -110,7 +110,7 @@ export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> })
     const next = (active + (forward ? 1 : -1) + ranges.length) % ranges.length
     setActive(next)
     const range = ranges[next]
-    if (range) scrollToRange(range)
+    if (range) revealRange(range)
   }
 
   function close(): void {
@@ -192,7 +192,10 @@ function collectVisibleTextNodes(container: HTMLElement, exclude: HTMLElement | 
       const parent = node.parentElement
       if (!parent || !node.nodeValue) return NodeFilter.FILTER_REJECT
       if (exclude?.contains(parent) || parent.closest('script, style, textarea')) return NodeFilter.FILTER_REJECT
-      return isVisible(parent) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+      if (isVisible(parent)) return NodeFilter.FILTER_ACCEPT
+      // 閉じた <details> の中身も探す（ヒットしたら revealRange で開く）。
+      const details = outermostClosedDetails(parent, container)
+      return details && isVisible(details) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
     }
   })
   const nodes: Text[] = []
@@ -200,6 +203,21 @@ function collectVisibleTextNodes(container: HTMLElement, exclude: HTMLElement | 
   return nodes
 }
 
-function scrollToRange(range: Range): void {
-  range.startContainer.parentElement?.scrollIntoView({ block: 'center', inline: 'nearest' })
+/** `element` を囲む閉じた `<details>` のうち、`container` の中で最も外側のもの。 */
+function outermostClosedDetails(element: Element, container: HTMLElement): HTMLDetailsElement | null {
+  let found: HTMLDetailsElement | null = null
+  for (let current = element.parentElement; current && container.contains(current); current = current.parentElement) {
+    if (current instanceof HTMLDetailsElement && !current.open) found = current
+  }
+  return found
+}
+
+/** ヒット箇所を囲む閉じた `<details>` を開いてから、そこまでスクロールする。 */
+function revealRange(range: Range): void {
+  const element = range.startContainer.parentElement
+  for (let current = element; current; current = current.parentElement) {
+    if (current instanceof HTMLDetailsElement && !current.open && !current.querySelector(':scope > summary')?.contains(element))
+      current.open = true
+  }
+  element?.scrollIntoView({ block: 'center', inline: 'nearest' })
 }

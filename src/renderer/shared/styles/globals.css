@@ -218,6 +218,13 @@
 .markdown :where(th, td) {
   @apply border border-border px-2 py-1;
 }
+/** Markdown ファイル中の `<details>` / `<summary>`。 */
+.markdown details {
+  margin: 0.5em 0;
+}
+.markdown summary {
+  cursor: pointer;
+}
 
 /** shiki の出力に CSS カウンタで行番号を付ける。 */
 .shiki-lines pre.shiki {
