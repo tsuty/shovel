@@ -38,8 +38,10 @@ async function runOk(args: string[], opts: { input?: string; cwd?: string } = {}
 
 export async function sbxLs(): Promise<SbxLsEntry[]> {
   const result = await runOk(['ls', '--json'])
-  const parsed = JSON.parse(result.stdout) as { sandboxes?: SbxLsEntry[] }
-  return parsed.sandboxes ?? []
+  // 新しい sbx はトップレベル配列、旧い sbx は `{ sandboxes: [...] }` を返す。
+  const parsed = JSON.parse(result.stdout) as SbxLsEntry[] | { sandboxes?: SbxLsEntry[] } | null
+  if (Array.isArray(parsed)) return parsed
+  return parsed?.sandboxes ?? []
 }
 
 // eslint-disable-next-line no-control-regex
