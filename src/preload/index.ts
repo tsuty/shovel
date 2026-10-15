@@ -143,7 +143,8 @@ const api: RendererApi = {
   },
   print: {
     openPreview: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.PrintOpenPreview, projectId, relPath),
-    run: () => ipcRenderer.invoke(IpcChannel.PrintRun)
+    run: () => ipcRenderer.invoke(IpcChannel.PrintRun),
+    runHtml: (html) => ipcRenderer.invoke(IpcChannel.PrintRunHtml, html)
   }
 }
 

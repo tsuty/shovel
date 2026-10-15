@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { withLinksInNewWindow } from '../htmlPreview'
+import { withLinksInNewWindow } from '../lib/htmlPreview'
 
 /**
  * HTML ファイルのプレビュー。`sandbox="allow-popups"` の iframe に `srcdoc` で流し込むので、スクリプト・フォーム・

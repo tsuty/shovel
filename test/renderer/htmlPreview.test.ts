@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { withLinksInNewWindow } from '../../src/renderer/main-window/htmlPreview'
+import { withLinksInNewWindow } from '../../src/renderer/shared/lib/htmlPreview'
 
 describe('withLinksInNewWindow', () => {
   it('inserts the base element right after the doctype', () => {

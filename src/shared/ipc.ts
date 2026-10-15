@@ -92,6 +92,7 @@ export const IpcChannel = {
 
   PrintOpenPreview: 'print:openPreview',
   PrintRun: 'print:run',
+  PrintRunHtml: 'print:runHtml',
 
   // main -> renderer (send)
   TranscriptEvent: 'transcript:event',
@@ -313,9 +314,11 @@ export interface RendererApi {
     onExit(cb: (exit: CommandExit) => void): () => void
   }
   print: {
-    /** Markdown ファイルの印刷用表示を別ウィンドウで開く。 */
+    /** Markdown / HTML ファイルの印刷用表示を別ウィンドウで開く。 */
     openPreview(projectId: string, relPath: string): Promise<void>
     /** 呼び出したウィンドウを OS の印刷ダイアログで印刷する。キャンセルされても resolve する。 */
     run(): Promise<void>
+    /** HTML をそのページだけで（JavaScript を無効にして）OS の印刷ダイアログで印刷する。キャンセルされても resolve する。 */
+    runHtml(html: string): Promise<void>
   }
 }

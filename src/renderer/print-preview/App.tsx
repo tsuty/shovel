@@ -2,13 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Printer, RotateCw } from 'lucide-react'
 import { Markdown } from '../shared/components/Markdown'
+import { HtmlPreview } from '../shared/components/HtmlPreview'
 import { Button } from '../shared/components/ui/button'
 import { RenderTrackerContext, type RenderTracker } from '../shared/lib/renderTracker'
 import { useSettings } from '../shared/useSettings'
+import { editorLanguageFor } from '@shared/fileKinds'
 
 type Content = { kind: 'loading' } | { kind: 'text'; text: string } | { kind: 'unreadable' }
 
-/** Markdown の印刷用表示。開いた時点のディスクの内容を、```mermaid を図として埋め込んで描く。 */
+/**
+ * Markdown / HTML の印刷用表示。開いた時点のディスクの内容を描く。Markdown は ```mermaid を図として埋め込む。
+ * HTML は画面用の表示で、印刷はそのページだけを読み込んだ別のウィンドウで行う。
+ */
 export function App(): React.JSX.Element {
   const { t } = useTranslation()
   // 言語の設定だけを使う。テーマは追わない。
@@ -17,6 +22,7 @@ export function App(): React.JSX.Element {
   const projectId = params.get('projectId') ?? ''
   const relPath = params.get('relPath') ?? ''
   const fileName = relPath.split('/').pop() ?? relPath
+  const isHtml = editorLanguageFor(relPath) === 'html'
 
   const [content, setContent] = useState<Content>({ kind: 'loading' })
   const [loadCount, setLoadCount] = useState(0)
@@ -64,14 +70,15 @@ export function App(): React.JSX.Element {
   const print = useCallback(async (): Promise<void> => {
     setPrinting(true)
     try {
-      await window.shovel.print.run()
+      if (isHtml && content.kind === 'text') await window.shovel.print.runHtml(content.text)
+      else await window.shovel.print.run()
     } finally {
       setPrinting(false)
     }
-  }, [])
+  }, [isHtml, content])
 
   return (
-    <div className="min-h-screen bg-muted print:bg-white">
+    <div className={isHtml ? 'flex h-screen flex-col bg-muted' : 'min-h-screen bg-muted print:bg-white'}>
       <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-background px-3 py-1.5 print:hidden">
         <span className="truncate text-sm font-medium" title={relPath}>
           {fileName}
@@ -80,6 +87,7 @@ export function App(): React.JSX.Element {
         {content.kind === 'text' && !ready && (
           <span className="text-xs text-muted-foreground">{t('printPreview.preparing')}</span>
         )}
+        {isHtml && <span className="text-xs text-muted-foreground">{t('printPreview.htmlNote')}</span>}
         <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setLoadCount((n) => n + 1)}>
           <RotateCw size={14} />
           {t('printPreview.reload')}
@@ -89,16 +97,28 @@ export function App(): React.JSX.Element {
           {t('printPreview.print')}
         </Button>
       </div>
-      {/* 画面では用紙（A4 幅）に見立てて描く。印刷時の余白は @page に任せる。 */}
-      <div className="print-document mx-auto my-6 max-w-[210mm] bg-white p-[15mm] text-black shadow-md print:m-0 print:max-w-none print:p-0 print:shadow-none">
-        {content.kind === 'loading' && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
-        {content.kind === 'unreadable' && <p className="text-sm text-muted-foreground">{t('printPreview.unreadable')}</p>}
-        {content.kind === 'text' && (
-          <RenderTrackerContext.Provider value={tracker}>
-            <Markdown key={loadCount} text={content.text} className="text-[10.5pt]" forPrint allowDetails />
-          </RenderTrackerContext.Provider>
-        )}
-      </div>
+      {isHtml ? (
+        <div className="mx-auto my-6 flex w-full max-w-[210mm] flex-1 flex-col bg-white shadow-md">
+          {content.kind === 'loading' && <p className="p-4 text-sm text-muted-foreground">{t('common.loading')}</p>}
+          {content.kind === 'unreadable' && (
+            <p className="p-4 text-sm text-muted-foreground">{t('printPreview.unreadable')}</p>
+          )}
+          {content.kind === 'text' && <HtmlPreview key={loadCount} html={content.text} title={relPath} />}
+        </div>
+      ) : (
+        /* 画面では用紙（A4 幅）に見立てて描く。印刷時の余白は @page に任せる。 */
+        <div className="print-document mx-auto my-6 max-w-[210mm] bg-white p-[15mm] text-black shadow-md print:m-0 print:max-w-none print:p-0 print:shadow-none">
+          {content.kind === 'loading' && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
+          {content.kind === 'unreadable' && (
+            <p className="text-sm text-muted-foreground">{t('printPreview.unreadable')}</p>
+          )}
+          {content.kind === 'text' && (
+            <RenderTrackerContext.Provider value={tracker}>
+              <Markdown key={loadCount} text={content.text} className="text-[10.5pt]" forPrint allowDetails />
+            </RenderTrackerContext.Provider>
+          )}
+        </div>
+      )}
     </div>
   )
 }

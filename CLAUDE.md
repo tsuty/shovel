@@ -83,7 +83,7 @@ sidebar panels, and a settings dialog (changes broadcast to every open window) f
 font size (drives `text-transcript*` sizes in the transcript and history views)/file-view font
 size (`editorFontSize` → `text-editor*`: viewer, Markdown editor source+preview, diff view; no
 font-family setting, decisions.md G-1-13)/send key (Enter vs Cmd/Ctrl+Enter,
-prompt input only)/default diff layout (side-by-side vs unified, `diffLayout`)), and a Markdown "印刷用表示" (print view: a separate
+prompt input only)/default diff layout (side-by-side vs unified, `diffLayout`)), and a Markdown/HTML "印刷用表示" (print view — for HTML it just shows the sandboxed preview, and "印刷…" prints the page alone from a hidden JavaScript-disabled window on an in-memory `shovel-html-print` session served via `shovel-print://` with a no-network CSP, `src/main/windows/htmlPrint.ts`; for Markdown: a separate
 `print-preview.html` window per file that embeds ```` ```mermaid ```` as diagrams — the one exception to "Mermaid code blocks
 only render in the popup" — always light theme, print button disabled until every diagram/highlight has rendered
 (`renderTracker.ts`), then the OS print dialog via `webContents.print`; PDF is left to the OS, decisions.md N-3-10) — type-checks, lints, and

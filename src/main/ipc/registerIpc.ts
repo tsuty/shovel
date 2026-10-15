@@ -29,6 +29,7 @@ import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authSer
 import { openProjectWindow, refreshProjectWindowTitle } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
 import { openPrintPreviewWindow } from '../windows/printPreviewWindow'
+import { printHtml } from '../windows/htmlPrint'
 import { installAppMenu } from '../windows/appMenu'
 import { projectsStore, settingsStore, sidebarStore } from '../persistence/store'
 import {
@@ -294,4 +295,8 @@ export function registerIpc(): void {
         })
       })
   )
+  ipcMain.handle(IpcChannel.PrintRunHtml, (_event, html: string) => {
+    if (typeof html !== 'string') throw new Error('html must be a string')
+    return printHtml(html)
+  })
 }

@@ -307,6 +307,7 @@
     "preparing": "Rendering diagrams…",
     "reload": "Reload",
     "print": "Print…",
+    "htmlNote": "This is the on-screen view. Check the printed result in the print dialog.",
     "unreadable": "This file cannot be displayed."
   }
 }

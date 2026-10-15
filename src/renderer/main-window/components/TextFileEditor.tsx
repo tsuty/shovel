@@ -10,7 +10,7 @@ import { onTurnEnd } from '../turnEnd'
 import { conflictPath, decideEditorSync } from '../editorSync'
 import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/types/filer'
 import { FileStatusBar } from './FileStatusBar'
-import { HtmlPreview } from './HtmlPreview'
+import { HtmlPreview } from '../../shared/components/HtmlPreview'
 import { cn } from '../../shared/lib/utils'
 import { computeIndent, findJsonProblem, lineNumbersText, offsetAt, type JsonProblem } from '../textEditing'
 import { usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
@@ -366,7 +366,7 @@ export function TextFileEditor({
           )
         })}
         <div className="flex-1" />
-        {language === 'markdown' &&
+        {(language === 'markdown' || language === 'html') &&
           (variant === 'attached' ? (
             // チャットの横では幅が狭いので、アイコンだけにする。
             <button
