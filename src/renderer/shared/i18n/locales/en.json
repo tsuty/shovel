@@ -161,7 +161,26 @@
       "title": "Which chat should it go beside?",
       "description": "Choose the chat to show {{path}} beside."
     },
-    "printPreview": "Print view"
+    "printPreview": "Print view",
+    "search": {
+      "find": "Find",
+      "replace": "Replace",
+      "next": "next",
+      "previous": "previous",
+      "all": "all",
+      "matchCase": "match case",
+      "regexp": "regexp",
+      "byWord": "by word",
+      "replaceOne": "replace",
+      "replaceAll": "replace all",
+      "close": "close",
+      "currentMatch": "current match",
+      "onLine": "on line",
+      "replacedMatches": "replaced $ matches",
+      "replacedMatchOnLine": "replaced match on line $",
+      "goToLine": "Go to line",
+      "go": "go"
+    }
   },
   "acpUpdate": {
     "title": "Agent update available",

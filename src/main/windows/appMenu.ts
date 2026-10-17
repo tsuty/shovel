@@ -1,5 +1,5 @@
 import { app, Menu, type MenuItemConstructorOptions } from 'electron'
-import { settingsStore } from '../persistence/store'
+import { resolveLocale } from '../locale'
 import { openProjectManagerWindow } from './projectManagerWindow'
 
 const labels = {
@@ -42,11 +42,4 @@ export function installAppMenu(): void {
     { role: 'windowMenu' }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
-}
-
-/** renderer と同じく、設定が無ければ OS の言語から決める。 */
-function resolveLocale(): 'en' | 'ja' {
-  const locale = settingsStore.get().locale
-  if (locale) return locale
-  return app.getLocale().toLowerCase().startsWith('ja') ? 'ja' : 'en'
 }

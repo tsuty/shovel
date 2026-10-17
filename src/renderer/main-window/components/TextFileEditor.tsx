@@ -12,9 +12,12 @@ import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/
 import { FileStatusBar } from './FileStatusBar'
 import { HtmlPreview } from '../../shared/components/HtmlPreview'
 import { cn } from '../../shared/lib/utils'
-import { computeIndent, findJsonProblem, lineNumbersText, offsetAt, type JsonProblem } from '../textEditing'
+import { findJsonProblem, type JsonProblem } from '../textEditing'
 import { usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
-import { revealInHighlightedCode, revealInTextarea, type FileReveal } from '../revealMatch'
+import { revealInHighlightedCode, type FileReveal } from '../revealMatch'
+import { openSearchPanel } from '@codemirror/search'
+import { createCodeEditor, replaceDocument, selectAt, type CodeEditor } from '../codeEditor'
+import { closeFindBar, registerEditorSearch } from '../editorSearch'
 
 /**
  * 表示の切り替え。Markdown / Mermaid / HTML は「分割・ソース・プレビュー」、
@@ -59,6 +62,27 @@ function savedByteSize(text: string, meta: FileMeta): number {
   return bytes + newlines + (meta.encoding === 'UTF-8 BOM' ? 3 : 0)
 }
 const EXTERNAL_CHECK_INTERVAL_MS = 3000
+
+/** CodeMirror の検索パネルの文言（英語の原文）と、訳のキー。 */
+const EDITOR_PHRASE_KEYS: Record<string, string> = {
+  Find: 'find',
+  Replace: 'replace',
+  next: 'next',
+  previous: 'previous',
+  all: 'all',
+  'match case': 'matchCase',
+  regexp: 'regexp',
+  'by word': 'byWord',
+  replace: 'replaceOne',
+  'replace all': 'replaceAll',
+  close: 'close',
+  'current match': 'currentMatch',
+  'on line': 'onLine',
+  'replaced $ matches': 'replacedMatches',
+  'replaced match on line $': 'replacedMatchOnLine',
+  'Go to line': 'goToLine',
+  go: 'go'
+}
 
 /**
  * アプリ内で編集できるテキストファイルのエディタ。`variant: 'attached'` はチャットタブの右に添えたとき。
@@ -109,9 +133,14 @@ export function TextFileEditor({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const syncQueueRef = useRef<Promise<void>>(Promise.resolve())
 
+  const editorRef = useRef<CodeEditor | null>(null)
+  const editorHostRef = useRef<HTMLDivElement>(null)
+
+  /** 外から中身を差し替える（読み込み・外部変更の読み直し）。エディタにも反映する。 */
   const applyText = useCallback((content: string): void => {
     textRef.current = content
     setText(content)
+    if (editorRef.current) replaceDocument(editorRef.current.view, content)
   }, [])
 
   useEffect(() => {
@@ -209,7 +238,8 @@ export function TextFileEditor({
 
   function onChange(value: string): void {
     if (readOnly) return
-    applyText(value)
+    textRef.current = value
+    setText(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     // 発火時点の最新の flush を呼ぶ。
     debounceRef.current = setTimeout(() => {
@@ -217,54 +247,70 @@ export function TextFileEditor({
     }, AUTOSAVE_DEBOUNCE_MS)
   }
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const gutterRef = useRef<HTMLPreElement>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
-  /**
-   * Tab / Shift+Tab でインデントを増やす・減らす（フォーカスを次の要素へ移さない）。
-   * `execCommand('insertText')` で入れるので、元に戻す（Cmd/Ctrl+Z）が効き、input イベント経由で
-   * 自動保存も走る。使えない環境では値を直接書き換える。
-   */
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
-    if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.nativeEvent.isComposing || readOnly) return
-    e.preventDefault()
-    const area = e.currentTarget
-    const edit = computeIndent(area.value, area.selectionStart, area.selectionEnd, e.shiftKey)
-    if (!edit) return
-    area.setSelectionRange(edit.replaceStart, edit.replaceEnd)
-    const inserted =
-      edit.insert === '' ? document.execCommand('delete') : document.execCommand('insertText', false, edit.insert)
-    if (!inserted) {
-      area.setRangeText(edit.insert, edit.replaceStart, edit.replaceEnd)
-      onChange(area.value)
+  // 読み込みが済んだらエディタを作る。ソースを隠している間も作ったままにする（元に戻すの履歴を保つ）。
+  useEffect(() => {
+    const host = editorHostRef.current
+    if (!loaded || deleted || !host) return
+    const editor = createCodeEditor({
+      parent: host,
+      doc: textRef.current,
+      language,
+      highlightLang: langFromFilename(relPath),
+      readOnly: false,
+      phrases: {},
+      onChange: (value) => onChangeRef.current(value)
+    })
+    editorRef.current = editor
+    return () => {
+      editor.view.destroy()
+      editorRef.current = null
     }
-    area.setSelectionRange(edit.selectionStart, edit.selectionEnd)
-  }
+  }, [loaded, deleted, language, relPath])
 
-  // 行番号を付けるときは折り返さない（Markdown は折り返して行番号を付けない）。
-  const showLineNumbers = language !== 'markdown'
-  const lineNumbers = useMemo(() => (showLineNumbers ? lineNumbersText(text) : ''), [showLineNumbers, text])
-  function syncGutter(): void {
-    if (gutterRef.current && textareaRef.current) gutterRef.current.scrollTop = textareaRef.current.scrollTop
-  }
+  useEffect(() => {
+    editorRef.current?.setReadOnly(readOnly)
+  }, [readOnly, loaded, deleted])
+
+  useEffect(() => {
+    editorRef.current?.setPhrases(
+      Object.fromEntries(Object.entries(EDITOR_PHRASE_KEYS).map(([phrase, key]) => [phrase, t(`editor.search.${key}`)]))
+    )
+  }, [t, loaded, deleted])
+
+  // タブで開いていてソースが見えている間は、Cmd/Ctrl+F をこのエディタの検索パネルで受ける。
+  useEffect(() => {
+    const editor = editorRef.current
+    if (variant !== 'tab' || !showSource || !editor) return
+    return registerEditorSearch({ element: editor.view.dom, open: () => openSearchPanel(editor.view) })
+  }, [variant, showSource, loaded, deleted, language])
+
+  // タブで開いているときは、表示を切り替えたらページ内検索を閉じる。
+  const previousModeRef = useRef(mode)
+  useEffect(() => {
+    if (previousModeRef.current === mode) return
+    previousModeRef.current = mode
+    if (variant === 'tab') closeFindBar()
+  }, [mode, variant])
 
   // JSON は書式の誤りをステータスバーに出し、押すとその位置を編集できるようにする。
   const jsonProblem = useMemo(() => (language === 'json' ? findJsonProblem(text) : null), [language, text])
-  /** 誤りの位置へ移るとき、textarea が出てからカーソルを置くための保留。 */
-  const pendingCaretRef = useRef<number | null>(null)
+  /** 誤りの位置へ移るとき、ソースが見えてからカーソルを置くための保留。 */
+  const pendingCaretRef = useRef<{ line: number; column: number } | null>(null)
   function revealProblem(problem: JsonProblem): void {
     if (problem.line === undefined) return
-    pendingCaretRef.current = offsetAt(textRef.current, problem.line, problem.column ?? 1)
+    pendingCaretRef.current = { line: problem.line, column: problem.column ?? 1 }
     if (!showSource) setMode(modes.includes('edit') ? 'edit' : 'source')
     else placePendingCaret()
   }
   function placePendingCaret(): void {
-    const area = textareaRef.current
+    const editor = editorRef.current
     const caret = pendingCaretRef.current
-    if (!area || caret === null) return
+    if (!editor || caret === null) return
     pendingCaretRef.current = null
-    area.focus()
-    area.setSelectionRange(caret, caret)
+    selectAt(editor.view, caret.line, caret.column)
   }
   useEffect(() => {
     if (showSource) placePendingCaret()
@@ -272,7 +318,7 @@ export function TextFileEditor({
 
   const renderedSource = useDebouncedValue(text, RENDERED_PREVIEW_DELAY_MS)
 
-  /** まだ反映していない `reveal`。読み込みと、移り先（textarea か表示）の描画が済んでから反映する。 */
+  /** まだ反映していない `reveal`。読み込みと、移り先（エディタか表示）の描画が済んでから反映する。 */
   const pendingRevealRef = useRef<FileReveal | null>(null)
   const highlightedRef = useRef<HTMLDivElement>(null)
 
@@ -300,9 +346,9 @@ export function TextFileEditor({
     const pending = pendingRevealRef.current
     if (!pending || !loaded || deleted) return
     if (showSource) {
-      if (!textareaRef.current) return
+      if (!editorRef.current) return
       pendingRevealRef.current = null
-      revealInTextarea(textareaRef.current, pending)
+      selectAt(editorRef.current.view, pending.line, pending.column, pending.length)
     } else if (mode === 'view' && highlightedRef.current) {
       // 読み込み前の空の内容を描いたものには行が無いので、本物が描かれるまで待つ。
       if (revealInHighlightedCode(highlightedRef.current, pending)) pendingRevealRef.current = null
@@ -405,32 +451,13 @@ export function TextFileEditor({
         )}
       </div>
       <div className="flex flex-1 overflow-hidden">
-        {showSource && (
-          <div className="flex h-full min-w-0 flex-1 overflow-hidden border-r border-border">
-            {showLineNumbers && (
-              // 横スクロールバーの分だけ textarea の方が深くスクロールできるので、下に余白を足しておく。
-              <pre
-                ref={gutterRef}
-                aria-hidden
-                className="shrink-0 select-none overflow-hidden pt-3 pb-8 pl-3 pr-2 text-right font-mono text-editor text-muted-foreground/60"
-              >
-                {lineNumbers}
-              </pre>
-            )}
-            <textarea
-              ref={textareaRef}
-              className="h-full min-w-0 flex-1 resize-none overflow-auto bg-transparent p-3 font-mono text-editor outline-hidden"
-              value={text}
-              readOnly={readOnly}
-              wrap={showLineNumbers ? 'off' : undefined}
-              // 図や設定ファイルのキーに英語のスペルチェックの波線が付かないよう、Markdown だけ有効にする。
-              spellCheck={language === 'markdown'}
-              onChange={(e) => onChange(e.target.value)}
-              onKeyDown={onKeyDown}
-              onScroll={syncGutter}
-            />
-          </div>
-        )}
+        <div
+          ref={editorHostRef}
+          className={cn(
+            'h-full min-w-0 flex-1 overflow-hidden border-r border-border font-mono text-editor',
+            !showSource && 'hidden'
+          )}
+        />
         {showPreview && (
           <div className={cn('h-full flex-1 overflow-auto', language !== 'html' && 'p-3')}>
             {language === 'markdown' ? (

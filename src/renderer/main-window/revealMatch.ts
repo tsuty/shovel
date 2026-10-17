@@ -1,5 +1,3 @@
-import { offsetAt } from './textEditing'
-
 /**
  * ファイルを開いたときに、指定の位置（中身検索で当たった箇所）へ移る指示。
  * `nonce` は同じ位置へもう一度移るときにも効かせるための通し番号。
@@ -26,30 +24,6 @@ export function revealInHighlightedCode(container: HTMLElement, reveal: FileReve
   const range = rangeInElement(lineEl, reveal.column - 1, reveal.length)
   if (range && 'highlights' in CSS) CSS.highlights.set(HIGHLIGHT, new Highlight(range))
   return true
-}
-
-/** textarea で一致箇所を選択し、その行が見えるようにスクロールする。 */
-export function revealInTextarea(area: HTMLTextAreaElement, reveal: FileReveal): void {
-  const start = offsetAt(area.value, reveal.line, reveal.column)
-  const end = Math.min(start + reveal.length, area.value.length)
-  area.focus()
-  area.setSelectionRange(start, end)
-  // 折り返さないとき（行番号付き）は行の高さから位置が決まる。折り返すときは選択の手前までの
-  // 内容を同じ幅の textarea に入れて高さを測る（行の折り返しで位置がずれるため）。
-  const style = getComputedStyle(area)
-  const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.5
-  let top: number
-  if (area.wrap === 'off') {
-    top = (reveal.line - 1) * lineHeight
-  } else {
-    const probe = area.cloneNode() as HTMLTextAreaElement
-    probe.value = area.value.slice(0, start)
-    Object.assign(probe.style, { position: 'absolute', visibility: 'hidden', height: '0', width: `${area.clientWidth}px` })
-    area.parentElement?.appendChild(probe)
-    top = probe.scrollHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - lineHeight
-    probe.remove()
-  }
-  area.scrollTop = Math.max(0, top - area.clientHeight / 2)
 }
 
 /** 要素のテキストの `[start, start + length)` を指す Range（テキストノードをまたいでよい）。 */

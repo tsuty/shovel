@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { findTextMatches } from '../findInPage'
+import { onCloseFindBar, openEditorSearchIn } from '../editorSearch'
 
 const HIGHLIGHT = 'shovel-find'
 const HIGHLIGHT_ACTIVE = 'shovel-find-active'
@@ -9,8 +10,10 @@ const HIGHLIGHT_ACTIVE = 'shovel-find-active'
 const RESCAN_DEBOUNCE_MS = 150
 
 /**
- * ページ内検索バー（Cmd/Ctrl+F）。`root` の中の、いま見えているテキスト（textarea / input の中身は除く）を探す。
+ * ページ内検索バー（Cmd/Ctrl+F）。`root` の中の、いま見えているテキスト（textarea / input・エディタの中身は除く）を探す。
  * ヒット箇所は CSS Custom Highlight API で塗る（DOM を書き換えないので React の描画と衝突しない）。
+ * フォーカスがエディタにあるときはエディタが自分で検索パネルを開き、ソースが見えているエディタが
+ * 検索を登録していればそちらへ渡す（`editorSearch.ts`）。
  */
 export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> }): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -26,7 +29,12 @@ export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> })
     function handleKeyDown(event: KeyboardEvent): void {
       const modifierPressed = isMac ? event.metaKey : event.ctrlKey
       if (!modifierPressed || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'f') return
+      if (event.defaultPrevented || (event.target instanceof Element && event.target.closest('.cm-editor'))) return
       event.preventDefault()
+      if (root.current && openEditorSearchIn(root.current)) {
+        setOpen(false)
+        return
+      }
       setOpen(true)
       // 既に開いていれば入力欄へ戻して全選択する（ブラウザと同じ）。
       requestAnimationFrame(() => {
@@ -36,7 +44,9 @@ export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> })
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [root])
+
+  useEffect(() => onCloseFindBar(() => setOpen(false)), [])
 
   const scan = useCallback((): Range[] => {
     const container = root.current
@@ -191,7 +201,7 @@ function collectVisibleTextNodes(container: HTMLElement, exclude: HTMLElement | 
     acceptNode: (node) => {
       const parent = node.parentElement
       if (!parent || !node.nodeValue) return NodeFilter.FILTER_REJECT
-      if (exclude?.contains(parent) || parent.closest('script, style, textarea')) return NodeFilter.FILTER_REJECT
+      if (exclude?.contains(parent) || parent.closest('script, style, textarea, .cm-editor')) return NodeFilter.FILTER_REJECT
       if (isVisible(parent)) return NodeFilter.FILTER_ACCEPT
       // 閉じた <details> の中身も探す（ヒットしたら revealRange で開く）。
       const details = outermostClosedDetails(parent, container)

@@ -137,3 +137,34 @@ export async function highlightToHtml(code: string, lang: string): Promise<strin
     themes: { light: 'github-light', dark: 'github-dark' }
   })
 }
+
+/** 色を付ける範囲（`code` の中の位置）と、その `style` 属性の値。 */
+export interface StyledRange {
+  from: number
+  to: number
+  style: string
+}
+
+/**
+ * `highlightToHtml` と同じ配色を、HTML ではなく範囲の一覧で返す（エディタに重ねる用）。
+ * `style` にはライト側の色と、ダーク側の `--shiki-dark*` の CSS 変数が入る。
+ */
+export async function highlightToRanges(code: string, lang: string): Promise<StyledRange[]> {
+  const highlighter = await getHighlighter()
+  const effectiveLang = isLang(lang) && (await ensureLang(highlighter, lang)) ? lang : 'plaintext'
+  const { tokens } = highlighter.codeToTokens(code, {
+    lang: effectiveLang,
+    themes: { light: 'github-light', dark: 'github-dark' }
+  })
+  const ranges: StyledRange[] = []
+  for (const line of tokens) {
+    for (const token of line) {
+      if (!token.content || !token.htmlStyle) continue
+      const style = Object.entries(token.htmlStyle)
+        .map(([key, value]) => `${key}:${value}`)
+        .join(';')
+      ranges.push({ from: token.offset, to: token.offset + token.content.length, style })
+    }
+  }
+  return ranges
+}

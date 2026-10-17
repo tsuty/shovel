@@ -55,9 +55,15 @@ bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports
 open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in
 `src/shared/fileKinds.ts`): Markdown, Mermaid and HTML get split/source/preview (Mermaid's preview is the diagram, debounced; HTML renders in a script-less `sandbox="allow-popups"` srcdoc iframe — `HtmlPreview.tsx`, links go out via `<base target="_blank">` → `setWindowOpenHandler`),
 JSON/YAML (and plain `.txt`, uncoloured) get a highlighted "表示" view by default plus an "編集" toggle (`usesViewEditModes`). The editing
-surface is still a plain textarea, plus Tab/Shift+Tab indent (via `execCommand('insertText')` so undo works), a
-line-number gutter with no wrapping for everything but Markdown (Markdown keeps wrapping, no gutter), and a clickable
-"JSON の書式に誤り（N 行目 M 列目）" status-bar entry (`src/renderer/main-window/textEditing.ts`). The Filer's
+surface is CodeMirror 6, driven directly via `EditorView` (no React wrapper; `src/renderer/main-window/codeEditor.ts`,
+decisions.md N-3-1 改訂 2026-10-17): syntax colours come from shiki (`shikiHighlight.ts` turns `codeToTokens` into
+decorations, so 表示/編集 look identical — no CodeMirror language packages), `indentWithTab`, line numbers on every
+kind (Markdown also wraps), rectangular selection (Alt-drag; needs `allowMultipleSelections` + `drawSelection`),
+trailing-whitespace highlighting, external reloads applied as a minimal
+non-undoable change, and the view kept alive (hidden) in preview/"表示" modes so undo history survives mode switches.
+Cmd/Ctrl+F goes to CodeMirror's search panel when a file tab shows source (registered via `editorSearch.ts`) or
+focus is inside an editor, otherwise to `FindBar`, which never searches `.cm-editor` content. A clickable
+"JSON の書式に誤り（N 行目 M 列目）" status-bar entry remains (`src/renderer/main-window/textEditing.ts`). The Filer's
 creation items live under a "新規ファイル ▸" submenu (Markdown / Text / Mermaid / HTML / JSON / YAML; JSON starts as `{}`, Mermaid
 with a starter template); other binaries show an
 "open with default app" button rather than opening automatically; text views and the Markdown
@@ -274,6 +280,9 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
 - **Specs live in Markdown, not in code comments.** Behavior specs, design rationale, and
   references like `decisions.md N-x-y` belong in `docs/design/*.md`. Code comments are limited to
   explaining what the code does and describing variables, constants, and fields.
+- **Right-click on editable fields shows the native OS edit menu** (spelling suggestions, undo/cut/copy/paste…),
+  installed for every window in `createSecureWindow` via `editContextMenu.ts` (decisions.md G-1-16). Non-editable
+  places keep their own React menus.
 - **Tooltips: just write `title`.** Native tooltips are never shown — `TooltipLayer` (mounted once
   per window in each `main.tsx`) moves `title` to `data-tip` on hover and draws its own popup
   (decisions.md G-1-15). For an ⓘ-only hint use `InfoTip`. Don't add per-component tooltip code.
@@ -296,5 +305,7 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   through `shell.trashItem()` (OS trash), not `fs.rm`; edit conflicts produce a conflict copy
   rather than overwriting; `git clean` is not used programmatically.
 - Do not introduce libraries already rejected in `decisions.md` (Vercel AI SDK,
-  `@ai-sdk/harness-acp`, Monaco/CodeMirror, `node-pty`, `better-sqlite3`,
-  memfs+unionfs) without re-reading why they were rejected first.
+  `@ai-sdk/harness-acp`, Monaco, `node-pty`, `better-sqlite3`,
+  memfs+unionfs) without re-reading why they were rejected first. CodeMirror 6 was rejected
+  too but has since been adopted for the editing surface of `TextFileEditor` (decisions.md
+  N-3-1 「改訂（2026-10-17）」) — the set of editable file types is unchanged.

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron'
 import path from 'node:path'
+import { installEditContextMenu } from './editContextMenu'
 
 /**
  * `contextIsolation: true` / `nodeIntegration: false` で `BrowserWindow` を作り、
@@ -35,6 +36,8 @@ export function createSecureWindow(options: {
     event.preventDefault()
     if (!isSameOrigin(url, current)) openExternalIfSafe(url)
   })
+
+  installEditContextMenu(win)
 
   win.once('ready-to-show', () => win.show())
 

@@ -390,7 +390,9 @@ React で実装し、`--ra-*` の CSS カスタムプロパティを shadcn の�
 ✅ **解決済み**（[open-issues.md](./open-issues.md) V-5、decisions.md N-1-a）。
 Cmd/Ctrl+F でタブ領域の右上に検索バーを出す。Enter で次、Shift+Enter で前、Esc で閉じる。
 大文字小文字は区別しない。対象は**タブ領域（アクティブなタブ）の表示されているテキスト**で、
-サイドバー・非表示のタブ・折り畳まれた中身・textarea / input の中身は対象外。
+サイドバー・非表示のタブ・折り畳まれた中身・textarea / input・エディタ（CodeMirror）の中身は対象外。
+ファイルのタブがソース・分割・「編集」のときは、Cmd/Ctrl+F でエディタの検索パネルを出す。チャットの横の
+エディタは、フォーカスがエディタにあるときだけエディタの検索パネルを出す（decisions.md N-3-1「改訂（2026-10-17）」）。
 ヒット箇所は CSS Custom Highlight API で塗り、DOM は書き換えない
 （`src/renderer/main-window/components/FindBar.tsx`）。検索中に本文が変わったら
 （ストリーミング・タブ切り替え）照合し直す。
@@ -579,6 +581,9 @@ Cmd/Ctrl+F でタブ領域の右上に検索バーを出す。Enter で次、Shi
 - プレビューは `react-markdown` + `remark-gfm` + `shiki`。
   トランスクリプトとレンダラを共有する
 - **autosave。** UI に「保存」ボタンを出さない
+- ソースは CodeMirror 6。行番号を付け（Markdown は折り返す）、色は shiki で「表示」・トランスクリプトと同じにする。
+  右クリックで OS 標準の編集メニュー（スペルの候補・元に戻す・切り取り・コピー・貼り付けなど。
+  decisions.md N-3-1「改訂（2026-10-17）」・G-1-16）
 - **印刷用表示**（ツールバー右の `printer`。チャットの横ではアイコンだけ）: 別ウィンドウで文書全体を
   描き、```mermaid は図として埋め込む。上端に「読み込み直す」「印刷…」。図とハイライトが描き終わるまで
   「印刷…」は押せない。テーマは常にライト。PDF 化は OS の印刷ダイアログに任せる（decisions.md N-3-10）

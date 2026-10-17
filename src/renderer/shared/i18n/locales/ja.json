@@ -159,7 +159,26 @@
       "title": "どのチャットの横に表示しますか？",
       "description": "{{path}} を横に表示するチャットを選んでください。"
     },
-    "printPreview": "印刷用表示"
+    "printPreview": "印刷用表示",
+    "search": {
+      "find": "検索",
+      "replace": "置換",
+      "next": "次へ",
+      "previous": "前へ",
+      "all": "すべて選択",
+      "matchCase": "大文字と小文字を区別",
+      "regexp": "正規表現",
+      "byWord": "単語単位",
+      "replaceOne": "置換",
+      "replaceAll": "すべて置換",
+      "close": "閉じる",
+      "currentMatch": "現在の一致",
+      "onLine": "行目",
+      "replacedMatches": "$ 件置換しました",
+      "replacedMatchOnLine": "$ 行目を置換しました",
+      "goToLine": "行へ移動",
+      "go": "移動"
+    }
   },
   "acpUpdate": {
     "title": "エージェントの更新があります",

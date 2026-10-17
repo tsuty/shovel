@@ -360,7 +360,7 @@ shovel は Docker Sandboxes 専用であり、以下のコマンドに依存す�
 | :--- | :--- |
 | **Vercel AI SDK** | ACP の表現力（思考ログ、plan、tool_call の kind/locations/diffs、権限要求、modes、configOptions、session/list、session/load）を LanguageModel / HarnessAgent の抽象に通すと失われる。ハーネス層は**エージェントを隠蔽する**ための抽象であり、shovel は**エージェントの挙動を見せる**アプリなので方向が逆 |
 | **`@ai-sdk/harness-acp`** | サンドボックス内にブリッジを置き WebSocket で通信する方式で、**ポート公開が必須**。Docker Sandboxes でのポート公開はホストでの CLI 実行を要し、非エンジニア向けの前提と両立しない |
-| **Monaco / CodeMirror** | 編集できるのは Markdown と設定ファイル（JSON / YAML）だけで、他は閲覧のみ（コードを書くのは AI であって人間ではない）。重量級エディタは目的に対して過剰 |
+| **Monaco** | 編集できるのは設定ファイル・メモ・出力物だけで、他は閲覧のみ（コードを書くのは AI であって人間ではない）。バンドルが数MB・Web Worker 構成が要り、目的に対して過剰。編集面には CodeMirror 6 を使う（decisions.md N-3-1「改訂（2026-10-17）」） |
 | **`node-pty`** | ネイティブモジュールを増やし、配布と署名を複雑にする。TTY が要る場面は、PTY をサンドボックス内の `python3` で作って代える（decisions.md N-4「TTY モード」）。xterm.js は純 JS なので、その表示にだけ使う |
 | **`better-sqlite3`** | ネイティブモジュール。保存する量に対して `electron-store` で足りる |
 | **memfs + unionfs** | Node プロセス内の `fs` を差し替える仕組みであり、別プロセス・コンテナ内のエージェントには届かない |

@@ -239,6 +239,15 @@
   color: var(--shiki-dark) !important;
   background-color: var(--shiki-dark-bg) !important;
 }
+/* 行番号付きの表示は地の色を付けない（ダークでも、エディタと同じアプリの地の色にする）。 */
+.dark .shiki-lines pre.shiki,
+.dark .shiki-lines pre.shiki span {
+  background-color: transparent !important;
+}
+/* エディタ（CodeMirror）に shiki で付けた色（shikiHighlight.ts）。 */
+.dark .cm-shiki {
+  color: var(--shiki-dark) !important;
+}
 .shiki-lines .line::before {
   counter-increment: line;
   content: counter(line);
