@@ -671,7 +671,7 @@ export function App(): React.JSX.Element {
   }
 
   const tabIds = tabs.map((tab) => tab.sessionId)
-  useTabSwitchShortcuts(tabIds, selectTabExclusively)
+  useTabSwitchShortcuts(tabIds, activeSessionId, selectTabExclusively)
 
   if (!projectId) {
     return <div className="p-4 text-sm text-muted-foreground">{t('mainWindow.noProject')}</div>
