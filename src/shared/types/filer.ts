@@ -15,10 +15,18 @@ export type TextEncoding = 'UTF-8' | 'UTF-8 BOM' | 'UTF-16 LE' | 'UTF-16 BE' | '
 /** 改行コード。`none` は改行を含まない、`mixed` は複数が混在する。 */
 export type LineEnding = 'LF' | 'CRLF' | 'CR' | 'mixed' | 'none'
 
-/** そのまま書き戻せる（UTF-8 で保存しても中身が変わらない）文字コード。 */
+/** 同じ文字コードのまま書き戻せる文字コード。 */
 export function isWritableEncoding(encoding: TextEncoding): boolean {
-  return encoding === 'UTF-8' || encoding === 'UTF-8 BOM'
+  return encoding === 'UTF-8' || encoding === 'UTF-8 BOM' || encoding === 'Shift_JIS'
 }
+
+/**
+ * テキストの書き込みの結果。`unencodable` は元の文字コード（Shift_JIS）で表せない文字があって
+ * 書き込まなかったとき。位置は LF に揃えた内容での 1 始まりの行・列（UTF-16 単位）。
+ */
+export type WriteTextResult =
+  | { ok: true }
+  | { ok: false; reason: 'unencodable'; encoding: TextEncoding; line: number; column: number; char: string }
 
 export type FileReadResult =
   | {

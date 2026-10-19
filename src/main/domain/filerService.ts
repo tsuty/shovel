@@ -3,11 +3,11 @@ import path from 'node:path'
 import { clipboard, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import ignore, { type Ignore } from 'ignore'
-import type { FileReadResult, FileSearchResult, FsEntry } from '@shared/types/filer'
+import type { FileReadResult, FileSearchResult, FsEntry, WriteTextResult } from '@shared/types/filer'
 import type { Project } from '@shared/types/project'
 import { isNewFileKind, type NewFileKind } from '@shared/fileKinds'
 import { projectsStore } from '../persistence/store'
-import { decodeText, encodeForWrite } from './textEncoding'
+import { decodeText, encodeForWrite, UnencodableTextError } from './textEncoding'
 import { searchDirectory } from './fileSearch'
 
 /**
@@ -130,14 +130,22 @@ export async function readFileForViewer(projectId: string, relPath: string): Pro
   }
 }
 
-export async function writeTextFile(projectId: string, relPath: string, content: string): Promise<void> {
+export async function writeTextFile(projectId: string, relPath: string, content: string): Promise<WriteTextResult> {
   const project = requireProject(projectId)
   const absPath = resolveAbsolute(project, relPath)
   const existing = await readFile(absPath).catch((err: NodeJS.ErrnoException) => {
     if (err.code === 'ENOENT') return null
     throw err
   })
-  await writeFile(absPath, encodeForWrite(content, existing))
+  let bytes: Buffer
+  try {
+    bytes = encodeForWrite(content, existing)
+  } catch (err) {
+    if (!(err instanceof UnencodableTextError)) throw err
+    return { ok: false, reason: 'unencodable', encoding: 'Shift_JIS', line: err.line, column: err.column, char: err.char }
+  }
+  await writeFile(absPath, bytes)
+  return { ok: true }
 }
 
 export async function createDirectory(projectId: string, parentRelPath: string): Promise<string> {

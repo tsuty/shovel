@@ -12,6 +12,8 @@ describe('editorLanguageFor', () => {
     expect(editorLanguageFor('docs/Flow.Mermaid')).toBe('mermaid')
     expect(editorLanguageFor('site/index.html')).toBe('html')
     expect(editorLanguageFor('Page.HTM')).toBe('html')
+    expect(editorLanguageFor('data/Sales.CSV')).toBe('csv')
+    expect(editorLanguageFor('export.tsv')).toBe('tsv')
   })
 
   it('leaves other files to the read-only viewer', () => {

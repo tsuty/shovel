@@ -1,27 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Columns2, Eye, PanelRight, Printer, SquareCode, SquarePen, X } from 'lucide-react'
+import { Columns2, ExternalLink, Eye, PanelRight, Printer, SquareCode, SquarePen, Table, X } from 'lucide-react'
 import { Markdown } from '../../shared/components/Markdown'
 import { MermaidViewer } from '../../shared/components/MermaidViewer'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/input'
 import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { registerFlush } from '../editorRegistry'
 import { onTurnEnd } from '../turnEnd'
 import { conflictPath, decideEditorSync } from '../editorSync'
 import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/types/filer'
-import { FileStatusBar } from './FileStatusBar'
+import { FileStatusBar, formatFileSize } from './FileStatusBar'
 import { HtmlPreview } from '../../shared/components/HtmlPreview'
 import { cn } from '../../shared/lib/utils'
 import { findJsonProblem, type JsonProblem } from '../textEditing'
-import { usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
+import { isTableLanguage, usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
 import { revealInHighlightedCode, type FileReveal } from '../revealMatch'
 import { openSearchPanel } from '@codemirror/search'
 import { createCodeEditor, replaceDocument, selectAt, type CodeEditor } from '../codeEditor'
 import { closeFindBar, registerEditorSearch } from '../editorSearch'
+import { loadFirstRowIsHeader, parseCsvRecords, saveFirstRowIsHeader, toCsvTable } from '../csvTable'
+import { CsvTable } from './CsvTable'
 
 /**
  * 表示の切り替え。Markdown / Mermaid / HTML は「分割・ソース・プレビュー」、
- * JSON / YAML / テキストは「表示（ハイライト、既定）・編集」。
+ * JSON / YAML / テキストは「表示（ハイライト、既定）・編集」、CSV / TSV は「表示（表、既定）・編集」。
  */
 type ViewMode = 'split' | 'source' | 'preview' | 'view' | 'edit'
 
@@ -55,13 +58,26 @@ interface FileMeta {
   lineEnding: LineEnding
 }
 
-/** 保存後のバイト数を、main が元の改行コード・BOM に戻して書くのに合わせて見積もる。 */
+/** Shift_JIS でのバイト数の見積もり（ASCII と半角カナは 1 バイト、それ以外は 2 バイト）。 */
+function shiftJisByteLength(text: string): number {
+  let bytes = 0
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i)
+    bytes += c < 0x80 || (c >= 0xff61 && c <= 0xff9f) ? 1 : 2
+  }
+  return bytes
+}
+
+/** 保存後のバイト数を、main が元の文字コード・改行コード・BOM に戻して書くのに合わせて見積もる。 */
 function savedByteSize(text: string, meta: FileMeta): number {
-  const bytes = new TextEncoder().encode(text).length
+  const bytes = meta.encoding === 'Shift_JIS' ? shiftJisByteLength(text) : new TextEncoder().encode(text).length
   const newlines = meta.lineEnding === 'CRLF' ? (text.match(/\n/g)?.length ?? 0) : 0
   return bytes + newlines + (meta.encoding === 'UTF-8 BOM' ? 3 : 0)
 }
 const EXTERNAL_CHECK_INTERVAL_MS = 3000
+
+/** これより大きい CSV / TSV はアプリ内で開かず、OS の関連付けアプリに任せる。 */
+const MAX_TABLE_FILE_BYTES = 10 * 1024 * 1024
 
 /** CodeMirror の検索パネルの文言（英語の原文）と、訳のキー。 */
 const EDITOR_PHRASE_KEYS: Record<string, string> = {
@@ -124,8 +140,14 @@ export function TextFileEditor({
   const [diskSize, setDiskSize] = useState(0)
   /** 最後に自動保存が完了した時刻。ファイルを開いてからまだ保存していなければ null。 */
   const [savedAt, setSavedAt] = useState<number | null>(null)
-  // UTF-8 以外のファイルは表示だけにする。
+  // 書き戻せない文字コードのファイルは表示だけにする。
   const readOnly = !isWritableEncoding(meta.encoding)
+  /** CSV / TSV が大きすぎてアプリ内で開かないとき。 */
+  const [tooLarge, setTooLarge] = useState(false)
+  const tooLargeRef = useRef(false)
+  const [openError, setOpenError] = useState<string | null>(null)
+  /** 元の文字コードで表せない文字があって、最後の自動保存ができなかったとき。 */
+  const [unencodable, setUnencodable] = useState<{ line: number; column: number; char: string } | null>(null)
 
   const savedTextRef = useRef('')
   const textRef = useRef('')
@@ -148,7 +170,10 @@ export function TextFileEditor({
     setLoaded(false)
     void window.shovel.fs.readFile(projectId, relPath).then((result) => {
       if (cancelled) return
-      const content = result.kind === 'text' ? result.content : ''
+      const large = isTableLanguage(language) && result.kind === 'text' && result.size > MAX_TABLE_FILE_BYTES
+      tooLargeRef.current = large
+      setTooLarge(large)
+      const content = result.kind === 'text' && !large ? result.content : ''
       if (result.kind === 'text') {
         setMeta({ encoding: result.encoding, lineEnding: result.lineEnding })
         setDiskSize(result.size)
@@ -160,7 +185,7 @@ export function TextFileEditor({
     return () => {
       cancelled = true
     }
-  }, [projectId, relPath, applyText])
+  }, [projectId, relPath, language, applyText])
 
   /**
    * ディスクの内容と突き合わせる。外部で変更されていれば再読込するか、未保存の編集を
@@ -170,7 +195,7 @@ export function TextFileEditor({
   const syncWithDisk = useCallback(
     (save: boolean): Promise<void> => {
       const run = async (): Promise<void> => {
-        if (deletedRef.current) return
+        if (deletedRef.current || tooLargeRef.current) return
         const result = await window.shovel.fs.readFile(projectId, relPath)
         const editorText = textRef.current
         const action = decideEditorSync(result, savedTextRef.current, editorText)
@@ -185,18 +210,25 @@ export function TextFileEditor({
           case 'reload':
             applyText(action.content)
             savedTextRef.current = action.content
+            setUnencodable(null)
             break
           case 'conflict': {
             applyText(action.content)
             savedTextRef.current = action.content
             const backupPath = conflictPath(relPath)
             await window.shovel.fs.writeTextFile(projectId, backupPath, editorText)
+            setUnencodable(null)
             setNotice(t('editor.conflict', { path: backupPath }))
             break
           }
           case 'unchanged':
             if (save && editorText !== savedTextRef.current) {
-              await window.shovel.fs.writeTextFile(projectId, relPath, editorText)
+              const written = await window.shovel.fs.writeTextFile(projectId, relPath, editorText)
+              if (!written.ok) {
+                setUnencodable({ line: written.line, column: written.column, char: written.char })
+                break
+              }
+              setUnencodable(null)
               savedTextRef.current = editorText
               setSavedAt(Date.now())
               // 読み込んだのは書く前なので、サイズは書いた内容から見積もる。
@@ -225,7 +257,11 @@ export function TextFileEditor({
       clearTimeout(debounceRef.current)
       debounceRef.current = null
     }
-    if (textRef.current === savedTextRef.current) return
+    if (textRef.current === savedTextRef.current) {
+      // 保存できない文字を消して、保存済みの内容に戻ったとき。
+      setUnencodable(null)
+      return
+    }
     await syncWithDisk(true)
   }, [syncWithDisk])
 
@@ -299,7 +335,7 @@ export function TextFileEditor({
   const jsonProblem = useMemo(() => (language === 'json' ? findJsonProblem(text) : null), [language, text])
   /** 誤りの位置へ移るとき、ソースが見えてからカーソルを置くための保留。 */
   const pendingCaretRef = useRef<{ line: number; column: number } | null>(null)
-  function revealProblem(problem: JsonProblem): void {
+  function revealProblem(problem: Pick<JsonProblem, 'line' | 'column'>): void {
     if (problem.line === undefined) return
     pendingCaretRef.current = { line: problem.line, column: problem.column ?? 1 }
     if (!showSource) setMode(modes.includes('edit') ? 'edit' : 'source')
@@ -324,7 +360,7 @@ export function TextFileEditor({
 
   // JSON / YAML / テキストの表示は shiki で描く（テキストは色なしで行番号だけ。外部での変更を読み直したときも描き直す）。
   const [highlighted, setHighlighted] = useState<string | null>(null)
-  const highlightsCode = usesViewEditModes(language) && showPreview
+  const highlightsCode = usesViewEditModes(language) && !isTableLanguage(language) && showPreview
   useEffect(() => {
     if (!highlightsCode) return
     let cancelled = false
@@ -340,6 +376,8 @@ export function TextFileEditor({
     if (!reveal) return
     pendingRevealRef.current = reveal
     if (!usesViewEditModes(language) && !showSource) setMode(modes[0])
+    // 表には行・列の位置が無いので、編集へ切り替えてから選択する。
+    if (isTableLanguage(language) && !showSource) setMode('edit')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reveal?.nonce])
   useEffect(() => {
@@ -372,6 +410,34 @@ export function TextFileEditor({
     [syncWithDisk]
   )
 
+  // CSV / TSV の「1行目を見出しにする」。ファイルが替わったら、そのファイルの設定を読み直す。
+  const headerKey = `${projectId}\0${relPath}`
+  const [headerPref, setHeaderPref] = useState<{ key: string; value: boolean } | null>(null)
+  const firstRowIsHeader =
+    headerPref?.key === headerKey ? headerPref.value : loadFirstRowIsHeader(projectId, relPath)
+  function changeFirstRowIsHeader(value: boolean): void {
+    saveFirstRowIsHeader(projectId, relPath, value)
+    setHeaderPref({ key: headerKey, value })
+  }
+  const tableRecords = useMemo(
+    () =>
+      isTableLanguage(language) && showPreview && loaded ? parseCsvRecords(text, language === 'tsv' ? '\t' : ',') : null,
+    [language, showPreview, loaded, text]
+  )
+  const tableData = useMemo(
+    () => (tableRecords ? toCsvTable(tableRecords, firstRowIsHeader) : null),
+    [tableRecords, firstRowIsHeader]
+  )
+
+  async function openInOS(): Promise<void> {
+    setOpenError(null)
+    try {
+      await window.shovel.fs.openInOS(projectId, relPath)
+    } catch (err) {
+      setOpenError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   /** 印刷用表示はディスクから読むので、自動保存待ちの編集を書き出してから開く。 */
   async function openPrintPreview(): Promise<void> {
     await flush().catch((err: unknown) => console.warn('[editor] autosave failed', err))
@@ -383,6 +449,18 @@ export function TextFileEditor({
   }
   if (deleted) {
     return <div className="p-4 text-sm text-muted-foreground">{t('filer.fileDeleted')}</div>
+  }
+  if (tooLarge) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-sm text-muted-foreground">
+        <p>{t('editor.tableTooLarge', { size: formatFileSize(diskSize), limit: formatFileSize(MAX_TABLE_FILE_BYTES) })}</p>
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void openInOS()}>
+          <ExternalLink size={14} />
+          {t('filer.openWithDefaultApp')}
+        </Button>
+        {openError && <p className="text-xs text-destructive">{openError}</p>}
+      </div>
+    )
   }
 
   return (
@@ -411,6 +489,18 @@ export function TextFileEditor({
             </Button>
           )
         })}
+        {tableData && (
+          <>
+            <label className="ml-2 flex items-center gap-1.5 text-xs">
+              <Checkbox checked={firstRowIsHeader} onChange={(e) => changeFirstRowIsHeader(e.target.checked)} />
+              {t('editor.firstRowIsHeader')}
+            </label>
+            <span className="ml-2 flex items-center gap-1 text-xs text-muted-foreground">
+              <Table size={12} />
+              {t('editor.tableSize', { rows: tableData.rows.length, columns: tableData.headers.length })}
+            </span>
+          </>
+        )}
         <div className="flex-1" />
         {(language === 'markdown' || language === 'html') &&
           (variant === 'attached' ? (
@@ -462,8 +552,8 @@ export function TextFileEditor({
           <div
             className={cn(
               'h-full flex-1',
-              language === 'mermaid' ? 'flex min-w-0 flex-col' : 'overflow-auto',
-              language !== 'html' && language !== 'mermaid' && 'p-3'
+              language === 'mermaid' || tableData ? 'flex min-w-0 flex-col' : 'overflow-auto',
+              language !== 'html' && language !== 'mermaid' && !tableData && 'p-3'
             )}
           >
             {language === 'markdown' ? (
@@ -472,6 +562,8 @@ export function TextFileEditor({
               <MermaidViewer code={renderedSource} className="flex-1" />
             ) : language === 'html' ? (
               <HtmlPreview html={renderedSource} title={relPath} />
+            ) : tableData ? (
+              <CsvTable data={tableData} />
             ) : highlighted !== null ? (
               <div
                 ref={highlightedRef}
@@ -487,9 +579,19 @@ export function TextFileEditor({
         encoding={meta.encoding}
         lineEnding={meta.lineEnding}
         readOnly={readOnly}
-        savedAt={savedAt}
+        savedAt={unencodable ? null : savedAt}
         problem={
-          jsonProblem && {
+          unencodable
+            ? {
+                label: t('editor.unencodable', {
+                  encoding: meta.encoding,
+                  line: unencodable.line,
+                  char: unencodable.char
+                }),
+                detail: t('editor.unencodableDetail', { encoding: meta.encoding }),
+                onClick: () => revealProblem(unencodable)
+              }
+            : jsonProblem && {
             label:
               jsonProblem.line === undefined
                 ? t('editor.jsonInvalid')

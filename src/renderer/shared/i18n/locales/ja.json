@@ -164,6 +164,11 @@
     "attachToChat": "チャットの横に表示",
     "jsonInvalid": "JSON の書式に誤りがあります",
     "jsonInvalidAt": "JSON の書式に誤りがあります（{{line}} 行目 {{column}} 列目）",
+    "unencodable": "{{encoding}} で保存できない文字「{{char}}」があります（{{line}} 行目）",
+    "unencodableDetail": "この文字を消すか置き換えるまで保存されません。押すとその位置へ移ります。",
+    "firstRowIsHeader": "1行目を見出しにする",
+    "tableSize": "{{rows}} 行 × {{columns}} 列",
+    "tableTooLarge": "このファイルは大きすぎるため（{{size}}）、アプリ内では表示できません（上限 {{limit}}）。",
     "attachTarget": {
       "title": "どのチャットの横に表示しますか？",
       "description": "{{path}} を横に表示するチャットを選んでください。"

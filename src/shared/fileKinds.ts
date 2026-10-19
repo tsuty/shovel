@@ -9,13 +9,18 @@ export function isNewFileKind(value: unknown): value is NewFileKind {
 
 /**
  * アプリ内エディタで開くときの種類。Markdown / Mermaid / HTML は「分割・ソース・プレビュー」、
- * JSON / YAML / テキストは「表示（ハイライト。テキストは色なし）・編集」を切り替える。
+ * JSON / YAML / テキストは「表示（ハイライト。テキストは色なし）・編集」、CSV / TSV は「表示（表）・編集」を切り替える。
  */
-export type EditorLanguage = 'markdown' | 'mermaid' | 'html' | 'json' | 'yaml' | 'text'
+export type EditorLanguage = 'markdown' | 'mermaid' | 'html' | 'json' | 'yaml' | 'text' | 'csv' | 'tsv'
 
 /** 「表示・編集」を切り替える種類か（そうでなければ「分割・ソース・プレビュー」）。 */
 export function usesViewEditModes(language: EditorLanguage): boolean {
-  return language === 'json' || language === 'yaml' || language === 'text'
+  return language === 'json' || language === 'yaml' || language === 'text' || isTableLanguage(language)
+}
+
+/** 「表示」を表にする種類か。 */
+export function isTableLanguage(language: EditorLanguage): language is 'csv' | 'tsv' {
+  return language === 'csv' || language === 'tsv'
 }
 
 export function editorLanguageFor(relPath: string): EditorLanguage | null {
@@ -26,5 +31,7 @@ export function editorLanguageFor(relPath: string): EditorLanguage | null {
   if (lower.endsWith('.json')) return 'json'
   if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'yaml'
   if (lower.endsWith('.txt')) return 'text'
+  if (lower.endsWith('.csv')) return 'csv'
+  if (lower.endsWith('.tsv')) return 'tsv'
   return null
 }

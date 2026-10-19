@@ -29,6 +29,8 @@ const LANGS = [
   'xml',
   'docker',
   'mermaid',
+  'csv',
+  'tsv',
   'plaintext'
 ] as const
 
@@ -104,7 +106,9 @@ const EXT_TO_LANG: Record<string, string> = {
   xml: 'xml',
   dockerfile: 'docker',
   mmd: 'mermaid',
-  mermaid: 'mermaid'
+  mermaid: 'mermaid',
+  csv: 'csv',
+  tsv: 'tsv'
 }
 
 /** Markdown のフェンスの言語名（`ts` / `typescript` / `sh` など）を shiki の言語名にする。 */

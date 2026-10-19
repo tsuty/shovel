@@ -13,7 +13,7 @@ import type {
   SessionMeta,
   SessionSnapshot
 } from './types/session'
-import type { FileReadResult, FileSearchResult, FsEntry } from './types/filer'
+import type { FileReadResult, FileSearchResult, FsEntry, WriteTextResult } from './types/filer'
 import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput } from './types/command'
 import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
@@ -290,7 +290,7 @@ export interface RendererApi {
   fs: {
     list(projectId: string, relPath: string): Promise<FsEntry[]>
     readFile(projectId: string, relPath: string): Promise<FileReadResult>
-    writeTextFile(projectId: string, relPath: string, content: string): Promise<void>
+    writeTextFile(projectId: string, relPath: string, content: string): Promise<WriteTextResult>
     rename(projectId: string, relPath: string, newName: string): Promise<void>
     remove(projectId: string, relPath: string): Promise<void>
     move(projectId: string, relPath: string, destDirRelPath: string): Promise<void>

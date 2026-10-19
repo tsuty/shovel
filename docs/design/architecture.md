@@ -61,7 +61,7 @@ OS のリソースとプロセスを扱うものはすべてここに置く。
 | :--- | :--- |
 | **ACP クライアント** | `@agentclientprotocol/sdk` を使い、`sbx exec` の子プロセスと JSON-RPC を交換する |
 | **`sbx` CLI の実行** | `create` / `ls` / `rm` / `stop` / `exec` / `secret` / `diagnose` |
-| **ファイルシステム** | ファイルツリー、読み書き、`shell.trashItem`、`shell.openPath` |
+| **ファイルシステム** | ファイルツリー、読み書き（Shift_JIS の書き戻しは `iconv-lite`）、`shell.trashItem`、`shell.openPath` |
 | **永続化** | 設定、プロジェクト一覧、セッションスナップショット |
 | **ログ** | ACP トラフィックログ、エージェントの `stderr` |
 | **ウィンドウ管理** | `BrowserWindow` の生成・単一インスタンス制御 |
@@ -80,6 +80,7 @@ OS のリソースとプロセスを扱うものはすべてここに置く。
 | Markdown | `react-markdown` + `remark-gfm` + `remark-gemoji` |
 | シンタックスハイライト | `shiki` |
 | ファイルツリー | `react-arborist` |
+| CSV / TSV の表 | `papaparse` + `@tanstack/react-table` + `@tanstack/react-virtual` |
 | コマンド実行の TTY モード | `@xterm/xterm` + `@xterm/addon-fit`（表示のみ。PTY はサンドボックス内） |
 
 ### セキュリティ設定
@@ -340,6 +341,7 @@ shovel は Docker Sandboxes 専用であり、以下のコマンドに依存す�
 | Markdown | `react-markdown` + `remark-gfm` + `remark-gemoji` |
 | ハイライト | `shiki` |
 | ファイルツリー | `react-arborist` |
+| CSV / TSV の表 | `papaparse` + `@tanstack/react-table` + `@tanstack/react-virtual` |
 | `.gitignore` 判定 | `ignore`（npm。git コマンドを呼ばない） |
 | 永続化 | `electron-store`（JSON） |
 | i18n | `i18next` + `react-i18next`（英語・日本語） |

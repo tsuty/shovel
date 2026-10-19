@@ -1,4 +1,5 @@
-import type { LineEnding, TextEncoding } from '@shared/types/filer'
+import iconv from 'iconv-lite'
+import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/types/filer'
 
 /**
  * テキストファイルの文字コード・改行コードの判定と、書き戻し時の復元。
@@ -76,19 +77,55 @@ function dominantLineEnding(text: string): '\n' | '\r\n' {
   return crlf > lf ? '\r\n' : '\n'
 }
 
+/** Shift_JIS で表せない文字が含まれていて書き込めない。位置は LF に揃えた内容での 1 始まりの行・列（UTF-16 単位）。 */
+export class UnencodableTextError extends Error {
+  constructor(
+    readonly line: number,
+    readonly column: number,
+    readonly char: string
+  ) {
+    super(`character ${JSON.stringify(char)} at ${line}:${column} cannot be encoded in Shift_JIS`)
+  }
+}
+
 /**
- * LF に揃えた編集内容を、既存ファイル（`existing`、新規なら null）の改行コード・BOM に合わせて
- * バイト列にする。UTF-8 で読めないファイルへの上書きは拒否する。
+ * Shift_JIS（読み込みと同じ CP932 / Windows-31J）のバイト列にする。読み直して元に戻らない文字
+ * （絵文字など）があれば、最初のものの位置を付けて `UnencodableTextError` を投げる。
+ */
+function encodeShiftJis(text: string): Buffer {
+  const bytes = iconv.encode(text, 'cp932')
+  if (tryDecode('shift_jis', bytes) === text) return bytes
+  for (const [i, line] of text.split('\n').entries()) {
+    let column = 1
+    for (const char of line) {
+      if (tryDecode('shift_jis', iconv.encode(char, 'cp932')) !== char) {
+        throw new UnencodableTextError(i + 1, column, char)
+      }
+      column += char.length
+    }
+  }
+  throw new UnencodableTextError(1, 1, '')
+}
+
+/**
+ * LF に揃えた編集内容を、既存ファイル（`existing`、新規なら null）の文字コード・改行コード・BOM に
+ * 合わせてバイト列にする。書き込めるのは UTF-8（BOM の有無）と Shift_JIS で、それ以外の既存ファイルへの
+ * 上書きは拒否する。
  */
 export function encodeForWrite(content: string, existing: Buffer | null): Buffer {
   const normalized = content.replace(/\r\n?/g, '\n')
   if (!existing) return Buffer.from(normalized, 'utf8')
   const decoded = decodeText(existing)
-  if (decoded.kind === 'binary' || (decoded.encoding !== 'UTF-8' && decoded.encoding !== 'UTF-8 BOM')) {
-    throw new Error('refusing to overwrite a file that is not UTF-8 text')
+  if (decoded.kind === 'binary' || !isWritableEncoding(decoded.encoding)) {
+    throw new Error('refusing to overwrite a file that is not UTF-8 or Shift_JIS text')
   }
   const eol =
-    decoded.lineEnding === 'none' ? '\n' : decoded.lineEnding === 'CR' ? '\r' : dominantLineEnding(existing.toString('utf8'))
+    decoded.lineEnding === 'none' ? '\n' : decoded.lineEnding === 'CR' ? '\r' : dominantLineEnding(existing.toString('latin1'))
+  if (decoded.encoding === 'Shift_JIS') {
+    // 改行の位置を保ったまま検査できるよう、改行を戻す前に変換する（改行のバイトは Shift_JIS でも同じ）。
+    const body = encodeShiftJis(normalized)
+    return eol === '\n' ? body : Buffer.from(body.toString('latin1').replace(/\n/g, eol), 'latin1')
+  }
   const body = Buffer.from(eol === '\n' ? normalized : normalized.replace(/\n/g, eol), 'utf8')
   return decoded.encoding === 'UTF-8 BOM' ? Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), body]) : body
 }

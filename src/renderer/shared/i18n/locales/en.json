@@ -166,6 +166,11 @@
     "attachToChat": "Show beside chat",
     "jsonInvalid": "Invalid JSON",
     "jsonInvalidAt": "Invalid JSON (line {{line}}, column {{column}})",
+    "unencodable": "\"{{char}}\" can't be saved in {{encoding}} (line {{line}})",
+    "unencodableDetail": "Changes won't be saved until this character is removed or replaced. Click to jump to it.",
+    "firstRowIsHeader": "First row is header",
+    "tableSize": "{{rows}} rows × {{columns}} columns",
+    "tableTooLarge": "This file is too large to show in the app ({{size}}; the limit is {{limit}}).",
     "attachTarget": {
       "title": "Which chat should it go beside?",
       "description": "Choose the chat to show {{path}} beside."

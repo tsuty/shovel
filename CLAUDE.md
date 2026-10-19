@@ -54,7 +54,10 @@ read-only syntax-highlighted viewer (images previewed in-app — zoom/fit/drag-p
 bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those. Editable text files all
 open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in
 `src/shared/fileKinds.ts`): Markdown, Mermaid and HTML get split/source/preview (Mermaid's preview is the diagram, debounced, with zoom/fit/drag-pan via `MermaidViewer` (on `ZoomableView`) — also used by the ```` ```mermaid ```` popup, which can be maximized; print view keeps the static `MermaidDiagram`, decisions.md N-3-2b「大きい図の表示」; HTML renders in a script-less `sandbox="allow-popups"` srcdoc iframe — `HtmlPreview.tsx`, links go out via `<base target="_blank">` → `setWindowOpenHandler`),
-JSON/YAML (and plain `.txt`, uncoloured) get a highlighted "表示" view by default plus an "編集" toggle (`usesViewEditModes`). The editing
+JSON/YAML (and plain `.txt`, uncoloured) get a highlighted "表示" view by default plus an "編集" toggle (`usesViewEditModes`);
+CSV/TSV use the same toggle with "表示" as a read-only virtualized table (`CsvTable.tsx`: PapaParse + TanStack Table/Virtual, sort,
+column resize, a per-file "1行目を見出しにする" checkbox in `localStorage`; files over 10MB only offer "open with default app";
+row-number cells must not be `position: sticky` — that crashed the renderer on ~200k rows; decisions.md N-3-12). The editing
 surface is CodeMirror 6, driven directly via `EditorView` (no React wrapper; `src/renderer/main-window/codeEditor.ts`,
 decisions.md N-3-1 改訂 2026-10-17): syntax colours come from shiki (`shikiHighlight.ts` turns `codeToTokens` into
 decorations, so 表示/編集 look identical — no CodeMirror language packages), `indentWithTab`, line numbers on every
@@ -68,7 +71,9 @@ creation items live under a "新規ファイル ▸" submenu (Markdown / Text / 
 with a starter template); other binaries show an
 "open with default app" button rather than opening automatically; text views and the Markdown
 editor have a status bar with size/encoding/line ending (plus the last autosave time in the editor) — writes preserve the file's original
-line ending and BOM, and non-UTF-8 files are view-only, see decisions.md N-3-2) and a split-view Markdown
+line ending, BOM and encoding — Shift_JIS is written back as CP932 via `iconv-lite`, and a character it can't encode blocks the
+autosave with a clickable status-bar entry (`WriteTextResult`) instead of being replaced; files that are neither UTF-8 nor
+Shift_JIS are view-only, see decisions.md N-3-2) and a split-view Markdown
 editor (any editable file type, not just Markdown) that can also be attached to the right of a chat tab or an un-resumed history tab
 (decisions.md G-1-9: bound to that tab, not in the tab bar, closes with it, carried over on
 Resume, source/preview only; if the target isn't obvious — active tab isn't a chat and there are
@@ -287,7 +292,7 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   per window in each `main.tsx`) moves `title` to `data-tip` on hover and draws its own popup
   (decisions.md G-1-15). For an ⓘ-only hint use `InfoTip`. Don't add per-component tooltip code.
 - **`dependencies` = only what main/preload `require` at runtime** (`@agentclientprotocol/sdk`,
-  `zod`, `ignore`). Renderer libraries and anything main should bundle (e.g. ESM-only
+  `zod`, `ignore`, `iconv-lite`). Renderer libraries and anything main should bundle (e.g. ESM-only
   `electron-store`) go in `devDependencies` — electron-builder ships every `dependencies` entry
   in `app.asar`, and renderer code is already bundled into `out/renderer` (docs/DEVELOPMENT.md).
 - **Zero native modules.** Do not add `node-pty`, `better-sqlite3`, or anything requiring
