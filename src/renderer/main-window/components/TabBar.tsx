@@ -7,6 +7,8 @@ import { MenuItem } from './MenuItem'
 export interface TabInfo {
   sessionId: string
   title: string
+  /** タブ名のツールチップ（ファイルのタブはプロジェクト内のパス）。無ければ `title`。 */
+  tooltip?: string
   kind: 'session' | 'file' | 'history' | 'connecting'
   /**
    * セッションタブがいま書き込んでいるスナップショットの id。↻ で新しい会話を
@@ -219,7 +221,7 @@ export function TabBar({
                 ) : (
                   <Loader2 size={12} className="shrink-0 animate-spin" />
                 ))}
-              <span className="truncate" title={tab.title}>
+              <span className="truncate" title={tab.tooltip ?? tab.title}>
                 {tab.title}
               </span>
             </button>

@@ -120,7 +120,7 @@
     "newYamlFile": "新規設定（YAML）",
     "copy": "コピー",
     "paste": "貼り付け",
-    "unreadable": "このフォルダの中身は表示できません",
+    "unreadable": "このフォルダの内容は表示できません",
     "refresh": "更新",
     "openInFinder": "Finder で開く",
     "openInExplorer": "エクスプローラーで開く",
@@ -128,6 +128,8 @@
     "attachToChat": "チャットの横で開く"
   },
   "fileStatus": {
+    "copyPath": "押すとパスをコピー",
+    "copied": "コピーしました",
     "encodingUnknown": "文字コード不明",
     "eolMixed": "改行混在",
     "eolNone": "改行なし",
@@ -330,14 +332,16 @@
     "deletedDate": "削除済み・{{date}}"
   },
   "fileSearch": {
-    "title": "ファイルの中身を検索",
-    "open": "ファイルの中身を検索",
+    "title": "ファイルを検索",
+    "open": "ファイルを検索（ファイル名・コンテンツ）",
     "inFolder": "このフォルダ内を検索",
-    "placeholder": "検索キーワード",
+    "placeholder": "ファイル名・コンテンツのキーワード",
     "scope": "範囲: {{path}}",
     "clearScope": "プロジェクト全体を検索",
-    "excluded": "次のものは検索しません:\n・「.」で始まるフォルダ\n・node_modules\n・テキスト以外のファイル（画像など）、UTF-8 以外のテキスト、2MB を超えるファイル",
+    "excluded": "次のものは検索しません:\n・「.」で始まるフォルダ\n・node_modules\n・フォルダの名前\nコンテンツは、次のファイルも検索しません:\n・テキスト以外のファイル（画像など）、UTF-8 以外のテキスト、2MB を超えるファイル",
     "noResults": "一致するファイルはありません。",
+    "nameMatches": "ファイル名",
+    "contentMatches": "コンテンツ",
     "lineAt": "{{line}} 行目",
     "truncated": "先頭の {{count}} 件だけを表示しています。キーワードを絞り込んでください。"
   },

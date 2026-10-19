@@ -680,6 +680,7 @@ export function App(): React.JSX.Element {
   const tabInfos: TabInfo[] = tabs.map((tab) => ({
     sessionId: tab.sessionId,
     title: tab.title,
+    tooltip: tab.kind === 'file' ? tab.relPath : undefined,
     kind: tab.kind,
     snapshotId: tab.kind === 'session' ? tab.snapshotId : undefined,
     failed: tab.kind === 'connecting' ? tab.error !== undefined : undefined,

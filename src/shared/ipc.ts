@@ -15,7 +15,7 @@ import type {
   SessionMeta,
   SessionSnapshot
 } from './types/session'
-import type { FileReadResult, FileSearchResult, FsEntry, WriteTextResult } from './types/filer'
+import type { FileReadResult, FileSearchResults, FsEntry, WriteTextResult } from './types/filer'
 import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput } from './types/command'
 import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
@@ -314,8 +314,8 @@ export interface RendererApi {
     copyExternal(projectId: string, absPaths: string[], destDirRelPath: string): Promise<string[]>
     /** ドロップされた `File` のホスト上の絶対パス（Electron の `webUtils.getPathForFile`）。 */
     pathForFile(file: File): string
-    /** 中身検索（`scopeRelPath` が空ならプロジェクト全体）。新しい検索に追い越されたときは null。 */
-    search(projectId: string, scopeRelPath: string, query: string): Promise<FileSearchResult[] | null>
+    /** ファイル名とコンテンツの検索（`scopeRelPath` が空ならプロジェクト全体）。新しい検索に追い越されたときは null。 */
+    search(projectId: string, scopeRelPath: string, query: string): Promise<FileSearchResults | null>
   }
   command: {
     run(projectId: string, command: string): Promise<{ runId: string }>

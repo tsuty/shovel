@@ -44,16 +44,19 @@ folder/Markdown file, rename, delete, move via drag & drop, and clipboard copy/p
 right-click menu — including on empty space for root-level creation/paste — plus copy-in from the
 OS file manager by paste or drop (always a copy, never a move; `readClipboardFilePaths` reads
 Electron 44's `text/uri-list` clipboard format (+ `x-special/gnome-copied-files` on Linux), drops use `webUtils.getPathForFile`), a manual refresh button, a
-file-*contents* search (🔎 in the Filer header, or a folder's right-click "search in this folder";
-`FileSearchDialog.tsx` remembers its query/scope/results per project across closes; host-side
-`src/main/domain/fileSearch.ts` skips `.`-prefixed folders, `node_modules`, binaries and non-UTF-8 files;
-clicking a result opens the file and jumps to the match via `openFile(relPath, at)` → `FileReveal`,
-`revealMatch.ts`, decisions.md N-3-11), and
+file search over names *and* contents with one query (🔎 in the Filer header, or a folder's right-click "search in this folder";
+`FileSearchDialog.tsx` shows "file names" and "contents" sections and remembers its query/scope/results per project across closes; host-side
+`src/main/domain/fileSearch.ts` matches file names (not folder names) in the same walk, skips `.`-prefixed folders and `node_modules`,
+and reads no binaries/non-UTF-8 files for contents;
+clicking a content result opens the file and jumps to the match via `openFile(relPath, at)` → `FileReveal`,
+`revealMatch.ts`, decisions.md N-3-11 改訂 2026-10-19), and
 "Open in Finder/Explorer" for folders; `.git` is always hidden, the old toggle is gone; files open
 on double-click or Enter — single click/arrow keys only select, folders still toggle on single
 click (decisions.md N-3-4); a right-click "open with default app" for files was deliberately
 rejected because `shell.openPath` can execute agent-written scripts on the host) with a
-read-only syntax-highlighted viewer (images previewed in-app — zoom/fit/drag-pan via the same `ZoomableView` as Mermaid, starting at fit-to-view — with a size + width×height status
+read-only syntax-highlighted viewer (every file view — including binaries and too-large CSVs — has a bottom status bar whose left end is the
+project-relative path, click to copy; the autosave time sits on the right; file tabs' tooltips are the path too —
+`FileStatusBar.tsx`, decisions.md N-3-13) (images previewed in-app — zoom/fit/drag-pan via the same `ZoomableView` as Mermaid, starting at fit-to-view — with a size + width×height status
 bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those. Editable text files all
 open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in
 `src/shared/fileKinds.ts`): Markdown, Mermaid and HTML get split/source/preview (Mermaid's preview is the diagram, debounced, with zoom/fit/drag-pan via `MermaidViewer` (on `ZoomableView`) — also used by the ```` ```mermaid ```` popup, which can be maximized; print view keeps the static `MermaidDiagram`, decisions.md N-3-2b「大きい図の表示」; HTML renders in a script-less `sandbox="allow-popups"` srcdoc iframe — `HtmlPreview.tsx`, links go out via `<base target="_blank">` → `setWindowOpenHandler`),

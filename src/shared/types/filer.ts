@@ -47,13 +47,27 @@ export type FileReadResult =
   | { kind: 'binary' }
   | { kind: 'missing' }
 
-/** ファイラーの中身検索で返す最大件数。これに達したら打ち切る。 */
+/** ファイラーの検索で返す最大件数（ファイル名・コンテンツそれぞれ）。これに達したら打ち切る。 */
 export const FILE_SEARCH_MAX_RESULTS = 100
 
-/** ファイラーの中身検索の1件（1ファイルにつき最初の一致だけ）。 */
+/** ファイラーの検索の結果。ファイル名の一致とコンテンツの一致を分けて返す。 */
+export interface FileSearchResults {
+  names: FileNameMatch[]
+  contents: FileSearchResult[]
+}
+
+/** ファイル名の一致の1件。 */
+export interface FileNameMatch {
+  relPath: string
+  /** ファイル名の中の一致箇所（文字（UTF-16）単位）。太字にする。 */
+  start: number
+  length: number
+}
+
+/** ファイラーのコンテンツ検索の1件（1ファイルにつき最初の一致だけ）。 */
 export interface FileSearchResult {
   relPath: string
-  /** 一致箇所。1 始まり。列は改行を LF に揃えた中身での文字（UTF-16）単位。 */
+  /** 一致箇所。1 始まり。列は改行を LF に揃えたコンテンツでの文字（UTF-16）単位。 */
   line: number
   column: number
   length: number

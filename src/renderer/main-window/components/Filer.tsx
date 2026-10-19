@@ -116,7 +116,7 @@ export function Filer({
   canAttachFile
 }: {
   projectId: string
-  /** `at` があれば、開いた後にその位置（中身検索の一致箇所）へ移る。 */
+  /** `at` があれば、開いた後にその位置（コンテンツ検索の一致箇所）へ移る。 */
   onOpenFile: (relPath: string, at?: Omit<FileReveal, 'nonce'>) => void
   onAddToContext: (relPath: string) => void
   /** 編集できるファイルを今のチャットタブの右に添える。 */
@@ -559,9 +559,7 @@ export function Filer({
         projectId={projectId}
         open={searchOpen}
         onOpenChange={setSearchOpen}
-        onOpenResult={(result) =>
-          onOpenFile(result.relPath, { line: result.line, column: result.column, length: result.length })
-        }
+        onOpenResult={onOpenFile}
       />
     </div>
   )

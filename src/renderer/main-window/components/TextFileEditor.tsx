@@ -10,7 +10,7 @@ import { registerFlush } from '../editorRegistry'
 import { onTurnEnd } from '../turnEnd'
 import { conflictPath, decideEditorSync } from '../editorSync'
 import { isWritableEncoding, type LineEnding, type TextEncoding } from '@shared/types/filer'
-import { FileStatusBar, formatFileSize } from './FileStatusBar'
+import { FileStatusBar, PathStatusBar, formatFileSize } from './FileStatusBar'
 import { HtmlPreview } from '../../shared/components/HtmlPreview'
 import { cn } from '../../shared/lib/utils'
 import { findJsonProblem, type JsonProblem } from '../textEditing'
@@ -452,13 +452,16 @@ export function TextFileEditor({
   }
   if (tooLarge) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-sm text-muted-foreground">
-        <p>{t('editor.tableTooLarge', { size: formatFileSize(diskSize), limit: formatFileSize(MAX_TABLE_FILE_BYTES) })}</p>
-        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void openInOS()}>
-          <ExternalLink size={14} />
-          {t('filer.openWithDefaultApp')}
-        </Button>
-        {openError && <p className="text-xs text-destructive">{openError}</p>}
+      <div className="flex h-full flex-col">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4 text-sm text-muted-foreground">
+          <p>{t('editor.tableTooLarge', { size: formatFileSize(diskSize), limit: formatFileSize(MAX_TABLE_FILE_BYTES) })}</p>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void openInOS()}>
+            <ExternalLink size={14} />
+            {t('filer.openWithDefaultApp')}
+          </Button>
+          {openError && <p className="text-xs text-destructive">{openError}</p>}
+        </div>
+        <PathStatusBar relPath={relPath} size={diskSize} />
       </div>
     )
   }
@@ -575,6 +578,7 @@ export function TextFileEditor({
         )}
       </div>
       <FileStatusBar
+        relPath={relPath}
         size={text !== savedTextRef.current ? savedByteSize(text, meta) : diskSize}
         encoding={meta.encoding}
         lineEnding={meta.lineEnding}

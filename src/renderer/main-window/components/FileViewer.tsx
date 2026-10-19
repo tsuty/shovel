@@ -6,7 +6,7 @@ import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { Button } from '../../shared/components/ui/button'
 import { ZoomableView } from '../../shared/components/ZoomableView'
 import { parseViewBox, type Size } from '../../shared/lib/zoom'
-import { FileStatusBar, ImageStatusBar } from './FileStatusBar'
+import { FileStatusBar, ImageStatusBar, PathStatusBar } from './FileStatusBar'
 import { onTurnEnd } from '../turnEnd'
 import { revealInHighlightedCode, type FileReveal } from '../revealMatch'
 
@@ -161,13 +161,16 @@ export function FileViewer({
       )
     case 'binary':
       return (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4 text-sm text-muted-foreground">
-          <p>{t('filer.noPreview')}</p>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void openInOS()}>
-            <ExternalLink size={14} />
-            {t('filer.openWithDefaultApp')}
-          </Button>
-          {openError && <p className="text-xs text-destructive">{openError}</p>}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4 text-sm text-muted-foreground">
+            <p>{t('filer.noPreview')}</p>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void openInOS()}>
+              <ExternalLink size={14} />
+              {t('filer.openWithDefaultApp')}
+            </Button>
+            {openError && <p className="text-xs text-destructive">{openError}</p>}
+          </div>
+          <PathStatusBar relPath={relPath} />
         </div>
       )
     case 'image':
@@ -190,7 +193,7 @@ export function FileViewer({
               onError={() => setImageDims(null)}
             />
           </ZoomableView>
-          <ImageStatusBar size={view.size} dimensions={imageDims} />
+          <ImageStatusBar relPath={relPath} size={view.size} dimensions={imageDims} />
         </div>
       )
     case 'text':
@@ -199,7 +202,12 @@ export function FileViewer({
           <div className="flex-1 overflow-auto p-2">
             <div ref={codeRef} className="shiki-lines text-editor" dangerouslySetInnerHTML={{ __html: view.html }} />
           </div>
-          <FileStatusBar size={view.file.size} encoding={view.file.encoding} lineEnding={view.file.lineEnding} />
+          <FileStatusBar
+            relPath={relPath}
+            size={view.file.size}
+            encoding={view.file.encoding}
+            lineEnding={view.file.lineEnding}
+          />
         </div>
       )
   }
