@@ -22,6 +22,10 @@ const api: RendererApi = {
     getWidths: () => ipcRenderer.invoke(IpcChannel.SidebarGetWidths),
     setWidth: (panel, width) => ipcRenderer.invoke(IpcChannel.SidebarSetWidth, panel, width)
   },
+  tabs: {
+    restore: (projectId) => ipcRenderer.invoke(IpcChannel.TabsRestore, projectId),
+    save: (projectId, tabs) => ipcRenderer.invoke(IpcChannel.TabsSave, projectId, tabs)
+  },
   auth: {
     status: (projectId) => ipcRenderer.invoke(IpcChannel.AuthStatus, projectId),
     setApiKey: (projectId, apiKey) => ipcRenderer.invoke(IpcChannel.AuthSetApiKey, projectId, apiKey),

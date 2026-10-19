@@ -19,6 +19,13 @@ export interface TabInfo {
   failed?: boolean
 }
 
+/** 押したまま、この距離（px）を超えて動かしたらドラッグとみなす。 */
+const DRAG_THRESHOLD = 5
+/** ドラッグ中、タブ列の端からこの幅（px）に入ったら横にスクロールする。 */
+const DRAG_SCROLL_EDGE = 32
+/** ドラッグ中の横スクロールの速さ（px／フレーム）。 */
+const DRAG_SCROLL_STEP = 8
+
 export function TabBar({
   tabs,
   activeSessionId,
@@ -26,6 +33,7 @@ export function TabBar({
   onClose,
   onCloseFiles,
   onNew,
+  onMove,
   canAddTab
 }: {
   tabs: TabInfo[]
@@ -35,6 +43,8 @@ export function TabBar({
   /** ファイルのタブをまとめて閉じる（チャット・履歴は残す）。`keepId` のタブだけは残す。 */
   onCloseFiles: (keepId: string | null) => void
   onNew: () => void
+  /** タブ `id` を `beforeId` のタブの左（`null` なら一番右）へ動かす。 */
+  onMove: (id: string, beforeId: string | null) => void
   canAddTab: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -42,6 +52,83 @@ export function TabBar({
   const fileTabCount = tabs.filter((tab) => tab.kind === 'file').length
   const stripRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  /** ドラッグ中のタブと、離したときに入る位置（`beforeId` のタブの左。`null` は一番右）。 */
+  const [drag, setDrag] = useState<{ id: string; beforeId: string | null; indicatorLeft: number } | null>(null)
+  /** ドラッグを終えた直後のクリックを、タブの切り替えとして扱わないための印。 */
+  const suppressClickRef = useRef(false)
+
+  /** タブを押したところからドラッグを見張る。動かさずに離せば通常のクリックになる。 */
+  function startDragWatch(e: React.PointerEvent, id: string): void {
+    if (e.button !== 0) return
+    const strip = stripRef.current
+    if (!strip) return
+    const startX = e.clientX
+    const startY = e.clientY
+    let active = false
+    let pointerX = startX
+    let target: { beforeId: string | null; indicatorLeft: number } | null = null
+    let scrollFrame = 0
+
+    // ポインタの位置から、離したときに入る位置と、その目印の位置（タブ列の中の x）を求める。
+    const locate = (): { beforeId: string | null; indicatorLeft: number } => {
+      const els = Array.from(strip.querySelectorAll<HTMLElement>('[data-tab-id]'))
+      for (const el of els) {
+        const rect = el.getBoundingClientRect()
+        if (pointerX < rect.left + rect.width / 2) return { beforeId: el.dataset.tabId!, indicatorLeft: el.offsetLeft - 3 }
+      }
+      const last = els[els.length - 1]
+      return { beforeId: null, indicatorLeft: last ? last.offsetLeft + last.offsetWidth + 1 : 0 }
+    }
+    const update = (): void => {
+      target = locate()
+      setDrag({ id, ...target })
+    }
+    // 端に寄せている間は、ポインタを止めていても横に送り続ける。
+    const autoScroll = (): void => {
+      const rect = strip.getBoundingClientRect()
+      const delta =
+        pointerX < rect.left + DRAG_SCROLL_EDGE ? -DRAG_SCROLL_STEP : pointerX > rect.right - DRAG_SCROLL_EDGE ? DRAG_SCROLL_STEP : 0
+      if (delta !== 0) {
+        strip.scrollLeft += delta
+        update()
+      }
+      scrollFrame = requestAnimationFrame(autoScroll)
+    }
+
+    const onPointerMove = (ev: PointerEvent): void => {
+      pointerX = ev.clientX
+      if (!active) {
+        if (Math.abs(ev.clientX - startX) < DRAG_THRESHOLD && Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return
+        active = true
+        scrollFrame = requestAnimationFrame(autoScroll)
+      }
+      update()
+    }
+    const finish = (commit: boolean): void => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+      window.removeEventListener('keydown', onKey, true)
+      cancelAnimationFrame(scrollFrame)
+      if (!active) return
+      setDrag(null)
+      suppressClickRef.current = true
+      setTimeout(() => (suppressClickRef.current = false), 0)
+      if (commit && target) onMove(id, target.beforeId)
+    }
+    const onUp = (): void => finish(true)
+    const onCancel = (): void => finish(false)
+    const onKey = (ev: KeyboardEvent): void => {
+      if (ev.key !== 'Escape' || !active) return
+      ev.preventDefault()
+      ev.stopPropagation()
+      finish(false)
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+    window.addEventListener('keydown', onKey, true)
+  }
 
   // 右端のタブで開いたメニューが画面外へはみ出さないよう、描画直後に左へ寄せる。
   useLayoutEffect(() => {
@@ -102,11 +189,18 @@ export function TabBar({
               'relative flex h-7 max-w-40 shrink-0 items-center gap-1.5 rounded-t-md border border-transparent px-2 text-xs',
               isActive
                 ? 'border-border border-b-background bg-background text-foreground'
-                : 'text-muted-foreground hover:bg-accent'
+                : 'text-muted-foreground hover:bg-accent',
+              drag?.id === tab.sessionId && 'opacity-50'
             )}
             onContextMenu={(e) => {
               e.preventDefault()
               setMenu({ x: e.clientX, y: e.clientY, tab })
+            }}
+            onPointerDown={(e) => startDragWatch(e, tab.sessionId)}
+            onClickCapture={(e) => {
+              if (!suppressClickRef.current) return
+              e.preventDefault()
+              e.stopPropagation()
             }}
           >
             {showPendingBadge && (
@@ -141,6 +235,12 @@ export function TabBar({
           </div>
         )
       })}
+      {drag && (
+        <div
+          className="pointer-events-none absolute top-1 bottom-1 w-0.5 rounded-full bg-primary"
+          style={{ left: drag.indicatorLeft }}
+        />
+      )}
       </div>
       <button
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:opacity-40"

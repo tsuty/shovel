@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { AcpUpdateOffer, ProjectWithStatus } from '@shared/types/project'
-import type { HistoryEntry, LocalRecordSummary, SessionMeta, SessionSnapshot } from '@shared/types/session'
+import type {
+  HistoryEntry,
+  LocalRecordSummary,
+  RestoredTab,
+  SavedTab,
+  SessionMeta,
+  SessionSnapshot
+} from '@shared/types/session'
 import { Header } from './components/Header'
 import { Sidebar, type SidebarPanel } from './components/Sidebar'
 import { TabBar, type TabInfo } from './components/TabBar'
@@ -73,6 +80,8 @@ type Tab =
       /** バックアップ／削除済みを開いた Read Only タブ。 */
       readOnlyKind?: ReadOnlyKind
       recordTimestamp?: number
+      /** Read Only タブで開いたローカル記録のファイル名。 */
+      recordFileName?: string
       /** `session/list` にだけあってローカル記録が無い行。`snapshot` は中身の無い仮のもの。 */
       agentOnly?: boolean
       /** 右に添えたファイル。再開後も引き継ぐ。 */
@@ -91,6 +100,49 @@ function countsTowardTabLimit(tab: Tab): boolean {
   return tab.kind === 'session' || tab.kind === 'connecting' || (tab.kind === 'history' && tab.readOnlyKind !== undefined)
 }
 
+/** 保存しておいたタブを、開き直すタブにする。 */
+function tabFromRestored(restored: RestoredTab, untitled: string): Tab {
+  if (restored.kind === 'file') {
+    const { relPath } = restored
+    return { kind: 'file', sessionId: `file:${relPath}`, title: relPath.split('/').pop() ?? relPath, relPath, editor: editorLanguageFor(relPath) }
+  }
+  const { snapshot, readOnly, agentOnly, attachedFile } = restored
+  const title = snapshot.title || untitled
+  if (readOnly) {
+    return {
+      kind: 'history',
+      sessionId: `${snapshot.sessionId}::${readOnly.kind}::${readOnly.timestamp}`,
+      title,
+      snapshot,
+      readOnlyKind: readOnly.kind,
+      recordTimestamp: readOnly.timestamp,
+      recordFileName: readOnly.fileName,
+      attachedFile
+    }
+  }
+  return { kind: 'history', sessionId: `history:${snapshot.sessionId}`, title, snapshot, agentOnly, attachedFile }
+}
+
+/** 次にウィンドウを開いたときに開き直すための、タブの控え。接続中のタブは残さない。 */
+function savedFromTab(tab: Tab): SavedTab[] {
+  switch (tab.kind) {
+    case 'file':
+      return [{ kind: 'file', relPath: tab.relPath }]
+    case 'session':
+      return [{ kind: 'record', fileName: `${tab.snapshotId}.json`, attachedFile: tab.attachedFile }]
+    case 'history': {
+      if (!tab.agentOnly) {
+        const fileName = tab.recordFileName ?? `${tab.snapshot.sessionId}.json`
+        return [{ kind: 'record', fileName, attachedFile: tab.attachedFile }]
+      }
+      const { sessionId: key, acpSessionId, title, savedAt } = tab.snapshot
+      return acpSessionId ? [{ kind: 'agentOnly', key, acpSessionId, title, savedAt, attachedFile: tab.attachedFile }] : []
+    }
+    case 'connecting':
+      return []
+  }
+}
+
 function getProjectIdFromQuery(): string | null {
   return new URLSearchParams(window.location.search).get('projectId')
 }
@@ -100,7 +152,17 @@ export function App(): React.JSX.Element {
   const [projectId] = useState(getProjectIdFromQuery)
   const [allProjects, setAllProjects] = useState<ProjectWithStatus[]>([])
   const [project, setProject] = useState<ProjectWithStatus | null>(null)
+  /** タブバーの表示順に並べたタブ。 */
   const [tabs, setTabs] = useState<Tab[]>([])
+  /**
+   * タブの中身を描く順（開いた順）。タブを並べ替えても中身の DOM を動かさない
+   * （動かすと iframe が読み直しになる）よう、表示順とは別に持つ。
+   */
+  const mountOrderRef = useRef<string[]>([])
+  /** 前回のタブを並べ終えたら true。それまではタブの控えを保存しない。 */
+  const tabsRestoredRef = useRef(false)
+  /** 最後に保存したタブの控え（JSON）。同じなら保存し直さない。 */
+  const lastSavedTabsRef = useRef<string | null>(null)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [openPanels, setOpenPanels] = useState<Set<SidebarPanel>>(new Set(['tabs']))
@@ -237,21 +299,55 @@ export function App(): React.JSX.Element {
   }
 
   // StrictMode の二重発火でセッションが2つ開かないよう、ref で一度だけに絞る。
-  // ACP アダプタの新しい版が出ていれば、最初のタブを開く前に更新するか尋ねる。
+  // 前回開いていたタブを並べてから、新しいチャットを一番右に開く。
+  // ACP アダプタの新しい版が出ていれば、新しいチャットを開く前に更新するか尋ねる。
   const didOpenInitialTabRef = useRef(false)
   useEffect(() => {
     if (projectId && !didOpenInitialTabRef.current) {
       didOpenInitialTabRef.current = true
-      void window.shovel.agents
-        .acpUpdateOffer(projectId)
-        .catch(() => null)
-        .then((offer) => {
-          if (offer) setAcpUpdateOffer(offer)
-          else openNewTab()
-        })
+      void (async () => {
+        const restored = await restoreTabs(projectId)
+        // 復元した Read Only タブだけで上限に達していたら、新しいチャットは開かない。
+        if (restored.filter(countsTowardTabLimit).length >= MAX_SESSION_TABS) {
+          setError(t('mainWindow.tabLimitReached'))
+          return
+        }
+        const offer = await window.shovel.agents.acpUpdateOffer(projectId).catch(() => null)
+        if (offer) setAcpUpdateOffer(offer)
+        else openNewTab()
+      })()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
+
+  /** 前回開いていたタブを左から並べ、最後のタブを前面に出す。並べたタブを返す。 */
+  async function restoreTabs(id: string): Promise<Tab[]> {
+    const restored = await window.shovel.tabs.restore(id).catch(() => [])
+    // 同じタブが重複して保存されていたら、最初の1つだけを開く。
+    const seen = new Set<string>()
+    const restoredTabs = restored
+      .map((r) => tabFromRestored(r, t('history.untitled')))
+      .filter((tab) => !seen.has(tab.sessionId) && seen.add(tab.sessionId))
+    tabsRestoredRef.current = true
+    // 並べ終える前にファイラーなどから開いたタブは、復元したタブの右に残す。
+    setTabs((prev) => [
+      ...restoredTabs.filter((tab) => !prev.some((p) => p.sessionId === tab.sessionId)),
+      ...prev
+    ])
+    const last = restoredTabs[restoredTabs.length - 1]
+    if (last) setActiveSessionId((prev) => prev ?? last.sessionId)
+    return restoredTabs
+  }
+
+  // タブの構成・並びが変わったら控えを保存する。
+  useEffect(() => {
+    if (!projectId || !tabsRestoredRef.current) return
+    const saved = tabs.flatMap(savedFromTab)
+    const json = JSON.stringify(saved)
+    if (json === lastSavedTabsRef.current) return
+    lastSavedTabsRef.current = json
+    void window.shovel.tabs.save(projectId, saved).catch(() => {})
+  }, [projectId, tabs])
 
   async function answerAcpUpdate(update: boolean | null): Promise<void> {
     setAcpUpdateOffer(null)
@@ -381,7 +477,8 @@ export function App(): React.JSX.Element {
           title: snapshot.title || t('history.untitled'),
           snapshot,
           readOnlyKind,
-          recordTimestamp: record.timestamp
+          recordTimestamp: record.timestamp,
+          recordFileName: record.fileName
         }
       ]
     })
@@ -546,6 +643,20 @@ export function App(): React.JSX.Element {
     )
   }
 
+  /** タブバーでドラッグしたタブを、`beforeId` のタブの左（`null` なら一番右）へ動かす。 */
+  function moveTab(id: string, beforeId: string | null): void {
+    if (id === beforeId) return
+    setTabs((prev) => {
+      const moving = prev.find((tab) => tab.sessionId === id)
+      if (!moving) return prev
+      const rest = prev.filter((tab) => tab.sessionId !== id)
+      const at = beforeId === null ? rest.length : rest.findIndex((tab) => tab.sessionId === beforeId)
+      if (at < 0) return prev
+      rest.splice(at, 0, moving)
+      return rest.every((tab, i) => tab === prev[i]) ? prev : rest
+    })
+  }
+
   function renameTab(sessionId: string, title: string): void {
     setTabs((prev) => prev.map((tab) => (tab.sessionId === sessionId ? { ...tab, title } : tab)))
   }
@@ -575,6 +686,12 @@ export function App(): React.JSX.Element {
     status: tab.kind === 'session' ? tabStatuses[tab.sessionId] : undefined
   }))
   const activeTab = tabs.find((tab) => tab.sessionId === activeSessionId) ?? null
+
+  const tabsById = new Map(tabs.map((tab) => [tab.sessionId, tab]))
+  const mountOrder = mountOrderRef.current.filter((id) => tabsById.has(id))
+  for (const tab of tabs) if (!mountOrder.includes(tab.sessionId)) mountOrder.push(tab.sessionId)
+  mountOrderRef.current = mountOrder
+  const tabsInMountOrder = mountOrder.map((id) => tabsById.get(id)!)
 
   return (
     <div className="flex h-screen flex-col">
@@ -612,6 +729,7 @@ export function App(): React.JSX.Element {
             onSelect={setActiveSessionId}
             onClose={(id) => void closeTab(id)}
             onCloseFiles={closeFileTabs}
+            onMove={moveTab}
             onNew={openNewTab}
             canAddTab={limitedTabCount < MAX_SESSION_TABS}
           />
@@ -623,7 +741,7 @@ export function App(): React.JSX.Element {
           )}
           <div ref={tabContentRef} className="relative flex flex-1 flex-col overflow-hidden">
             <FindBar root={tabContentRef} />
-            {tabs.map((tab) => (
+            {tabsInMountOrder.map((tab) => (
               <div
                 key={tab.sessionId}
                 className={

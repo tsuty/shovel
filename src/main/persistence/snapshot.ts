@@ -38,14 +38,14 @@ function snapshotPath(projectId: string, sessionId: string): string {
   return path.join(snapshotDir(projectId), `${sessionId}.json`)
 }
 
-interface ParsedRecordName {
+export interface ParsedRecordName {
   sessionId: string
   kind: LocalRecordKind
   /** `backup` / `deleted` のときのファイル名の epochMillis。 */
   epochMillis?: number
 }
 
-function parseRecordName(fileName: string): ParsedRecordName | null {
+export function parseRecordName(fileName: string): ParsedRecordName | null {
   if (fileName.startsWith('.')) return null
   const m = fileName.match(RECORD_FILE_RE)
   if (!m) return null

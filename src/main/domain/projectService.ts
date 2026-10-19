@@ -19,7 +19,7 @@ import type {
 import { type SbxDiagnoseCheck, sbxCreate, sbxDiagnose, sbxDiagnoseChecks, sbxLs, sbxMeasureSandboxPath, sbxRm, sbxStop } from '../sbx/cli'
 import { hostPathsEqual } from './pathTranslate'
 import { removeAllRecordsForProject, snapshotDir } from '../persistence/snapshot'
-import { pickDirectoryStore, projectsStore } from '../persistence/store'
+import { openTabsStore, pickDirectoryStore, projectsStore } from '../persistence/store'
 import { logsDir } from '../log'
 import { applyLoginShellPath } from '../shellPath'
 
@@ -244,6 +244,7 @@ export async function removeProject(id: string, trashHostDir: boolean): Promise<
 
   // バックアップ・削除済みを含めてスナップショットを削除する。
   await removeAllRecordsForProject(project.id)
+  openTabsStore.remove(project.id)
 
   projectsStore.remove(id)
 }

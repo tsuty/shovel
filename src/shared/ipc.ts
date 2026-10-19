@@ -10,6 +10,8 @@ import type {
   HistoryListing,
   LocalRecordSummary,
   LocalSearchResult,
+  RestoredTab,
+  SavedTab,
   SessionMeta,
   SessionSnapshot
 } from './types/session'
@@ -46,6 +48,8 @@ export const IpcChannel = {
   SettingsChanged: 'settings:changed',
   SidebarGetWidths: 'sidebar:getWidths',
   SidebarSetWidth: 'sidebar:setWidth',
+  TabsRestore: 'tabs:restore',
+  TabsSave: 'tabs:save',
   AuthStatus: 'auth:status',
   AuthSetApiKey: 'auth:setApiKey',
   AuthOpenLoginTerminal: 'auth:openLoginTerminal',
@@ -202,6 +206,11 @@ export interface RendererApi {
     /** パネル id(tabs/filer) ごとの幅(px)。 */
     getWidths(): Promise<Record<string, number>>
     setWidth(panel: string, width: number): Promise<void>
+  }
+  tabs: {
+    /** 前回ウィンドウで開いていたタブ（表示順）。消えたファイル・記録は除いてある。 */
+    restore(projectId: string): Promise<RestoredTab[]>
+    save(projectId: string, tabs: SavedTab[]): Promise<void>
   }
   auth: {
     status(projectId: string): Promise<{ loggedIn: boolean; checkFailed: boolean }>

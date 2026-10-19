@@ -147,6 +147,7 @@ V-2 / V-3 / V-10 / V-11 の検証を待って埋める（[open-issues.md](./open
 | プロジェクト一覧（`Project[]`） | `electron-store`（JSON） |
 | 設定（自動添付、フォントサイズ、言語 …） | `electron-store` |
 | ウィンドウ状態、サイドバー幅 | `electron-store` |
+| 開いていたタブ（プロジェクト単位・表示順。decisions.md G-1-17） | `electron-store`（`openTabs`） |
 | セッション名の上書き | `electron-store` |
 | コマンド履歴（**プロジェクト単位**） | `electron-store` |
 | セッションのスナップショット | **個別 JSON ファイル**（`{sessionId}.json`） |

@@ -104,6 +104,40 @@ export interface SnapshotEntry {
 export type LocalRecordKind = 'current' | 'backup' | 'deleted'
 
 /**
+ * ウィンドウを閉じても残しておく、開いていたタブ。配列の並びはタブバーの表示順。
+ *   - `file`: ファイルのタブ
+ *   - `record`: セッション・履歴・Read Only のタブ。`fileName` はローカル記録のファイル名
+ *   - `agentOnly`: `session/list` にだけあった（ローカル記録の無い）履歴のタブ
+ * `attachedFile` はチャットの右に添えていたファイル。
+ */
+export type SavedTab =
+  | { kind: 'file'; relPath: string }
+  | { kind: 'record'; fileName: string; attachedFile?: string }
+  | {
+      kind: 'agentOnly'
+      key: string
+      acpSessionId: string
+      title: string
+      savedAt: number
+      attachedFile?: string
+    }
+
+/**
+ * 保存しておいたタブを開き直すための中身。消えたファイル・記録はここに含めない。
+ * セッションのタブも接続はせず、履歴のタブとして開き直す。
+ */
+export type RestoredTab =
+  | { kind: 'file'; relPath: string }
+  | {
+      kind: 'history'
+      snapshot: SessionSnapshot
+      /** バックアップ／削除済みの記録。 */
+      readOnly?: { kind: 'backup' | 'deleted'; timestamp: number; fileName: string }
+      agentOnly?: boolean
+      attachedFile?: string
+    }
+
+/**
  * チャット履歴パネル・ローカル検索が扱う、スナップショットファイル1つ分の
  * 要約（本文 `entries` は含まない）。`fileName` がファイルの識別子で、
  * 中身は `session.readLocalRecord(fileName)` で取り出す。

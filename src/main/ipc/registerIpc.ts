@@ -8,6 +8,7 @@ import {
 } from '@shared/ipc'
 import type { TranscriptAction } from '@shared/types/transcript'
 import type { AppSettings } from '@shared/types/settings'
+import type { SavedTab } from '@shared/types/session'
 import { AGENT_TABLE } from '@shared/agentTable'
 import type { NewFileKind } from '@shared/fileKinds'
 import {
@@ -76,6 +77,7 @@ import {
 } from '../domain/commandService'
 import { listLocalRecords, readLocalRecord } from '../persistence/snapshot'
 import { searchLocalRecords } from '../domain/localSearch'
+import { restoreOpenTabs, saveOpenTabs } from '../domain/openTabsService'
 import { getAcpUpdateOffer, resolveAcpUpdate } from '../domain/acpVersionService'
 
 export function registerIpc(): void {
@@ -93,6 +95,8 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.SidebarSetWidth, (_event, panel: string, width: number) =>
     sidebarStore.setWidth(panel, width)
   )
+  ipcMain.handle(IpcChannel.TabsRestore, (_event, projectId: string) => restoreOpenTabs(projectId))
+  ipcMain.handle(IpcChannel.TabsSave, (_event, projectId: string, tabs: SavedTab[]) => saveOpenTabs(projectId, tabs))
 
   ipcMain.handle(IpcChannel.AuthStatus, (_event, projectId: string) => checkAuthStatus(projectId))
   ipcMain.handle(IpcChannel.AuthSetApiKey, (_event, projectId: string, apiKey: string) =>

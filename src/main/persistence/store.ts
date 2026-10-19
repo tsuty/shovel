@@ -3,6 +3,7 @@ import type { Project } from '@shared/types/project'
 import type { AppSettings } from '@shared/types/settings'
 import type { AcpRegistryEntry } from '@shared/acpVersion'
 import type { CommandHistory } from '@shared/types/command'
+import type { SavedTab } from '@shared/types/session'
 
 /** `electron-store`（JSON）に保存する設定・プロジェクト・履歴。 */
 export type { AppSettings }
@@ -18,6 +19,8 @@ interface StoreSchema {
   lastPickedDirectory: string | null
   /** ACP レジストリから読んだ、パッケージ名ごとの表示名と最新バージョン。 */
   acpRegistryEntries: Record<string, AcpRegistryEntry>
+  /** プロジェクトごとの、開いていたタブ（表示順）。 */
+  openTabs: Record<string, SavedTab[]>
 }
 
 const defaults: StoreSchema = {
@@ -36,7 +39,8 @@ const defaults: StoreSchema = {
   pinnedCommands: {},
   sidebar: { widths: {} },
   lastPickedDirectory: null,
-  acpRegistryEntries: {}
+  acpRegistryEntries: {},
+  openTabs: {}
 }
 
 const store = new Store<StoreSchema>({ defaults })
@@ -177,5 +181,21 @@ export const acpRegistryStore = {
     const map = store.get('acpRegistryEntries')
     map[packageName] = entry
     store.set('acpRegistryEntries', map)
+  }
+}
+
+/** プロジェクトのウィンドウで開いていたタブ。次にウィンドウを開いたときに並べ直す。 */
+export const openTabsStore = {
+  get(projectId: string): SavedTab[] {
+    return store.get('openTabs')[projectId] ?? []
+  },
+  set(projectId: string, tabs: SavedTab[]): void {
+    const map = store.get('openTabs')
+    if (tabs.length > 0) map[projectId] = tabs
+    else delete map[projectId]
+    store.set('openTabs', map)
+  },
+  remove(projectId: string): void {
+    this.set(projectId, [])
   }
 }

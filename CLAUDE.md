@@ -26,7 +26,10 @@ proxy blocked per `sbx policy log`, with per-sandbox Allow (confirm first; only 
 blocks) / Ignore (persisted in `Project.ignoredNetworkHosts`), already-allowed hosts filtered out by
 re-implementing the policy pattern syntax in `src/main/domain/networkPolicy.ts` — decisions.md N-2-8); main window with tabs (right-click menu: close / close
 other files / close all files — the bulk actions never close chat or history tabs, decisions.md
-G-1-12), transcript rendering (per-message
+G-1-12; drag to reorder via pointer events — tab *contents* render in open order, not display order,
+so reordering never moves their DOM (an iframe would reload); open tabs are saved per project in
+`electron-store` `openTabs` and reopened next time — session tabs as un-resumed history tabs, missing
+files/records silently dropped — then a new chat opens at the far right, decisions.md G-1-17), transcript rendering (per-message
 copy, clickable tool-call locations/diffs, clickable attachment chips, code-block copy buttons and shiki highlighting of fenced code blocks (finalized blocks only),
 GFM task lists in agent replies rendered as interactive checkboxes + Send, a slash-command
 autocomplete dropdown driven by `available_commands_update`, a dedicated live-thinking strip above
