@@ -4,25 +4,32 @@ import { ExternalLink } from 'lucide-react'
 import type { FileReadResult } from '@shared/types/filer'
 import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { Button } from '../../shared/components/ui/button'
+import { ZoomableView } from '../../shared/components/ZoomableView'
+import { parseViewBox, type Size } from '../../shared/lib/zoom'
 import { FileStatusBar, ImageStatusBar } from './FileStatusBar'
 import { onTurnEnd } from '../turnEnd'
 import { revealInHighlightedCode, type FileReveal } from '../revealMatch'
 
 /**
- * 画像が固有の幅×高さを持つか。SVG はルートに `width`/`height` が絶対値で両方あるときだけ持つ
+ * SVG の寸法の手がかり。`intrinsic` はルートに `width`/`height` が絶対値で両方あるか
  * （無い・% 指定のときも Chromium は `naturalWidth/Height` に既定の 300×150 を返すので、それを除く）。
+ * `viewBox` は固有の寸法がないときに代わりに使う寸法。SVG でなければ null。
  */
-function hasIntrinsicSize(dataUrl: string): boolean {
+function svgSizeHints(dataUrl: string): { intrinsic: boolean; viewBox: Size | null } | null {
   const prefix = 'data:image/svg+xml;base64,'
-  if (!dataUrl.startsWith(prefix)) return true
+  if (!dataUrl.startsWith(prefix)) return null
   try {
     const bytes = Uint8Array.from(atob(dataUrl.slice(prefix.length)), (c) => c.charCodeAt(0))
     const doc = new DOMParser().parseFromString(new TextDecoder().decode(bytes), 'image/svg+xml')
     const root = doc.documentElement
+    if (root.localName !== 'svg') return { intrinsic: false, viewBox: null }
     const isAbsolute = (value: string | null): boolean => value !== null && /^\s*[\d.]+\s*(px|pt|pc|mm|cm|in|em|ex)?\s*$/i.test(value)
-    return root.localName === 'svg' && isAbsolute(root.getAttribute('width')) && isAbsolute(root.getAttribute('height'))
+    return {
+      intrinsic: isAbsolute(root.getAttribute('width')) && isAbsolute(root.getAttribute('height')),
+      viewBox: parseViewBox(root.getAttribute('viewBox'))
+    }
   } catch {
-    return false
+    return { intrinsic: false, viewBox: null }
   }
 }
 
@@ -72,6 +79,8 @@ export function FileViewer({
   const [openError, setOpenError] = useState<string | null>(null)
   /** 画像の幅×高さ。読み込み前は `undefined`、取れなかった（寸法のない SVG など）ときは `null`。 */
   const [imageDims, setImageDims] = useState<{ width: number; height: number } | null | undefined>(undefined)
+  /** 画像を拡大・縮小するときの基準の寸法。読み込むまでは null。 */
+  const [imageNatural, setImageNatural] = useState<Size | null>(null)
 
   /** ターン終了ごとに増やす。読み直しのきっかけ。 */
   const [revision, setRevision] = useState(0)
@@ -90,6 +99,7 @@ export function FileViewer({
       setView({ kind: 'loading' })
       setOpenError(null)
       setImageDims(undefined)
+      setImageNatural(null)
     }
     // await をまたぐので、毎回読み直す（`run.cancelled` のままだと型の絞り込みが残る）。
     const isCancelled = (): boolean => run.cancelled
@@ -163,18 +173,23 @@ export function FileViewer({
     case 'image':
       return (
         <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex flex-1 items-center justify-center overflow-auto p-4">
+          <ZoomableView natural={imageNatural} initialMode="fitAll" className="flex-1">
             <img
               src={view.dataUrl}
               alt={relPath}
-              className="max-h-full max-w-full object-contain"
+              className="block h-full w-full object-contain"
+              draggable={false}
               onLoad={(e) => {
                 const { naturalWidth: width, naturalHeight: height } = e.currentTarget
-                setImageDims(width > 0 && height > 0 && hasIntrinsicSize(view.dataUrl) ? { width, height } : null)
+                const hints = svgSizeHints(view.dataUrl)
+                const measured = width > 0 && height > 0 ? { width, height } : null
+                const intrinsic = measured !== null && (hints === null || hints.intrinsic)
+                setImageDims(intrinsic ? measured : null)
+                setImageNatural(intrinsic ? measured : (hints?.viewBox ?? measured))
               }}
               onError={() => setImageDims(null)}
             />
-          </div>
+          </ZoomableView>
           <ImageStatusBar size={view.size} dimensions={imageDims} />
         </div>
       )

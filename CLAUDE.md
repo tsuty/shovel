@@ -50,10 +50,10 @@ clicking a result opens the file and jumps to the match via `openFile(relPath, a
 on double-click or Enter — single click/arrow keys only select, folders still toggle on single
 click (decisions.md N-3-4); a right-click "open with default app" for files was deliberately
 rejected because `shell.openPath` can execute agent-written scripts on the host) with a
-read-only syntax-highlighted viewer (images previewed in-app with a size + width×height status
+read-only syntax-highlighted viewer (images previewed in-app — zoom/fit/drag-pan via the same `ZoomableView` as Mermaid, starting at fit-to-view — with a size + width×height status
 bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those. Editable text files all
 open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in
-`src/shared/fileKinds.ts`): Markdown, Mermaid and HTML get split/source/preview (Mermaid's preview is the diagram, debounced, with zoom/fit/drag-pan via `MermaidViewer` — also used by the ```` ```mermaid ```` popup, which can be maximized; print view keeps the static `MermaidDiagram`, decisions.md N-3-2b「大きい図の表示」; HTML renders in a script-less `sandbox="allow-popups"` srcdoc iframe — `HtmlPreview.tsx`, links go out via `<base target="_blank">` → `setWindowOpenHandler`),
+`src/shared/fileKinds.ts`): Markdown, Mermaid and HTML get split/source/preview (Mermaid's preview is the diagram, debounced, with zoom/fit/drag-pan via `MermaidViewer` (on `ZoomableView`) — also used by the ```` ```mermaid ```` popup, which can be maximized; print view keeps the static `MermaidDiagram`, decisions.md N-3-2b「大きい図の表示」; HTML renders in a script-less `sandbox="allow-popups"` srcdoc iframe — `HtmlPreview.tsx`, links go out via `<base target="_blank">` → `setWindowOpenHandler`),
 JSON/YAML (and plain `.txt`, uncoloured) get a highlighted "表示" view by default plus an "編集" toggle (`usesViewEditModes`). The editing
 surface is CodeMirror 6, driven directly via `EditorView` (no React wrapper; `src/renderer/main-window/codeEditor.ts`,
 decisions.md N-3-1 改訂 2026-10-17): syntax colours come from shiki (`shikiHighlight.ts` turns `codeToTokens` into

@@ -144,13 +144,15 @@
     "title": "Diagram (Mermaid)",
     "show": "Show diagram",
     "error": "Couldn't draw the diagram (the Mermaid source has an error).",
+    "maximize": "Maximize",
+    "restore": "Restore size"
+  },
+  "zoom": {
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "actualSize": "Actual size (100%)",
     "fitWidth": "Fit to width",
-    "fitAll": "Fit whole diagram",
-    "maximize": "Maximize",
-    "restore": "Restore size"
+    "fitAll": "Fit to view"
   },
   "editor": {
     "mode": {

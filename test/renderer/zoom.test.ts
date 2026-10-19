@@ -1,4 +1,4 @@
-import { clampZoom, fitZoom, MAX_ZOOM, MIN_ZOOM, parseViewBox, stepZoom, wheelZoom } from '@renderer/shared/lib/diagramZoom'
+import { clampZoom, fitZoom, MAX_ZOOM, MIN_ZOOM, parseViewBox, stepZoom, wheelZoom } from '@renderer/shared/lib/zoom'
 
 describe('parseViewBox', () => {
   it('幅と高さを取る（空白・カンマ区切り）', () => {

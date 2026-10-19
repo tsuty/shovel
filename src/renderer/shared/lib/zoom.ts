@@ -1,4 +1,4 @@
-/** 図の拡大率の計算（`MermaidViewer` から使う）。 */
+/** 図・画像の拡大率の計算（`ZoomableView` から使う）。 */
 
 /** 拡大率の決め方。`manual` は拡大・縮小・等倍の操作で決めた値をそのまま使う。 */
 export type ZoomMode = 'fitWidth' | 'fitAll' | 'manual'
