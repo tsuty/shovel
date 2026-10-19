@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Columns2, ExternalLink, Eye, PanelRight, Printer, SquareCode, SquarePen, Table, X } from 'lucide-react'
+import { CircleHelp, Columns2, ExternalLink, Eye, PanelRight, Printer, SquareCode, SquarePen, Table, X } from 'lucide-react'
+import { InfoTip } from '../../shared/components/InfoTip'
 import { Markdown } from '../../shared/components/Markdown'
 import { MermaidViewer } from '../../shared/components/MermaidViewer'
 import { Button } from '../../shared/components/ui/button'
@@ -106,6 +107,13 @@ const EDITOR_PHRASE_KEYS: Record<string, string> = {
  * `reveal`（中身検索の一致箇所）が来たら、ソースが見えていればそこを選択し、「表示」ならその行へ移って
  * 塗る。Markdown / Mermaid / HTML のプレビューだけのときは、ソースが見えるモードへ切り替えてから選択する。
  */
+/** ショートカットの説明に埋め込むキー表記（macOS は記号、それ以外は「Ctrl+」の形）。 */
+function shortcutKeyLabels(): Record<'mod' | 'alt' | 'shift' | 'redo', string> {
+  return window.shovel.platform === 'darwin'
+    ? { mod: '⌘', alt: '⌥', shift: '⇧', redo: '⇧⌘Z' }
+    : { mod: 'Ctrl+', alt: 'Alt+', shift: 'Shift+', redo: 'Ctrl+Y' }
+}
+
 export function TextFileEditor({
   projectId,
   relPath,
@@ -535,12 +543,19 @@ export function TextFileEditor({
             </button>
           </>
         ) : (
-          onAttachToChat && (
-            <Button size="sm" variant="ghost" className="gap-1.5" disabled={!canAttachToChat} onClick={onAttachToChat}>
-              <PanelRight size={14} />
-              {t('editor.attachToChat')}
-            </Button>
-          )
+          <>
+            {onAttachToChat && (
+              <Button size="sm" variant="ghost" className="gap-1.5" disabled={!canAttachToChat} onClick={onAttachToChat}>
+                <PanelRight size={14} />
+                {t('editor.attachToChat')}
+              </Button>
+            )}
+            {!readOnly && (
+              <span className="ml-1 flex">
+                <InfoTip icon={CircleHelp} size={14} text={t('editor.shortcutsHelp', shortcutKeyLabels())} />
+              </span>
+            )}
+          </>
         )}
       </div>
       <div className="flex flex-1 overflow-hidden">

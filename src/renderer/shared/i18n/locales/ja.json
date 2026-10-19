@@ -164,6 +164,7 @@
     },
     "conflict": "AI がこのファイルを変更したため、あなたの編集を {{path}} に保存しました。",
     "attachToChat": "チャットの横に表示",
+    "shortcutsHelp": "編集中のキー操作:\n・{{mod}}Z / {{redo}}: 元に戻す / やり直し\n・{{mod}}F: 検索・置換（{{mod}}G で次へ）\n・{{alt}}{{mod}}G: 指定した行へ移動\n・Tab / {{shift}}Tab: インデントを増やす / 減らす\n・{{alt}}↑ / {{alt}}↓: 行を上下に移動\n・{{shift}}{{alt}}↑ / {{shift}}{{alt}}↓: 行を上下に複製\n・{{shift}}{{mod}}K: 行を削除\n・{{mod}}D: 同じ文字列を次も選択\n・{{mod}}+クリック: カーソルを追加\n・{{alt}}+ドラッグ: 矩形選択\n・Esc のあと Tab: エディタの外へ移動\n※ 入力中は {{mod}}← / {{mod}}→ でタブを切り替えません",
     "jsonInvalid": "JSON の書式に誤りがあります",
     "jsonInvalidAt": "JSON の書式に誤りがあります（{{line}} 行目 {{column}} 列目）",
     "unencodable": "{{encoding}} で保存できない文字「{{char}}」があります（{{line}} 行目）",

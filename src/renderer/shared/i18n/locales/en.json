@@ -166,6 +166,7 @@
     },
     "conflict": "The agent changed this file, so your edits were saved to {{path}}.",
     "attachToChat": "Show beside chat",
+    "shortcutsHelp": "Editing keys:\n• {{mod}}Z / {{redo}}: undo / redo\n• {{mod}}F: find & replace ({{mod}}G for next)\n• {{alt}}{{mod}}G: go to line\n• Tab / {{shift}}Tab: indent / outdent\n• {{alt}}↑ / {{alt}}↓: move line up / down\n• {{shift}}{{alt}}↑ / {{shift}}{{alt}}↓: duplicate line up / down\n• {{shift}}{{mod}}K: delete line\n• {{mod}}D: also select next occurrence\n• {{mod}}+click: add cursor\n• {{alt}}+drag: rectangular selection\n• Esc then Tab: move focus out of the editor\nNote: {{mod}}← / {{mod}}→ don't switch tabs while typing",
     "jsonInvalid": "Invalid JSON",
     "jsonInvalidAt": "Invalid JSON (line {{line}}, column {{column}})",
     "unencodable": "\"{{char}}\" can't be saved in {{encoding}} (line {{line}})",
