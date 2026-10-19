@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Columns2, Eye, PanelRight, Printer, SquareCode, SquarePen, X } from 'lucide-react'
 import { Markdown } from '../../shared/components/Markdown'
-import { MermaidDiagram } from '../../shared/components/MermaidDiagram'
+import { MermaidViewer } from '../../shared/components/MermaidViewer'
 import { Button } from '../../shared/components/ui/button'
 import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { registerFlush } from '../editorRegistry'
@@ -459,11 +459,17 @@ export function TextFileEditor({
           )}
         />
         {showPreview && (
-          <div className={cn('h-full flex-1 overflow-auto', language !== 'html' && 'p-3')}>
+          <div
+            className={cn(
+              'h-full flex-1',
+              language === 'mermaid' ? 'flex min-w-0 flex-col' : 'overflow-auto',
+              language !== 'html' && language !== 'mermaid' && 'p-3'
+            )}
+          >
             {language === 'markdown' ? (
               <Markdown text={text} className="text-editor" allowDetails />
             ) : language === 'mermaid' ? (
-              <MermaidDiagram code={renderedSource} />
+              <MermaidViewer code={renderedSource} className="flex-1" />
             ) : language === 'html' ? (
               <HtmlPreview html={renderedSource} title={relPath} />
             ) : highlighted !== null ? (

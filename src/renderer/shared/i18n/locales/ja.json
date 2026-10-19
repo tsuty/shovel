@@ -141,7 +141,14 @@
   "mermaid": {
     "title": "図（Mermaid）",
     "show": "図を表示",
-    "error": "図を描けませんでした（Mermaid の書き方に誤りがあります）。"
+    "error": "図を描けませんでした（Mermaid の書き方に誤りがあります）。",
+    "zoomIn": "拡大",
+    "zoomOut": "縮小",
+    "actualSize": "等倍で表示（100%）",
+    "fitWidth": "幅に合わせる",
+    "fitAll": "全体を表示",
+    "maximize": "最大化",
+    "restore": "元の大きさに戻す"
   },
   "editor": {
     "mode": {

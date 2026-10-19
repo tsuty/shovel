@@ -16,12 +16,11 @@ function useDarkClass(): boolean {
 }
 
 /**
- * Mermaid のコードを図にして見せる（ポップアップ・.mmd / .mermaid のタブ・印刷用表示で共通）。
- * テーマが切り替わったら描き直す。文法エラーはエラー内容と元のコードを出す。
+ * Mermaid のコードを SVG 文字列にする。テーマが切り替わったら描き直す。
+ * 描いている間は `svg` も `error` も null。文法エラーなら `error` にメッセージが入る。
  * `mermaid.render` は body 直下の一時要素で寸法を測るので、非表示のタブで描いても崩れない。
  */
-export function MermaidDiagram({ code }: { code: string }): React.JSX.Element {
-  const { t } = useTranslation()
+export function useMermaidSvg(code: string): { svg: string | null; error: string | null } {
   const dark = useDarkClass()
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -46,15 +45,30 @@ export function MermaidDiagram({ code }: { code: string }): React.JSX.Element {
     }
   }, [code, dark])
 
-  if (error) {
-    return (
-      <div className="flex flex-col gap-2 text-sm">
-        <p className="text-destructive">{t('mermaid.error')}</p>
-        <pre className="whitespace-pre-wrap rounded-md bg-destructive/10 p-2 text-xs text-destructive">{error}</pre>
-        <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{code}</pre>
-      </div>
-    )
-  }
+  return { svg, error }
+}
+
+/** 文法エラーのときに出す、エラー内容と元のコード。 */
+export function MermaidError({ error, code }: { error: string; code: string }): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="text-destructive">{t('mermaid.error')}</p>
+      <pre className="whitespace-pre-wrap rounded-md bg-destructive/10 p-2 text-xs text-destructive">{error}</pre>
+      <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{code}</pre>
+    </div>
+  )
+}
+
+/**
+ * Mermaid のコードを、幅に収まるよう縮めた図にして見せる（印刷用表示）。
+ * 拡大・縮小・移動ができる表示は `MermaidViewer`。
+ */
+export function MermaidDiagram({ code }: { code: string }): React.JSX.Element {
+  const { t } = useTranslation()
+  const { svg, error } = useMermaidSvg(code)
+
+  if (error) return <MermaidError error={error} code={code} />
   if (!svg) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
   // mermaid が securityLevel: 'strict' で生成した SVG（スクリプト・生 HTML は含まない）。
   return <div className="flex justify-center [&_svg]:h-auto [&_svg]:max-w-full" dangerouslySetInnerHTML={{ __html: svg }} />
