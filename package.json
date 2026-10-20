@@ -1,8 +1,8 @@
 {
   "name": "shovel",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "description": "Docker Sandboxes 上で動く AI エージェントを ACP でホストから操作するチャットアプリケーション",
+  "description": "AIエージェントチャット on Docker Sandboxes",
   "type": "commonjs",
   "main": "./out/main/index.js",
   "engines": {
