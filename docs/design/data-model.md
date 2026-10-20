@@ -230,3 +230,13 @@ main を経由せず renderer 内で `navigator.clipboard.writeText()` を直接
 | `session/set_config_option` の応答 | **部分的**（`mode` / `model` のみ）。キャッシュに**マージする** |
 
 素朴に「応答で置き換える」と実装すると Effort などのセレクタが消える。
+
+`session/set_config_option` / `session/set_mode` を送ったあとの表示は、通知を待たずに応答で更新する。
+claude-agent-acp は、クライアントから変更したときに `config_option_update`
+（`set_mode` の場合は `current_mode_update`）を送らないことがある。そうなると、
+制御されたセレクタは元の値に戻って見える。
+
+- `set_config_option` の応答の `configOptions` は、上の規則どおりマージする。
+- `set_mode` が成功したら `currentModeId` を要求した値にする。ただし応答待ちの間に
+  `current_mode_update` が届いていれば、実際に適用された値としてそちらを優先する
+  （例: Auto が使えず別モードに落ちたとき）。

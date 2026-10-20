@@ -14,7 +14,8 @@ import type {
   RequestPermissionResponse,
   SessionConfigOption,
   SessionModeState,
-  SessionUpdate
+  SessionUpdate,
+  SetSessionConfigOptionResponse
 } from '@agentclientprotocol/sdk'
 import type { AgentEntry, Project } from '@shared/types/project'
 import type {
@@ -35,6 +36,7 @@ import { buildAcpStream } from './stream'
 import { loadAcpSdk } from './sdk'
 import { permissionRequestToEvent, SessionTranslator } from './translate'
 import { backupSnapshot, saveSnapshot } from '../persistence/snapshot'
+import { mergeConfigOptions } from './configOptions'
 import { compareByMessageId, describeMessageIdComparison, SnapshotAccumulator } from './snapshotRecord'
 import { sessionTitleStore } from '../persistence/store'
 import { acpPackageSpec, recordAcpVersion } from '../domain/acpVersionService'
@@ -556,6 +558,7 @@ export async function openAcpSession(
     },
     async setMode(modeId: string) {
       if (!ready) return
+      const modeIdBeforeRequest = resolvedMetaState.currentModeId
       await withDeadline(
         ready.ctx.request(acp.AGENT_METHODS.session_set_mode, {
           sessionId: currentSession.sessionId,
@@ -563,6 +566,10 @@ export async function openAcpSession(
         }),
         REQUEST_DEADLINE_MS
       )
+      // 応答待ちの間に current_mode_update が届いていれば、そちらの値（実際に適用されたモード）を優先する。
+      if (resolvedMetaState.currentModeId !== modeIdBeforeRequest) return
+      resolvedMetaState.currentModeId = modeId
+      callbacks.onEvent({ ...resolvedMetaState, type: 'sessionMeta' })
     },
     async setConfigOption(configId: string, value: string | boolean) {
       if (!ready) return
@@ -570,10 +577,17 @@ export async function openAcpSession(
         typeof value === 'boolean'
           ? { sessionId: currentSession.sessionId, configId, type: 'boolean' as const, value }
           : { sessionId: currentSession.sessionId, configId, value }
-      await withDeadline(
+      const response: SetSessionConfigOptionResponse | undefined = await withDeadline(
         ready.ctx.request(acp.AGENT_METHODS.session_set_config_option, params),
         REQUEST_DEADLINE_MS
       )
+      // config_option_update が届かないエージェントもあるので、応答の configOptions で表示を更新する。
+      if (!response?.configOptions) return
+      resolvedMetaState.configOptions = mergeConfigOptions(
+        resolvedMetaState.configOptions,
+        response.configOptions.map(configOptionToPayload)
+      )
+      callbacks.onEvent({ ...resolvedMetaState, type: 'sessionMeta' })
     },
     resolvePermission(permissionId: string, optionId: string) {
       const resolve = pendingPermissions.get(permissionId)
