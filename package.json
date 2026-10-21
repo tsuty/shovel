@@ -7,6 +7,7 @@
   "author": "tsuty",
   "type": "commonjs",
   "main": "./out/main/index.js",
+  "desktopName": "shovel.desktop",
   "engines": {
     "node": ">=22",
     "pnpm": ">=9"

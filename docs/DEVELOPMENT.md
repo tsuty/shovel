@@ -144,6 +144,24 @@ sbx diagnose
   pnpm dist        # electron-builder でインストーラを生成（証明書は未設定。decisions.md F-3）
   ```
 
+  **リリース**: `package.json` の `version` と同じ `v<version>` タグ（例: `v0.0.1`）を
+  push すると、`.github/workflows/release.yml` が macOS / Windows / Linux の各ランナーで
+  typecheck・lint・test の後にパッケージを作り、GitHub Release に添付する。タグと
+  `version` が一致しなければ失敗する。
+
+  ```bash
+  git tag v0.0.1
+  git push origin v0.0.1
+  ```
+
+  | OS | 配布物 |
+  | :--- | :--- |
+  | macOS | `shovel-<version>-x64.dmg`・`shovel-<version>-arm64.dmg` |
+  | Windows | `shovel-Setup-<version>.exe`（x64、NSIS） |
+  | Linux | `shovel-<version>-x86_64.AppImage`・`shovel_<version>_amd64.deb`（x64） |
+
+  いずれも署名なし（decisions.md F-3）。
+
   `pnpm dev` / `pnpm start` は先に `install-electron` を実行する。Electron 42 以降は
   `pnpm install` 時に Electron 本体をダウンロードしなくなったが、electron-vite 5 は
   ダウンロード済みの本体（`node_modules/electron/path.txt`）を前提にしているため。

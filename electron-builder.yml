@@ -16,11 +16,25 @@ mac:
     - target: dmg
       arch: [x64, arm64]
   category: public.app-category.developer-tools
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
 win:
   target:
     - target: nsis
       arch: [x64]
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  category: Development
+  maintainer: tsuty
+  syncDesktopName: true
+appImage:
+  artifactName: ${productName}-${version}-${arch}.${ext}
 nsis:
+  artifactName: ${productName}-Setup-${version}.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
 extraFiles:
