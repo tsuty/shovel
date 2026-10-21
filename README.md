@@ -1,11 +1,15 @@
 # shovel（シャベル）
 
+![shovel のメイン画面](./docs/images/02-chat.png)
+
 Docker Sandboxes の中で動く AI エージェントを、ACP（Agent Client Protocol）で
 ホスト PC から操作するチャットアプリケーション。
 
-* 非エンジニアを含む対象者向けのローカルチャットアプリ
+* ローカルチャットアプリ
 * プロジェクトに関係なく AI と壁打ちできる
 * コードの編集権限がない人でも、AI との対話でコードや仕様を理解できる
+
+主な機能は [docs/FEATURES.md](./docs/FEATURES.md) を参照。
 
 設計は [docs/design/](./docs/design/) を参照。
 
@@ -30,3 +34,8 @@ Docker Sandboxes の中で動く AI エージェントを、ACP（Agent Client P
 対応 OS（アプリの動作対象）は Windows / macOS。
 ただし本リポジトリで**開発環境の構築手順をサポートするのは macOS と Linux のみ**。
 Windows でも開発自体は可能だが、環境構築手順は各自で用意する必要がある。
+
+## なぜシャベル？
+
+* サンドボックス（砂場）で定番のおもちゃ
+* エージェントと喋（しゃべ）る
