@@ -26,16 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6.1.0
+      # pnpm 本体と Node.js を入れ、pnpm install --frozen-lockfile まで行う
+      - uses: pnpm/setup@v3
         with:
           version: 12
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
+          runtime: node@22
+          cache: true
+          require-lockfile: true
 
       - name: Check tag matches package.json version
         shell: bash
