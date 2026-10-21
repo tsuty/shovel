@@ -1,0 +1,41 @@
+# main への push で macOS / Windows / Linux の各ランナーで typecheck・lint・test を実行する。
+# パッケージ作成はしない（タグ push 時の release.yml が担当）。
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# 同じブランチで新しい push が来たら、古い実行は取り消す
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test

@@ -144,6 +144,10 @@ sbx diagnose
   pnpm dist        # electron-builder でインストーラを生成（証明書は未設定。decisions.md F-3）
   ```
 
+  **CI**: `main` へ push すると、`.github/workflows/ci.yml` が macOS / Windows / Linux の
+  各ランナーで typecheck・lint・test を実行する（パッケージは作らない）。パス区切りなど
+  OS 依存の失敗をリリース前に見つけるため。
+
   **リリース**: `package.json` の `version` と同じ `v<version>` タグ（例: `v0.0.1`）を
   push すると、`.github/workflows/release.yml` が macOS / Windows / Linux の各ランナーで
   typecheck・lint・test の後にパッケージを作り、GitHub Release に添付する。タグと
