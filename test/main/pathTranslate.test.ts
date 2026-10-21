@@ -1,37 +1,40 @@
+import path from 'node:path'
 import { hostPathsEqual, hostToSandboxPath, sandboxToHostPath } from '@main/domain/pathTranslate'
 
-const roots = { hostPath: '/Users/me/project', sandboxPath: '/workspace/project' }
+const hostRoot = process.platform === 'win32' ? 'C:\\Users\\me\\project' : '/Users/me/project'
+const roots = { hostPath: hostRoot, sandboxPath: '/workspace/project' }
+const host = (...parts: string[]): string => path.join(hostRoot, ...parts)
 
 describe('hostToSandboxPath', () => {
   it('ルート直下のファイルを変換する', () => {
-    expect(hostToSandboxPath(roots, '/Users/me/project/README.md')).toBe('/workspace/project/README.md')
+    expect(hostToSandboxPath(roots, host('README.md'))).toBe('/workspace/project/README.md')
   })
 
   it('深い階層を変換する', () => {
-    expect(hostToSandboxPath(roots, '/Users/me/project/src/a/b.ts')).toBe('/workspace/project/src/a/b.ts')
+    expect(hostToSandboxPath(roots, host('src', 'a', 'b.ts'))).toBe('/workspace/project/src/a/b.ts')
   })
 
   it('ルートそのものはサンドボックスのルートになる', () => {
-    expect(hostToSandboxPath(roots, '/Users/me/project')).toBe('/workspace/project')
+    expect(hostToSandboxPath(roots, hostRoot)).toBe('/workspace/project')
   })
 
   it('プロジェクト外のパスは拒否する', () => {
-    expect(() => hostToSandboxPath(roots, '/Users/me/other/a.txt')).toThrow(/outside/)
-    expect(() => hostToSandboxPath(roots, '/Users/me')).toThrow(/outside/)
+    expect(() => hostToSandboxPath(roots, host('..', 'other', 'a.txt'))).toThrow(/outside/)
+    expect(() => hostToSandboxPath(roots, host('..'))).toThrow(/outside/)
   })
 
   it('".." で始まる名前のファイルはプロジェクト内として扱う', () => {
-    expect(hostToSandboxPath(roots, '/Users/me/project/..env')).toBe('/workspace/project/..env')
+    expect(hostToSandboxPath(roots, host('..env'))).toBe('/workspace/project/..env')
   })
 })
 
 describe('sandboxToHostPath', () => {
   it('ルート直下のファイルを変換する', () => {
-    expect(sandboxToHostPath(roots, '/workspace/project/README.md')).toBe('/Users/me/project/README.md')
+    expect(sandboxToHostPath(roots, '/workspace/project/README.md')).toBe(host('README.md'))
   })
 
   it('ルートそのものはホストのルートになる', () => {
-    expect(sandboxToHostPath(roots, '/workspace/project')).toBe('/Users/me/project')
+    expect(sandboxToHostPath(roots, '/workspace/project')).toBe(hostRoot)
   })
 
   it('ワークスペース外のパスは拒否する', () => {
@@ -39,12 +42,12 @@ describe('sandboxToHostPath', () => {
   })
 
   it('".." で始まる名前のファイルはワークスペース内として扱う', () => {
-    expect(sandboxToHostPath(roots, '/workspace/project/..env')).toBe('/Users/me/project/..env')
+    expect(sandboxToHostPath(roots, '/workspace/project/..env')).toBe(host('..env'))
   })
 
   it('往復で元に戻る', () => {
-    const host = '/Users/me/project/docs/日本語 ファイル.md'
-    expect(sandboxToHostPath(roots, hostToSandboxPath(roots, host))).toBe(host)
+    const hostPath = host('docs', '日本語 ファイル.md')
+    expect(sandboxToHostPath(roots, hostToSandboxPath(roots, hostPath))).toBe(hostPath)
   })
 })
 
