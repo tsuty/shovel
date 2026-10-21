@@ -158,6 +158,16 @@ sbx diagnose
   （electron-vite は `dependencies` 以外をバンドルに含める）。これで `app.asar` は
   約 256 MB → 約 31 MB になった。
 
+  **サードパーティのライセンス表示**: `pnpm build` のたびに
+  `out/THIRD_PARTY_NOTICES.txt` が生成される（`scripts/thirdPartyNotices.ts`。
+  `rollup-plugin-license` を main / preload / renderer の各ビルドに入れている）。対象は
+  バンドルに実際に含まれたパッケージと、`dependencies` を推移的に辿った実行時依存で、
+  ビルドツールは含まない。electron-builder の `extraFiles` で、このファイルと自前の
+  `LICENSE`（`LICENSE.txt` として）を配布物のルートに置く。Electron / Chromium の表示
+  （`LICENSE.electron.txt`・`LICENSES.chromium.html`）は electron-builder が自動で入れる。
+  パッケージ自体にライセンスファイルが同梱されていないもの（`react-arborist` など）は
+  本文の代わりに注記が入る。生成物なのでリポジトリにはコミットしない。
+
   TypeScript は 6.0 に留めている。7.0（Go 製のネイティブ版）は従来の JavaScript API を
   持たず、型情報を使う lint（typescript-eslint、対応は `<6.1`）が動かないため。tsconfig は
   7.0 で削除された設定（`baseUrl`、`moduleResolution: "Node"`）を使わない形にしてあるので、

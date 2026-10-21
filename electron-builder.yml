@@ -23,3 +23,8 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+extraFiles:
+  - from: out/THIRD_PARTY_NOTICES.txt
+    to: THIRD_PARTY_NOTICES.txt
+  - from: LICENSE
+    to: LICENSE.txt

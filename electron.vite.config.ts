@@ -2,12 +2,13 @@ import { resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { thirdPartyNotices } from './scripts/thirdPartyNotices'
 
 export default defineConfig({
   main: {
     // dependencies は実行時に node_modules から require する（配布物にも入る）。それ以外は
     // バンドルに含める。
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), thirdPartyNotices()],
     build: {
       rollupOptions: {
         input: {
@@ -23,7 +24,7 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), thirdPartyNotices()],
     build: {
       rollupOptions: {
         input: {
@@ -54,6 +55,6 @@ export default defineConfig({
         '@renderer': resolve(__dirname, 'src/renderer')
       }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss(), thirdPartyNotices()]
   }
 })
