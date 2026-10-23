@@ -177,6 +177,8 @@
       "description": "{{path}} を横に表示するチャットを選んでください。"
     },
     "printPreview": "印刷用表示",
+    "outline": "アウトライン",
+    "outlineEmpty": "見出しがありません",
     "search": {
       "find": "検索",
       "replace": "置換",

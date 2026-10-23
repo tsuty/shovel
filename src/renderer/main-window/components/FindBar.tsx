@@ -201,7 +201,7 @@ function collectVisibleTextNodes(container: HTMLElement, exclude: HTMLElement | 
     acceptNode: (node) => {
       const parent = node.parentElement
       if (!parent || !node.nodeValue) return NodeFilter.FILTER_REJECT
-      if (exclude?.contains(parent) || parent.closest('script, style, textarea, .cm-editor')) return NodeFilter.FILTER_REJECT
+      if (exclude?.contains(parent) || parent.closest('script, style, textarea, .cm-editor, [data-find-ignore]')) return NodeFilter.FILTER_REJECT
       if (isVisible(parent)) return NodeFilter.FILTER_ACCEPT
       // 閉じた <details> の中身も探す（ヒットしたら revealRange で開く）。
       const details = outermostClosedDetails(parent, container)

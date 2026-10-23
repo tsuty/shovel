@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CircleHelp, Columns2, ExternalLink, Eye, PanelRight, Printer, SquareCode, SquarePen, Table, X } from 'lucide-react'
+import {
+  CircleHelp,
+  Columns2,
+  ExternalLink,
+  Eye,
+  PanelRight,
+  Printer,
+  SquareCode,
+  SquarePen,
+  Table,
+  TableOfContents,
+  X
+} from 'lucide-react'
 import { InfoTip } from '../../shared/components/InfoTip'
 import { Markdown } from '../../shared/components/Markdown'
 import { MermaidViewer } from '../../shared/components/MermaidViewer'
@@ -18,10 +30,13 @@ import { findJsonProblem, type JsonProblem } from '../textEditing'
 import { isTableLanguage, usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
 import { revealInHighlightedCode, type FileReveal } from '../revealMatch'
 import { openSearchPanel } from '@codemirror/search'
-import { createCodeEditor, replaceDocument, selectAt, type CodeEditor } from '../codeEditor'
+import { createCodeEditor, moveToLineTop, replaceDocument, revealCaret, selectAt, type CodeEditor } from '../codeEditor'
 import { closeFindBar, registerEditorSearch } from '../editorSearch'
 import { loadFirstRowIsHeader, parseCsvRecords, saveFirstRowIsHeader, toCsvTable } from '../csvTable'
 import { CsvTable } from './CsvTable'
+import { extractOutline, type OutlineItem } from '../markdownOutline'
+import { OutlineMenu, OutlinePane } from './MarkdownOutline'
+import { ResizablePanel } from './ResizablePanel'
 
 /**
  * 表示の切り替え。Markdown / Mermaid / HTML は「分割・ソース・プレビュー」、
@@ -79,6 +94,19 @@ const EXTERNAL_CHECK_INTERVAL_MS = 3000
 
 /** これより大きい CSV / TSV はアプリ内で開かず、OS の関連付けアプリに任せる。 */
 const MAX_TABLE_FILE_BYTES = 10 * 1024 * 1024
+
+/** 本文の幅がこれ以上なら、アウトラインを左に並べて置ける。狭ければボタンから開く一覧にする。 */
+const OUTLINE_PANE_MIN_WIDTH = 600
+/** アウトラインの一覧の幅（px）。 */
+const OUTLINE_DEFAULT_WIDTH = 224
+const OUTLINE_MIN_WIDTH = 140
+const OUTLINE_MAX_WIDTH = 480
+
+/** 分割表示で、ソースとプレビューのそれぞれに残す最小の幅（px）。 */
+const SPLIT_PANE_MIN_WIDTH = 160
+
+/** プレビューの上の余白（`p-3`）。見出しへ移ったとき、見出しをこの分だけ上端から離す。 */
+const PREVIEW_PADDING_PX = 12
 
 /** CodeMirror の検索パネルの文言（英語の原文）と、訳のキー。 */
 const EDITOR_PHRASE_KEYS: Record<string, string> = {
@@ -401,6 +429,74 @@ export function TextFileEditor({
     }
   })
 
+  // Markdown のアウトライン。
+  const outline = useMemo(
+    () => (language === 'markdown' && loaded ? extractOutline(renderedSource) : []),
+    [language, loaded, renderedSource]
+  )
+  // 開閉・幅・分割の比率は保存しない（このエディタを開いている間だけ保つ）。
+  const [outlineOpen, setOutlineOpen] = useState(false)
+  function toggleOutline(): void {
+    setOutlineOpen((open) => !open)
+  }
+  const [outlineWidth, setOutlineWidth] = useState(OUTLINE_DEFAULT_WIDTH)
+  /** 分割表示でソースが占める割合（0〜1）。 */
+  const [splitRatio, setSplitRatio] = useState(0.5)
+  const splitRef = useRef<HTMLDivElement>(null)
+  function startSplitDrag(e: React.PointerEvent<HTMLDivElement>): void {
+    const container = splitRef.current
+    if (!container) return
+    e.preventDefault()
+    // HTML のプレビュー（iframe）の上を通ってもイベントを受け続ける。
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const rect = container.getBoundingClientRect()
+    const min = Math.min(SPLIT_PANE_MIN_WIDTH / rect.width, 0.5)
+    const onMove = (ev: PointerEvent): void => {
+      setSplitRatio(Math.min(1 - min, Math.max(min, (ev.clientX - rect.left) / rect.width)))
+    }
+    const onUp = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [bodyWidth, setBodyWidth] = useState(0)
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body) return
+    const observer = new ResizeObserver(() => setBodyWidth(body.clientWidth))
+    observer.observe(body)
+    return () => observer.disconnect()
+  }, [loaded, deleted, tooLarge])
+  const outlineAsPane = bodyWidth >= OUTLINE_PANE_MIN_WIDTH
+  const previewRef = useRef<HTMLDivElement>(null)
+  /** ソースが隠れている間に見出しへ移ったとき、見えるようになってからカーソルの行を上端へ寄せる。 */
+  const revealCaretOnShowRef = useRef(false)
+  useEffect(() => {
+    if (!showSource || !revealCaretOnShowRef.current || !editorRef.current) return
+    revealCaretOnShowRef.current = false
+    revealCaret(editorRef.current.view)
+  }, [showSource])
+
+  /** 見出しへ移る。見えているソースとプレビューの両方を動かす。 */
+  function jumpToHeading(item: OutlineItem): void {
+    const editor = editorRef.current
+    if (editor) {
+      moveToLineTop(editor.view, item.line, showSource)
+      revealCaretOnShowRef.current = !showSource
+    }
+    const container = previewRef.current
+    const heading = showPreview ? container?.querySelector<HTMLElement>(`[data-source-line="${item.line}"]`) : null
+    if (!container || !heading) return
+    for (let details = heading.closest('details'); details; details = details.parentElement?.closest('details') ?? null) {
+      details.open = true
+    }
+    container.scrollTop +=
+      heading.getBoundingClientRect().top - container.getBoundingClientRect().top - PREVIEW_PADDING_PX
+  }
+
   // 開いている間はポーリングで外部変更を検知する。
   useEffect(() => {
     const interval = setInterval(() => {
@@ -500,6 +596,26 @@ export function TextFileEditor({
             </Button>
           )
         })}
+        {language === 'markdown' &&
+          (!outlineAsPane ? (
+            <OutlineMenu items={outline} onSelect={jumpToHeading} />
+          ) : variant === 'attached' ? (
+            <button
+              className={cn(
+                'flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground',
+                outlineOpen && 'bg-secondary text-foreground'
+              )}
+              title={t('editor.outline')}
+              onClick={toggleOutline}
+            >
+              <TableOfContents size={14} />
+            </button>
+          ) : (
+            <Button size="sm" variant={outlineOpen ? 'secondary' : 'ghost'} className="gap-1.5" onClick={toggleOutline}>
+              <TableOfContents size={14} />
+              {t('editor.outline')}
+            </Button>
+          ))}
         {tableData && (
           <>
             <label className="ml-2 flex items-center gap-1.5 text-xs">
@@ -558,39 +674,61 @@ export function TextFileEditor({
           </>
         )}
       </div>
-      <div className="flex flex-1 overflow-hidden">
-        <div
-          ref={editorHostRef}
-          className={cn(
-            'h-full min-w-0 flex-1 overflow-hidden border-r border-border font-mono text-editor',
-            !showSource && 'hidden'
-          )}
-        />
-        {showPreview && (
-          <div
-            className={cn(
-              'h-full flex-1',
-              language === 'mermaid' || tableData ? 'flex min-w-0 flex-col' : 'overflow-auto',
-              language !== 'html' && language !== 'mermaid' && !tableData && 'p-3'
-            )}
+      <div ref={bodyRef} className="flex flex-1 overflow-hidden">
+        {language === 'markdown' && outlineAsPane && outlineOpen && (
+          <ResizablePanel
+            width={outlineWidth}
+            onResizeEnd={setOutlineWidth}
+            minWidth={OUTLINE_MIN_WIDTH}
+            maxWidth={OUTLINE_MAX_WIDTH}
           >
-            {language === 'markdown' ? (
-              <Markdown text={text} className="text-editor" allowDetails />
-            ) : language === 'mermaid' ? (
-              <MermaidViewer code={renderedSource} className="flex-1" />
-            ) : language === 'html' ? (
-              <HtmlPreview html={renderedSource} title={relPath} />
-            ) : tableData ? (
-              <CsvTable data={tableData} />
-            ) : highlighted !== null ? (
-              <div
-                ref={highlightedRef}
-                className="shiki-lines text-editor"
-                dangerouslySetInnerHTML={{ __html: highlighted }}
-              />
-            ) : null}
-          </div>
+            <OutlinePane items={outline} onSelect={jumpToHeading} />
+          </ResizablePanel>
         )}
+        <div ref={splitRef} className="relative flex min-w-0 flex-1">
+          <div
+            ref={editorHostRef}
+            className={cn(
+              'h-full min-w-0 overflow-hidden border-r border-border font-mono text-editor',
+              mode === 'split' ? 'shrink-0' : 'flex-1',
+              !showSource && 'hidden'
+            )}
+            style={mode === 'split' ? { width: `${splitRatio * 100}%` } : undefined}
+          />
+          {mode === 'split' && (
+            <div
+              className="absolute top-0 z-10 -ml-1 h-full w-2 cursor-col-resize"
+              style={{ left: `${splitRatio * 100}%` }}
+              onPointerDown={startSplitDrag}
+            />
+          )}
+          {showPreview && (
+            <div
+              ref={previewRef}
+              className={cn(
+                'h-full min-w-0 flex-1',
+                language === 'mermaid' || tableData ? 'flex min-w-0 flex-col' : 'overflow-auto',
+                language !== 'html' && language !== 'mermaid' && !tableData && 'p-3'
+              )}
+            >
+              {language === 'markdown' ? (
+                <Markdown text={text} className="text-editor" allowDetails headingLines />
+              ) : language === 'mermaid' ? (
+                <MermaidViewer code={renderedSource} className="flex-1" />
+              ) : language === 'html' ? (
+                <HtmlPreview html={renderedSource} title={relPath} />
+              ) : tableData ? (
+                <CsvTable data={tableData} />
+              ) : highlighted !== null ? (
+                <div
+                  ref={highlightedRef}
+                  className="shiki-lines text-editor"
+                  dangerouslySetInnerHTML={{ __html: highlighted }}
+                />
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
       <FileStatusBar
         relPath={relPath}

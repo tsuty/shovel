@@ -79,7 +79,12 @@ with a starter template); other binaries show an
 editor have a status bar with size/encoding/line ending (plus the last autosave time in the editor) — writes preserve the file's original
 line ending, BOM and encoding — Shift_JIS is written back as CP932 via `iconv-lite`, and a character it can't encode blocks the
 autosave with a clickable status-bar entry (`WriteTextResult`) instead of being replaced; files that are neither UTF-8 nor
-Shift_JIS are view-only, see decisions.md N-3-2) and a split-view Markdown
+Shift_JIS are view-only, see decisions.md N-3-2), a Markdown outline (headings from the same remark plugins as the
+preview via `markdownOutline.ts`; clicking one moves both the visible source and the preview — the preview's headings carry
+`data-source-line`; a left pane when the editor body is ≥600px wide, else a dropdown, also beside a chat; the pane's width and
+the split view's source/preview divider are mouse-draggable, and neither they nor the pane's open state are persisted;
+decisions.md N-3-14)
+and a split-view Markdown
 editor (any editable file type, not just Markdown) that can also be attached to the right of a chat tab or an un-resumed history tab
 (decisions.md G-1-9: bound to that tab, not in the tab bar, closes with it, carried over on
 Resume, source/preview only; if the target isn't obvious — active tab isn't a chat and there are

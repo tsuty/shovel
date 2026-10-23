@@ -36,8 +36,10 @@ export function ResizablePanel({
     if (!draggingRef.current) setLiveWidth(width)
   }, [width])
 
-  function startDrag(e: React.PointerEvent): void {
+  function startDrag(e: React.PointerEvent<HTMLDivElement>): void {
     e.preventDefault()
+    // iframe の上を通ってもイベントを受け続ける。
+    e.currentTarget.setPointerCapture(e.pointerId)
     const vertical = edge === 'top'
     const start = vertical ? e.clientY : e.clientX
     const startWidth = liveWidth

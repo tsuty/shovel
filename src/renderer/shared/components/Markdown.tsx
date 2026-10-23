@@ -1,7 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown'
-import remarkGemoji from 'remark-gemoji'
-import remarkGfm from 'remark-gfm'
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MermaidDialog } from './MermaidDialog'
@@ -10,7 +8,7 @@ import { MERMAID_BRAND_COLOR, MermaidIcon } from './icons/MermaidIcon'
 import { highlightToHtml, langFromFence } from '../lib/shiki'
 import { usePendingRender } from '../lib/renderTracker'
 import { cn } from '../lib/utils'
-import { remarkDetails } from '../remarkDetails'
+import { DEFAULT_PLUGINS, DETAILS_PLUGINS } from '../markdownPlugins'
 
 /**
  * Markdown エディタのプレビュー・印刷用表示・トランスクリプト共通のレンダラ（`react-markdown` + `remark-gfm` + `remark-gemoji`）。
@@ -277,9 +275,15 @@ function MarkdownLink({
   )
 }
 
-const DEFAULT_PLUGINS = [remarkGfm, remarkGemoji]
-// remarkDetails を先に通して、summary の文字列にも絵文字の置き換えが効くようにする。
-const DETAILS_PLUGINS = [remarkGfm, remarkDetails, remarkGemoji]
+/** 見出しに、ソースの行番号を `data-source-line` として付けて描く。 */
+const HEADING_WITH_LINE: Components = Object.fromEntries(
+  (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const).map((Tag) => [
+    Tag,
+    ({ node, ...props }: React.ComponentPropsWithoutRef<typeof Tag> & { node?: { position?: { start: { line: number } } } }) => (
+      <Tag {...props} data-source-line={node?.position?.start.line} />
+    )
+  ])
+)
 
 export function Markdown({
   text,
@@ -287,7 +291,8 @@ export function Markdown({
   onOpenFileLink,
   collapseCodeBlocks = false,
   forPrint = false,
-  allowDetails = false
+  allowDetails = false,
+  headingLines = false
 }: {
   text: string
   className?: string
@@ -299,6 +304,8 @@ export function Markdown({
   forPrint?: boolean
   /** `<details>` / `<summary>` を折り畳みとして描く（Markdown ファイルの表示用）。印刷用表示では常に開く。 */
   allowDetails?: boolean
+  /** 見出しに、ソースの行番号（1 始まり）を `data-source-line` として付ける（アウトラインから移るため）。 */
+  headingLines?: boolean
 }): React.JSX.Element {
   // 描画のたびに作り直すと、コードブロックが毎回作り直されて図やハイライトを描き直す
   // （印刷用表示では描画完了の通知で親が描き直されるので、終わらなくなる）。
@@ -312,9 +319,10 @@ export function Markdown({
           {children}
         </MarkdownLink>
       ),
-      ...(forPrint && { details: ({ node: _node, ...props }) => <details {...props} open /> })
+      ...(forPrint && { details: ({ node: _node, ...props }) => <details {...props} open /> }),
+      ...(headingLines && HEADING_WITH_LINE)
     }),
-    [collapseCodeBlocks, forPrint, onOpenFileLink]
+    [collapseCodeBlocks, forPrint, onOpenFileLink, headingLines]
   )
   return (
     <div className={`markdown ${className}`}>

@@ -168,3 +168,22 @@ export function selectAt(view: EditorView, line: number, column: number, length 
     effects: EditorView.scrollIntoView(from, { y: 'center' })
   })
 }
+
+/**
+ * 1 始まりの行の先頭にカーソルを置き、その行を画面の上端へ寄せる。`focus` が false ならフォーカスを移さない
+ * （隠れているエディタでは、見えるようになってから `revealCaret` で上端へ寄せ直す）。
+ */
+export function moveToLineTop(view: EditorView, line: number, focus: boolean): void {
+  const doc = view.state.doc
+  const from = doc.line(Math.min(Math.max(line, 1), doc.lines)).from
+  if (focus) view.focus()
+  view.dispatch({
+    selection: EditorSelection.single(from),
+    effects: EditorView.scrollIntoView(from, { y: 'start', yMargin: 8 })
+  })
+}
+
+/** カーソルの行を画面の上端へ寄せる。 */
+export function revealCaret(view: EditorView): void {
+  view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'start', yMargin: 8 }) })
+}
