@@ -290,6 +290,7 @@
     "sendHintModEnter": "送信: {{mod}}+Enter ／ 改行: Enter",
     "stop": "停止",
     "removeAttachment": "添付を外す",
+    "resizeHandle": "ドラッグで入力欄の高さを変更（ダブルクリックで元に戻す）",
     "usageTitle": "このセッションのコンテキストで {{used}} / {{size}} トークンを使用"
   },
   "errors": {

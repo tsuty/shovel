@@ -102,7 +102,7 @@ export function Transcript({
       stickToBottomRef.current = distance < 24
       setShowJumpToLatest(distance > 24)
     }
-    // 中身の大きさの変化を見て最下部へ追従する。
+    // 中身と表示領域の大きさの変化を見て最下部へ追従する。
     const observer = new ResizeObserver(() => {
       // 非表示タブ（display: none）では何もしない。
       if (container.clientHeight === 0) return
@@ -110,6 +110,7 @@ export function Transcript({
       else onScroll()
     })
     observer.observe(content)
+    observer.observe(container)
     container.addEventListener('scroll', onScroll)
     return () => {
       observer.disconnect()

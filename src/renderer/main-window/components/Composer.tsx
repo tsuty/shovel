@@ -6,7 +6,10 @@ import { Button } from '../../shared/components/ui/button'
 import { Textarea } from '../../shared/components/ui/input'
 import { cn } from '../../shared/lib/utils'
 
-const compactNumberFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
+/** 入力欄の高さの上限（ウィンドウの高さに対する割合）。 */
+const MAX_INPUT_HEIGHT_RATIO = 0.5
+
+const compactNumberFormat =new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 
 /** トークン使用量の表示。usage_update を受け取ったときだけ表示する。 */
 function formatUsage(usage: SessionUsage): string {
@@ -46,6 +49,10 @@ export function Composer({
   const [text, setText] = useState('')
   const composingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  /** ドラッグで決めた入力欄の高さ（px）。`null` は既定の 3 行。 */
+  const [inputHeight, setInputHeight] = useState<number | null>(null)
+  /** 既定（3 行）のときの入力欄の高さ。最初のドラッグ開始時に測り、下限に使う。 */
+  const minInputHeightRef = useRef(0)
 
   // テキスト全体が「/」+ 空白を含まない語のとき、スラッシュコマンドの候補を出す。
   const slashMatch = /^\/(\S*)$/.exec(text)
@@ -75,8 +82,36 @@ export function Composer({
     setText('')
   }
 
+  // 上端のつまみを上へ引くと入力欄が高くなる。
+  function startResize(e: React.PointerEvent): void {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    e.preventDefault()
+    if (inputHeight === null) minInputHeightRef.current = textarea.offsetHeight
+    const startY = e.clientY
+    const startHeight = textarea.offsetHeight
+
+    function onMove(moveEvent: PointerEvent): void {
+      const maxHeight = Math.max(minInputHeightRef.current, window.innerHeight * MAX_INPUT_HEIGHT_RATIO)
+      const next = startHeight + (startY - moveEvent.clientY)
+      setInputHeight(Math.min(maxHeight, Math.max(minInputHeightRef.current, next)))
+    }
+    function onUp(): void {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
   return (
-    <div className="border-t border-border p-3">
+    <div className="relative border-t border-border p-3">
+      <div
+        className="absolute -top-1 left-0 z-10 h-2 w-full cursor-row-resize"
+        title={t('composer.resizeHandle')}
+        onPointerDown={startResize}
+        onDoubleClick={() => setInputHeight(null)}
+      />
       {attachments.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
           {attachments.map((chip) => (
@@ -123,6 +158,9 @@ export function Composer({
         <Textarea
           ref={textareaRef}
           rows={3}
+          style={
+            inputHeight === null ? undefined : { height: inputHeight, maxHeight: `${MAX_INPUT_HEIGHT_RATIO * 100}vh` }
+          }
           value={text}
           placeholder={t('composer.placeholder')}
           onChange={(e) => setText(e.target.value)}

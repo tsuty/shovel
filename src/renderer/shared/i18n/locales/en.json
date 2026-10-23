@@ -293,6 +293,7 @@
     "sendHintModEnter": "Send: {{mod}}+Enter / New line: Enter",
     "stop": "Stop",
     "removeAttachment": "Remove attachment",
+    "resizeHandle": "Drag to resize the input (double-click to reset)",
     "usageTitle": "{{used}} / {{size}} tokens used in this session's context"
   },
   "errors": {
