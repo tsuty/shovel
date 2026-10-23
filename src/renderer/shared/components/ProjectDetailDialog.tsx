@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { withAcpRollback } from '@shared/acpVersion'
 import type { DataDirKind, ProjectDiagnostics } from '@shared/ipc'
 import {
   Dialog,
@@ -69,6 +70,16 @@ export function ProjectDetailDialog({
     }
   }
 
+  async function rollbackAcp(): Promise<void> {
+    if (!diagnostics) return
+    const { id, acpVersion, previousAcpVersion } = diagnostics.project
+    if (!previousAcpVersion) return
+    if (!confirm(t('detail.confirmRollbackAcp', { current: acpVersion, previous: previousAcpVersion }))) return
+    await window.shovel.agents.rollbackAcpVersion(id)
+    const project = withAcpRollback(diagnostics.project)
+    if (project) setDiagnostics({ ...diagnostics, project })
+  }
+
   async function copyAll(): Promise<void> {
     await navigator.clipboard.writeText(summaryText())
     setCopied(true)
@@ -92,7 +103,14 @@ export function ProjectDetailDialog({
               <dt className="text-muted-foreground">{t('detail.sandboxName')}</dt>
               <dd className="truncate">{diagnostics.project.sandboxName}</dd>
               <dt className="text-muted-foreground">{t('detail.agent')}</dt>
-              <dd>{agentLabel(diagnostics)}</dd>
+              <dd className="flex min-w-0 items-center gap-2">
+                <span className="truncate">{agentLabel(diagnostics)}</span>
+                {diagnostics.project.previousAcpVersion && (
+                  <button className="shrink-0 text-primary hover:underline" onClick={() => void rollbackAcp()}>
+                    {t('detail.rollbackAcp', { version: diagnostics.project.previousAcpVersion })}
+                  </button>
+                )}
+              </dd>
               <dt className="text-muted-foreground">{t('detail.logsDir')}</dt>
               <DataDirRow path={diagnostics.logsDir} onOpen={() => void openDataDir('logs')} />
               <dt className="text-muted-foreground">{t('detail.snapshotsDir')}</dt>

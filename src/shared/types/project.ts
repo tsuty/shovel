@@ -25,6 +25,8 @@ export interface Project {
    * セッション開始時にエージェントが `initialize` で告げた版を記録する。未記録なら undefined。
    */
   acpVersion?: string
+  /** 更新の確認で「更新する」を選ぶ前に記録していた版。プロジェクトの詳細から戻せる。 */
+  previousAcpVersion?: string
   /** 更新の確認で「今のまま」を選んだ版。これより新しい版が出るまでは再び尋ねない。 */
   skippedAcpVersion?: string
   /** 拒否された通信のうち、ユーザーが「無視」にした宛先（`host:port`）。 */

@@ -56,6 +56,7 @@ export const IpcChannel = {
   AgentsList: 'agents:list',
   AgentsAcpUpdateOffer: 'agents:acpUpdateOffer',
   AgentsResolveAcpUpdate: 'agents:resolveAcpUpdate',
+  AgentsRollbackAcpVersion: 'agents:rollbackAcpVersion',
 
   SessionOpenTab: 'session:openTab',
   SessionResumeTab: 'session:resumeTab',
@@ -252,6 +253,8 @@ export interface RendererApi {
     acpUpdateOffer(projectId: string): Promise<AcpUpdateOffer | null>
     /** 更新の確認への答え（true: 最新版にする、false: 今の版のまま）。 */
     resolveAcpUpdate(projectId: string, update: boolean): Promise<void>
+    /** 記録する版を更新前の版（`previousAcpVersion`）に戻す。開いているタブには効かない。 */
+    rollbackAcpVersion(projectId: string): Promise<void>
   }
   session: {
     /** `sessionId` はタブ id、`snapshotId` はそのタブがいま書き込んでいるスナップショットの id。 */

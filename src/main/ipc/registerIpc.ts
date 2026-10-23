@@ -78,7 +78,7 @@ import {
 import { listLocalRecords, readLocalRecord } from '../persistence/snapshot'
 import { searchLocalRecords } from '../domain/localSearch'
 import { restoreOpenTabs, saveOpenTabs } from '../domain/openTabsService'
-import { getAcpUpdateOffer, resolveAcpUpdate } from '../domain/acpVersionService'
+import { getAcpUpdateOffer, resolveAcpUpdate, rollbackAcpVersion } from '../domain/acpVersionService'
 
 export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AppOpenProjectManager, () => openProjectManagerWindow())
@@ -153,6 +153,7 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AgentsResolveAcpUpdate, (_event, projectId: string, update: boolean) =>
     resolveAcpUpdate(projectId, update)
   )
+  ipcMain.handle(IpcChannel.AgentsRollbackAcpVersion, (_event, projectId: string) => rollbackAcpVersion(projectId))
 
   ipcMain.handle(IpcChannel.SessionOpenTab, (event, projectId: string, requestId?: string) =>
     openTab(projectId, event.sender, (step, detail) => {

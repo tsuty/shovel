@@ -16,6 +16,8 @@
     "hostPath": "Host path",
     "sandboxName": "Sandbox name",
     "agent": "Agent",
+    "rollbackAcp": "Roll back to {{version}}",
+    "confirmRollbackAcp": "Roll the agent back from {{current}} to {{previous}}?\n\n- Tabs opened from now on use {{previous}}\n- Open tabs keep using {{current}} until closed and reopened\n- You won't be asked to update again until a version newer than {{current}} is released",
     "logsDir": "Logs",
     "snapshotsDir": "Session cache",
     "openDir": "Open",

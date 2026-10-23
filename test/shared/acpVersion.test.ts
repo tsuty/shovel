@@ -1,4 +1,5 @@
-import { compareVersions, findRegistryEntry, isValidVersion } from '@shared/acpVersion'
+import { compareVersions, findRegistryEntry, isValidVersion, withAcpRollback, withAcpUpdate } from '@shared/acpVersion'
+import type { Project } from '@shared/types/project'
 
 describe('compareVersions', () => {
   it('orders by major/minor/patch numerically', () => {
@@ -59,5 +60,38 @@ describe('findRegistryEntry', () => {
     expect(
       findRegistryEntry({ agents: [{ distribution: { npx: { package: '@scope/pkg' } } }] }, '@scope/pkg')
     ).toBeNull()
+  })
+})
+
+describe('withAcpUpdate / withAcpRollback', () => {
+  const project: Project = {
+    id: 'p',
+    displayName: 'p',
+    hostPath: '/h',
+    sandboxPath: '/h',
+    sandboxName: 's',
+    sandboxId: 'sid',
+    agentId: 'claude',
+    createdAt: 0,
+    acpVersion: '0.85.1'
+  }
+
+  it('keeps the version before the update', () => {
+    expect(withAcpUpdate(project, '0.86.0')).toMatchObject({ acpVersion: '0.86.0', previousAcpVersion: '0.85.1' })
+  })
+
+  it('rolls back to the previous version and skips the rolled-back one', () => {
+    const rolledBack = withAcpRollback(withAcpUpdate(project, '0.86.0'))
+    expect(rolledBack).toMatchObject({ acpVersion: '0.85.1', skippedAcpVersion: '0.86.0' })
+    expect(rolledBack).not.toHaveProperty('previousAcpVersion')
+  })
+
+  it('keeps a newer skipped version', () => {
+    const updated = { ...withAcpUpdate(project, '0.86.0'), skippedAcpVersion: '0.87.0' }
+    expect(withAcpRollback(updated)?.skippedAcpVersion).toBe('0.87.0')
+  })
+
+  it('returns null when there is nothing to roll back to', () => {
+    expect(withAcpRollback(project)).toBeNull()
   })
 })

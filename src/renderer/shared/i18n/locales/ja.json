@@ -16,6 +16,8 @@
     "hostPath": "ホストのパス",
     "sandboxName": "サンドボックス名",
     "agent": "エージェント",
+    "rollbackAcp": "{{version}} に戻す",
+    "confirmRollbackAcp": "エージェントのバージョンを {{current}} から {{previous}} に戻しますか？\n\n・これから開くタブから {{previous}} で動きます\n・開いているタブは、閉じて開き直すまで {{current}} のままです\n・{{current}} より新しい版が出るまで、更新の確認は出ません",
     "logsDir": "ログ",
     "snapshotsDir": "セッションキャッシュ",
     "openDir": "開く",

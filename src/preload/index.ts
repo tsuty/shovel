@@ -60,7 +60,8 @@ const api: RendererApi = {
   agents: {
     list: () => ipcRenderer.invoke(IpcChannel.AgentsList),
     acpUpdateOffer: (projectId) => ipcRenderer.invoke(IpcChannel.AgentsAcpUpdateOffer, projectId),
-    resolveAcpUpdate: (projectId, update) => ipcRenderer.invoke(IpcChannel.AgentsResolveAcpUpdate, projectId, update)
+    resolveAcpUpdate: (projectId, update) => ipcRenderer.invoke(IpcChannel.AgentsResolveAcpUpdate, projectId, update),
+    rollbackAcpVersion: (projectId) => ipcRenderer.invoke(IpcChannel.AgentsRollbackAcpVersion, projectId)
   },
   session: {
     openTab: (projectId, requestId) => ipcRenderer.invoke(IpcChannel.SessionOpenTab, projectId, requestId),
