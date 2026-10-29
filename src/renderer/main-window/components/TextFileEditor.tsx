@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   CircleHelp,
   Columns2,
@@ -30,6 +31,7 @@ import { findJsonProblem, type JsonProblem } from '../textEditing'
 import { isTableLanguage, usesViewEditModes, type EditorLanguage } from '@shared/fileKinds'
 import { revealInHighlightedCode, type FileReveal } from '../revealMatch'
 import { openSearchPanel } from '@codemirror/search'
+import { supportsFolding } from '../codeFolding'
 import { createCodeEditor, moveToLineTop, replaceDocument, revealCaret, selectAt, type CodeEditor } from '../codeEditor'
 import { closeFindBar, registerEditorSearch } from '../editorSearch'
 import { loadFirstRowIsHeader, parseCsvRecords, saveFirstRowIsHeader, toCsvTable } from '../csvTable'
@@ -108,25 +110,29 @@ const SPLIT_PANE_MIN_WIDTH = 160
 /** プレビューの上の余白（`p-3`）。見出しへ移ったとき、見出しをこの分だけ上端から離す。 */
 const PREVIEW_PADDING_PX = 12
 
-/** CodeMirror の検索パネルの文言（英語の原文）と、訳のキー。 */
+/** CodeMirror の検索パネル・折りたたみの文言（英語の原文）と、`editor.` 以下の訳のキー。 */
 const EDITOR_PHRASE_KEYS: Record<string, string> = {
-  Find: 'find',
-  Replace: 'replace',
-  next: 'next',
-  previous: 'previous',
-  all: 'all',
-  'match case': 'matchCase',
-  regexp: 'regexp',
-  'by word': 'byWord',
-  replace: 'replaceOne',
-  'replace all': 'replaceAll',
-  close: 'close',
-  'current match': 'currentMatch',
-  'on line': 'onLine',
-  'replaced $ matches': 'replacedMatches',
-  'replaced match on line $': 'replacedMatchOnLine',
-  'Go to line': 'goToLine',
-  go: 'go'
+  Find: 'search.find',
+  Replace: 'search.replace',
+  next: 'search.next',
+  previous: 'search.previous',
+  all: 'search.all',
+  'match case': 'search.matchCase',
+  regexp: 'search.regexp',
+  'by word': 'search.byWord',
+  replace: 'search.replaceOne',
+  'replace all': 'search.replaceAll',
+  close: 'search.close',
+  'current match': 'search.currentMatch',
+  'on line': 'search.onLine',
+  'replaced $ matches': 'search.replacedMatches',
+  'replaced match on line $': 'search.replacedMatchOnLine',
+  'Go to line': 'search.goToLine',
+  go: 'search.go',
+  'Fold line': 'fold.fold',
+  'Unfold line': 'fold.unfold',
+  'folded code': 'fold.foldedCode',
+  unfold: 'fold.unfold'
 }
 
 /**
@@ -136,10 +142,26 @@ const EDITOR_PHRASE_KEYS: Record<string, string> = {
  * 塗る。Markdown / Mermaid / HTML のプレビューだけのときは、ソースが見えるモードへ切り替えてから選択する。
  */
 /** ショートカットの説明に埋め込むキー表記（macOS は記号、それ以外は「Ctrl+」の形）。 */
-function shortcutKeyLabels(): Record<'mod' | 'alt' | 'shift' | 'redo', string> {
+function shortcutKeyLabels(): Record<'mod' | 'alt' | 'shift' | 'redo' | 'fold' | 'unfold' | 'foldAll' | 'unfoldAll', string> {
   return window.shovel.platform === 'darwin'
-    ? { mod: '⌘', alt: '⌥', shift: '⇧', redo: '⇧⌘Z' }
-    : { mod: 'Ctrl+', alt: 'Alt+', shift: 'Shift+', redo: 'Ctrl+Y' }
+    ? { mod: '⌘', alt: '⌥', shift: '⇧', redo: '⇧⌘Z', fold: '⌥⌘[', unfold: '⌥⌘]', foldAll: '⌃⌥[', unfoldAll: '⌃⌥]' }
+    : {
+        mod: 'Ctrl+',
+        alt: 'Alt+',
+        shift: 'Shift+',
+        redo: 'Ctrl+Y',
+        fold: 'Ctrl+Shift+[',
+        unfold: 'Ctrl+Shift+]',
+        foldAll: 'Ctrl+Alt+[',
+        unfoldAll: 'Ctrl+Alt+]'
+      }
+}
+
+/** キー操作の説明の文言。折りたためる種類には折りたたみの操作を足す。 */
+function shortcutsHelpText(t: TFunction, language: EditorLanguage): string {
+  const labels = shortcutKeyLabels()
+  const foldHelp = supportsFolding(language) ? t('editor.shortcutsHelpFold', labels) : ''
+  return t('editor.shortcutsHelp', { ...labels, foldHelp })
 }
 
 export function TextFileEditor({
@@ -348,7 +370,7 @@ export function TextFileEditor({
 
   useEffect(() => {
     editorRef.current?.setPhrases(
-      Object.fromEntries(Object.entries(EDITOR_PHRASE_KEYS).map(([phrase, key]) => [phrase, t(`editor.search.${key}`)]))
+      Object.fromEntries(Object.entries(EDITOR_PHRASE_KEYS).map(([phrase, key]) => [phrase, t(`editor.${key}`)]))
     )
   }, [t, loaded, deleted])
 
@@ -668,7 +690,7 @@ export function TextFileEditor({
             )}
             {!readOnly && (
               <span className="ml-1 flex">
-                <InfoTip icon={CircleHelp} size={14} text={t('editor.shortcutsHelp', shortcutKeyLabels())} />
+                <InfoTip icon={CircleHelp} size={14} text={shortcutsHelpText(t, language)} />
               </span>
             )}
           </>

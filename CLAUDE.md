@@ -68,7 +68,8 @@ surface is CodeMirror 6, driven directly via `EditorView` (no React wrapper; `sr
 decisions.md N-3-1 改訂 2026-10-17): syntax colours come from shiki (`shikiHighlight.ts` turns `codeToTokens` into
 decorations, so 表示/編集 look identical — no CodeMirror language packages), `indentWithTab`, line numbers on every
 kind (Markdown also wraps), rectangular selection (Alt-drag; needs `allowMultipleSelections` + `drawSelection`),
-trailing-whitespace highlighting, external reloads applied as a minimal
+trailing-whitespace highlighting, code folding for Markdown (headings + fenced code blocks)/HTML (elements + comments)/JSON/YAML
+(our own `foldService` ranges in `foldRanges.ts`, recomputed 300ms after typing — still no language packages), external reloads applied as a minimal
 non-undoable change, and the view kept alive (hidden) in preview/"表示" modes so undo history survives mode switches.
 Cmd/Ctrl+F goes to CodeMirror's search panel when a file tab shows source (registered via `editorSearch.ts`) or
 focus is inside an editor, otherwise to `FindBar`, which never searches `.cm-editor` content. A clickable

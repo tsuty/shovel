@@ -9,8 +9,10 @@ import {
   rectangularSelection
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { foldKeymap } from '@codemirror/language'
 import { search, searchKeymap } from '@codemirror/search'
 import type { EditorLanguage } from '@shared/fileKinds'
+import { codeFolding } from './codeFolding'
 import { shikiHighlight } from './shikiHighlight'
 
 /** 外部変更の読み直しなど、利用者の編集ではない書き換えに付ける印（自動保存を走らせない）。 */
@@ -34,6 +36,27 @@ const theme = EditorView.theme({
   },
   '.cm-lineNumbers': { opacity: '0.4' },
   '.cm-lineNumbers .cm-gutterElement': { minWidth: '2.5em', padding: '0' },
+  // 折りたたみの印の列は行の左の余白（1em）の代わりに置き、本文の位置を「表示」と揃えたままにする。
+  // 印は行番号より薄く出す。畳める行の印は行番号の列にマウスが乗っている間だけ、畳んである行の印は常に出す。
+  '.cm-foldGutter .cm-gutterElement': {
+    width: '1em',
+    textAlign: 'center',
+    cursor: 'pointer',
+    opacity: '0.25'
+  },
+  '.cm-foldGutter .cm-gutterElement > span': { opacity: '0', transition: 'opacity 0.15s' },
+  '.cm-gutters:hover .cm-foldGutter .cm-gutterElement > span, .cm-foldGutter .cm-gutterElement > span.cm-foldMarker-folded': {
+    opacity: '1'
+  },
+  '&.cm-hasFolding .cm-line': { paddingLeft: '0' },
+  '.cm-foldPlaceholder': {
+    backgroundColor: 'hsl(var(--muted))',
+    border: 'none',
+    borderRadius: '0.25rem',
+    color: 'hsl(var(--muted-foreground))',
+    padding: '0 0.375rem',
+    margin: '0 0.25rem'
+  },
   '&.cm-focused .cm-cursor': { borderLeftColor: 'hsl(var(--foreground))' },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
     backgroundColor: 'hsl(var(--accent))'
@@ -88,7 +111,8 @@ export interface CodeEditor {
 
 /**
  * 編集できるテキストファイルの CodeMirror。どの種類も行番号を付け、Markdown だけ折り返す
- * （折り返した続きの行には番号が付かない）。色は shiki で付ける。スペルチェックは Markdown だけ。
+ * （折り返した続きの行には番号が付かない）。Markdown / HTML / JSON / YAML は折りたためる（`codeFolding.ts`）。
+ * 色は shiki で付ける。スペルチェックは Markdown だけ。
  * 行末の空白は塗って見せる。
  */
 export function createCodeEditor(options: CodeEditorOptions): CodeEditor {
@@ -102,6 +126,7 @@ export function createCodeEditor(options: CodeEditorOptions): CodeEditor {
       extensions: [
         history(),
         lineNumbers(),
+        codeFolding(options.language),
         // 矩形選択（Alt / Option+ドラッグ）。複数の選択範囲を持てるようにし、それを描くために選択も自前で描く。
         EditorState.allowMultipleSelections.of(true),
         drawSelection(),
@@ -111,7 +136,7 @@ export function createCodeEditor(options: CodeEditorOptions): CodeEditor {
         isMarkdown ? EditorView.lineWrapping : [],
         shikiHighlight(options.highlightLang),
         search({ top: true }),
-        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, ...foldKeymap, indentWithTab]),
         EditorView.contentAttributes.of({ spellcheck: isMarkdown ? 'true' : 'false' }),
         readOnlyCompartment.of(EditorState.readOnly.of(options.readOnly)),
         phrasesCompartment.of(EditorState.phrases.of(options.phrases)),
