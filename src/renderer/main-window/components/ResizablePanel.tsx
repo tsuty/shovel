@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { cn } from '../../shared/lib/utils'
 
 const DEFAULT_MIN_WIDTH = 160
@@ -30,6 +31,7 @@ export function ResizablePanel({
 }): React.JSX.Element {
   const [liveWidth, setLiveWidth] = useState(width)
   const draggingRef = useRef(false)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   // 後から届いた保存値を反映する（ドラッグ中は無視する）。
   useEffect(() => {
@@ -41,8 +43,14 @@ export function ResizablePanel({
     // iframe の上を通ってもイベントを受け続ける。
     e.currentTarget.setPointerCapture(e.pointerId)
     const vertical = edge === 'top'
+    /** 実際に描かれている幅（`top` のときは高さ）。隣の要素の最小幅に押されて `liveWidth` より狭いことがある。 */
+    const renderedWidth = (): number => {
+      const rect = rootRef.current?.getBoundingClientRect()
+      if (!rect) return Infinity
+      return Math.round(vertical ? rect.height : rect.width)
+    }
     const start = vertical ? e.clientY : e.clientX
-    const startWidth = liveWidth
+    const startWidth = Math.min(liveWidth, renderedWidth())
     draggingRef.current = true
 
     const widthAt = (ev: PointerEvent): number => {
@@ -50,14 +58,22 @@ export function ResizablePanel({
       const delta = edge === 'right' ? pos - start : start - pos
       return Math.min(maxWidth, Math.max(minWidth, startWidth + delta))
     }
+    /** 幅を当てたうえで、実際に描けた幅に揃えて返す。 */
+    function applyWidth(ev: PointerEvent): number {
+      const next = widthAt(ev)
+      flushSync(() => setLiveWidth(next))
+      const actual = Math.max(minWidth, Math.min(next, renderedWidth()))
+      if (actual !== next) setLiveWidth(actual)
+      return actual
+    }
     function onMove(moveEvent: PointerEvent): void {
-      setLiveWidth(widthAt(moveEvent))
+      applyWidth(moveEvent)
     }
     function onUp(upEvent: PointerEvent): void {
       draggingRef.current = false
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      onResizeEnd(widthAt(upEvent))
+      onResizeEnd(applyWidth(upEvent))
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -65,7 +81,7 @@ export function ResizablePanel({
 
   if (edge === 'top') {
     return (
-      <div className="relative flex shrink-0 flex-col" style={{ height: liveWidth }}>
+      <div ref={rootRef} className="relative flex shrink-0 flex-col" style={{ height: liveWidth }}>
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         <div className="absolute -top-1 left-0 z-10 h-2 w-full cursor-row-resize" onPointerDown={startDrag} />
       </div>
@@ -74,6 +90,7 @@ export function ResizablePanel({
 
   return (
     <div
+      ref={rootRef}
       className={cn(
         'relative flex border-border',
         shrinkable ? 'shrink' : 'shrink-0',
