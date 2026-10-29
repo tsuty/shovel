@@ -108,6 +108,11 @@ export class SessionTranslator {
       case 'notice':
         // clientCapabilities で notices を宣言していないので、仕様上は届かない。
         return []
+      case 'subagent_update':
+      case 'session_message':
+      case 'session_message_chunk':
+        // clientCapabilities で subagents を宣言していないので、仕様上は届かない。
+        return []
       default:
         // 未知のバリアントはログに残して無視する。
         console.warn('[acp] unknown session/update variant', (update as { sessionUpdate?: string }).sessionUpdate)
