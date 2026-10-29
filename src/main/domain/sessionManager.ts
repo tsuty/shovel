@@ -3,13 +3,12 @@ import type { WebContents } from 'electron'
 import { getAgentEntry } from '@shared/agentTable'
 import type { HistoryEntry, HistoryListing, SessionMeta } from '@shared/types/session'
 import type { TranscriptAction, TranscriptEvent } from '@shared/types/transcript'
-import { IpcChannel, type SessionEnvelope } from '@shared/ipc'
+import { IpcChannel, type SessionEnvelope, type SessionOpenStep } from '@shared/ipc'
 import {
   openAcpSession,
   type AgentSessionInfo,
   type OpenedSession,
-  type RestoreRequest,
-  type SessionRuntimeCallbacks
+  type RestoreRequest
 } from '../acp/connection'
 import { projectsStore, sessionTitleStore } from '../persistence/store'
 import {
@@ -20,6 +19,7 @@ import {
   softDeleteSnapshot
 } from '../persistence/snapshot'
 import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
+import { runConnectPreflight } from './connectPreflight'
 
 /**
  * 1タブ = 1 ACP セッションのランタイム状態をプロジェクト横断で保持し、
@@ -43,12 +43,14 @@ const MAX_TABS_PER_WINDOW = 10
 
 export type OpenedTab = { sessionId: string; snapshotId: string; meta: SessionMeta }
 
+type OpenProgress = (step: SessionOpenStep, detail?: string) => void
+
 async function startTab(
   projectId: string,
   webContents: WebContents,
   sessionId: string,
   restore?: RestoreRequest,
-  onProgress?: SessionRuntimeCallbacks['onProgress']
+  onProgress?: OpenProgress
 ): Promise<OpenedTab> {
   if (tabCountForWindow(webContents) >= MAX_TABS_PER_WINDOW) {
     throw new Error('タブは最大10個までです。')
@@ -57,6 +59,8 @@ async function startTab(
   if (!project) throw new Error(`project not found: ${projectId}`)
   const agent = getAgentEntry(project.agentId)
   if (!agent) throw new Error(`unknown agent: ${project.agentId}`)
+
+  await runConnectPreflight(project, agent, onProgress)
 
   pendingEvents.set(sessionId, [])
   let opened: OpenedSession
@@ -94,7 +98,7 @@ async function startTab(
 export async function openTab(
   projectId: string,
   webContents: WebContents,
-  onProgress?: SessionRuntimeCallbacks['onProgress']
+  onProgress?: OpenProgress
 ): Promise<OpenedTab> {
   return startTab(projectId, webContents, randomUUID(), undefined, onProgress)
 }

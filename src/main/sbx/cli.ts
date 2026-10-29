@@ -66,6 +66,7 @@ export interface SbxDiagnoseCheck {
   /** `pass` / `warn` / `fail` / `skip`。 */
   status: string
   message?: string
+  hint?: string
 }
 
 /** `sbx diagnose --json` のチェック項目。JSON として読めなければ null。 */

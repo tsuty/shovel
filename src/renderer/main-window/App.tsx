@@ -31,9 +31,8 @@ import { addAttachmentToSession } from './attachmentRegistry'
 import { discardSessionEvents } from './sessionEvents'
 import { ResizablePanel } from './components/ResizablePanel'
 import { cn } from '../shared/lib/utils'
-import { friendlyErrorMessage } from '../shared/friendlyError'
+import { friendlyErrorMessage, needsSbxLogin } from '../shared/friendlyError'
 import { editorLanguageFor, type EditorLanguage } from '@shared/fileKinds'
-import { getAgentEntry } from '@shared/agentTable'
 import { ConnectingView, type ConnectingStepRecord } from './components/ConnectingView'
 import { FindBar } from './components/FindBar'
 import type { FileReveal } from './revealMatch'
@@ -70,6 +69,8 @@ type Tab =
       steps: ConnectingStepRecord[]
       /** 失敗したときのエラー（表示用に整えたもの）。 */
       error?: string
+      /** 失敗の原因が Docker への未サインインか（`sbx login` へ誘導する）。 */
+      needsSbxLogin?: boolean
     }
   | { kind: 'file'; sessionId: string; title: string; relPath: string; editor: EditorLanguage | null }
   | {
@@ -170,6 +171,8 @@ export function App(): React.JSX.Element {
   const tabContentRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
+  /** 認証画面でログインを確かめられたときにすること（新しいチャットを開く、など）。 */
+  const authConfirmedRef = useRef<() => void>(() => {})
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [lastOpenedFilePath, setLastOpenedFilePath] = useState<string | null>(null)
   /** 添え先が1つに決まらなかったときに、どのチャットに添えるかを選ばせる対象ファイル。 */
@@ -242,26 +245,19 @@ export function App(): React.JSX.Element {
     void connectTab(id)
   }
 
-  function updateConnectingTab(id: string, patch: { steps?: ConnectingStepRecord[]; error?: string }): void {
+  function updateConnectingTab(
+    id: string,
+    patch: { steps?: ConnectingStepRecord[]; error?: string; needsSbxLogin?: boolean }
+  ): void {
     setTabs((prev) => prev.map((tab) => (tab.sessionId === id && tab.kind === 'connecting' ? { ...tab, ...patch } : tab)))
   }
 
   /** 接続中タブ（またはその再試行）の接続。 */
   async function connectTab(id: string): Promise<void> {
     if (!projectId) return
-    // 認証状態の確認は renderer から呼ぶので、この段階だけはここで積む。
-    updateConnectingTab(id, { steps: [{ step: 'auth', startedAt: Date.now() }], error: undefined })
+    updateConnectingTab(id, { steps: [], error: undefined, needsSbxLogin: false })
 
     try {
-      // 接続前に認証状態を確認し、未ログインなら認証画面を出す。
-      const status = await window.shovel.auth.status(projectId)
-      if (abandonedConnectingIdsRef.current.delete(id)) return
-      if (!status.checkFailed && !status.loggedIn) {
-        removeConnectingTab(id)
-        setAuthOpen(true)
-        return
-      }
-
       const { sessionId, snapshotId, meta } = await window.shovel.session.openTab(projectId, id)
       // 接続の途中で閉じられていたら、開けたセッションをそのまま閉じる。
       if (abandonedConnectingIdsRef.current.delete(id)) {
@@ -283,14 +279,20 @@ export function App(): React.JSX.Element {
     } catch (err) {
       if (abandonedConnectingIdsRef.current.delete(id)) return
       const message = err instanceof Error ? err.message : String(err)
-      // 接続時の認証エラーでも認証画面を出す。
+      // 接続前の確認で未ログインと分かったとき・接続時の認証エラーのときは認証画面を出す。
       if (isAuthRequiredMessage(message)) {
         removeConnectingTab(id)
-        setAuthOpen(true)
+        openAuthDialog(openNewTab)
         return
       }
-      updateConnectingTab(id, { error: friendlyErrorMessage(message, t) })
+      updateConnectingTab(id, { error: friendlyErrorMessage(message, t), needsSbxLogin: needsSbxLogin(message) })
     }
+  }
+
+  /** 認証画面を出す。`onConfirmed` はログインを確かめられたときに呼ぶ。 */
+  function openAuthDialog(onConfirmed: () => void): void {
+    authConfirmedRef.current = onConfirmed
+    setAuthOpen(true)
   }
 
   function removeConnectingTab(id: string): void {
@@ -772,6 +774,7 @@ export function App(): React.JSX.Element {
                           recordTimestamp={tab.recordTimestamp}
                           agentOnly={tab.agentOnly}
                           onResume={() => resumeHistory(tab.snapshot, tab.agentOnly)}
+                          onAuthRequired={openAuthDialog}
                           onStartNew={openNewTab}
                           onOpenFile={openFile}
                           diffLayout={settings?.diffLayout}
@@ -805,8 +808,8 @@ export function App(): React.JSX.Element {
                 ) : tab.kind === 'connecting' ? (
                   <ConnectingView
                     steps={tab.steps}
-                    authCommand={project ? getAgentEntry(project.agentId)?.auth.statusCommand.join(' ') : undefined}
                     error={tab.error}
+                    onSbxLogin={tab.needsSbxLogin ? () => void window.shovel.projects.openSbxLogin() : undefined}
                     onRetry={() => void connectTab(tab.sessionId)}
                     onClose={() => void closeTab(tab.sessionId)}
                   />
@@ -873,7 +876,7 @@ export function App(): React.JSX.Element {
         open={authOpen}
         onOpenChange={setAuthOpen}
         projectId={projectId}
-        onConfirmed={openNewTab}
+        onConfirmed={() => authConfirmedRef.current()}
       />
     </div>
   )

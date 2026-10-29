@@ -5,7 +5,8 @@ import type { DiffLayout } from '@shared/types/settings'
 import { isRestoreUnsupportedMessage } from '@shared/restoreMarker'
 import { snapshotEntriesToEvents } from '@shared/snapshotEvents'
 import { Button } from '../../shared/components/ui/button'
-import { friendlyErrorMessage } from '../../shared/friendlyError'
+import { isAuthRequiredMessage } from '@shared/authMarker'
+import { friendlyErrorMessage, needsSbxLogin } from '../../shared/friendlyError'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
 import { Transcript } from './Transcript'
 
@@ -23,6 +24,7 @@ export function HistoryView({
   recordTimestamp,
   agentOnly,
   onResume,
+  onAuthRequired,
   onStartNew,
   onOpenFile,
   diffLayout
@@ -34,6 +36,8 @@ export function HistoryView({
   /** ローカル記録が無く `session/list` にだけある行。中身の代わりに説明を出す。 */
   agentOnly?: boolean
   onResume: () => Promise<void>
+  /** 再開の前の確認で未ログインと分かったとき。認証画面でログインを確かめられたら `retry` を呼ぶ。 */
+  onAuthRequired: (retry: () => void) => void
   onStartNew: () => void
   onOpenFile: (relPath: string) => void
   diffLayout?: DiffLayout
@@ -50,14 +54,21 @@ export function HistoryView({
   )
   const [resuming, setResuming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSbxLogin, setShowSbxLogin] = useState(false)
 
   async function resume(): Promise<void> {
     setResuming(true)
     setError(null)
+    setShowSbxLogin(false)
     try {
       await onResume()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      if (isAuthRequiredMessage(message)) {
+        onAuthRequired(() => void resume())
+        return
+      }
+      setShowSbxLogin(needsSbxLogin(message))
       setError(isRestoreUnsupportedMessage(message) ? t('history.resumeUnsupported') : friendlyErrorMessage(message, t))
     } finally {
       setResuming(false)
@@ -87,7 +98,15 @@ export function HistoryView({
       )}
       {error && (
         <div className="border-b border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {error}
+          <div className="whitespace-pre-wrap break-words">{error}</div>
+          {showSbxLogin && (
+            <button
+              className="mt-2 font-medium hover:underline"
+              onClick={() => void window.shovel.projects.openSbxLogin()}
+            >
+              {t('errors.sandboxUnreachable.signIn')}
+            </button>
+          )}
         </div>
       )}
       {snapshot.entries.length === 0 ? (

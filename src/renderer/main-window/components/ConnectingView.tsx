@@ -5,7 +5,7 @@ import type { SessionOpenStep } from '@shared/ipc'
 import { cn } from '../../shared/lib/utils'
 
 /** 表示する段階の順番。 */
-export const SESSION_OPEN_STEPS: readonly SessionOpenStep[] = ['auth', 'sandbox', 'adapter', 'session']
+export const SESSION_OPEN_STEPS: readonly SessionOpenStep[] = ['docker', 'auth', 'sandbox', 'adapter', 'session']
 
 /** 始まった段階1つ分。終わった時刻は次の段階が始まった時刻（または接続の完了）。 */
 export interface ConnectingStepRecord {
@@ -24,15 +24,15 @@ function formatSeconds(ms: number): string {
  */
 export function ConnectingView({
   steps,
-  authCommand,
   error,
+  onSbxLogin,
   onRetry,
   onClose
 }: {
   steps: ConnectingStepRecord[]
-  /** 認証状態の確認に使うコマンド。プロジェクトを読み込む前は分からないので、表示のたびに渡す。 */
-  authCommand?: string
   error?: string
+  /** 失敗の原因が Docker への未サインインのとき、`sbx login` を開く。 */
+  onSbxLogin?: () => void
   onRetry: () => void
   onClose: () => void
 }): React.JSX.Element {
@@ -60,7 +60,7 @@ export function ConnectingView({
             const isCurrent = record !== undefined && next === undefined
             const state = !record ? 'pending' : !isCurrent ? 'done' : error ? 'failed' : 'running'
             const elapsed = record ? (next?.startedAt ?? now) - record.startedAt : 0
-            const detail = record?.detail ?? (step === 'auth' ? authCommand : undefined)
+            const detail = record?.detail
             return (
               <li key={step} className="flex items-start gap-2 text-sm">
                 <span className="mt-0.5 shrink-0">
@@ -101,6 +101,11 @@ export function ConnectingView({
           <div className="mt-4 rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <div className="whitespace-pre-wrap break-words">{error}</div>
             <div className="mt-2 flex gap-3">
+              {onSbxLogin && (
+                <button className="font-medium hover:underline" onClick={onSbxLogin}>
+                  {t('errors.sandboxUnreachable.signIn')}
+                </button>
+              )}
               <button className="font-medium hover:underline" onClick={onRetry}>
                 {t('common.retry')}
               </button>

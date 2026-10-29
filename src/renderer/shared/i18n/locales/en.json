@@ -301,7 +301,16 @@
     "usageTitle": "{{used}} / {{size}} tokens used in this session's context"
   },
   "errors": {
-    "sbxNotFound": "The \"sbx\" (Docker Sandboxes) command line tool was not found. Install it and try again: https://docs.docker.com/ai/sandboxes/"
+    "sbxNotFound": "The \"sbx\" (Docker Sandboxes) command line tool was not found. Install it and try again: https://docs.docker.com/ai/sandboxes/",
+    "sandboxUnreachable": {
+      "notSignedIn": "Can't connect to the sandbox because you are not signed in to Docker. Run sbx login in a terminal to sign in, then try again.",
+      "diagnoseFailed": "Can't connect to the sandbox because of a problem with Docker Sandboxes. sbx diagnose reports these failed checks. See also the diagnostics in the project details.",
+      "missing": "The sandbox was not found. It may have been removed. Import it again as an existing sandbox from the Project Manager, or recreate the project.",
+      "workspaceMissing": "The sandbox's workspace (the folder on this computer) was not found. Check whether the folder was moved or deleted.",
+      "stopped": "The stopped sandbox couldn't be started. Try again; if it keeps failing, check the diagnostics in the project details.",
+      "unknown": "Couldn't reach the sandbox. Try again; if it keeps failing, check the diagnostics in the project details.",
+      "signIn": "Run sbx login in a terminal"
+    }
   },
   "mainWindow": {
     "noProject": "No project was specified.",
@@ -316,6 +325,7 @@
     "seconds": "{{value}}s",
     "adapterHint": "Starting the agent inside the sandbox and waiting for it to respond. The first run or a version update takes longer while the package is downloaded.",
     "steps": {
+      "docker": "Check the Docker sign-in and the sandbox",
       "auth": "Check the agent's sign-in status",
       "sandbox": "Check that the sandbox is reachable",
       "adapter": "Start the agent (ACP adapter)",

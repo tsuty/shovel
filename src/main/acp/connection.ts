@@ -30,7 +30,7 @@ import type {
 import type { TranscriptEvent } from '@shared/types/transcript'
 import type { SessionOpenStep } from '@shared/ipc'
 import { snapshotEntriesToEvents } from '@shared/snapshotEvents'
-import { sbxLivenessCheck, sbxSpawnInteractive } from '../sbx/cli'
+import { sbxSpawnInteractive } from '../sbx/cli'
 import { SessionLogger } from '../log'
 import { buildAcpStream } from './stream'
 import { loadAcpSdk } from './sdk'
@@ -61,7 +61,7 @@ export interface SessionRuntimeCallbacks {
   /** ターンの記録を保存し終えたことを知らせる。 */
   onTurnSaved: () => void
   /** 接続の段階が進んだことを知らせる（タブを開く途中の表示用）。 */
-  onProgress?: (step: Exclude<SessionOpenStep, 'auth'>, detail?: string) => void
+  onProgress?: (step: Exclude<SessionOpenStep, 'docker' | 'auth' | 'sandbox'>, detail?: string) => void
 }
 
 /** `session/list` の1件。 */
@@ -119,10 +119,10 @@ class IdleWatchdog {
 
 /**
  * サンドボックス内の ACP アダプタへ接続し、1つの ACP セッションを開始する。
- *   1. 生存確認（終了コードのみで判定）
- *   2. `sbx exec -i` でプロセス起動（`npx -y <package>@<version>`）、stdout/stderr を分離
- *   3. initialize（アイドルタイムアウト）。告げられたアダプタの版をプロジェクトに記録
- *   4. session/new（`restore` が指定されたときは session/load か session/resume）
+ * ログイン状態と到達の確認は呼び出し側（`runConnectPreflight`）で済ませておく。
+ *   1. `sbx exec -i` でプロセス起動（`npx -y <package>@<version>`）、stdout/stderr を分離
+ *   2. initialize（アイドルタイムアウト）。告げられたアダプタの版をプロジェクトに記録
+ *   3. session/new（`restore` が指定されたときは session/load か session/resume）
  *
  * 戻り値の `sessionId` は shovel が払い出すタブ id で、ACP の `SessionId` とは別物。
  */
@@ -133,14 +133,6 @@ export async function openAcpSession(
   callbacks: SessionRuntimeCallbacks,
   restore?: RestoreRequest
 ): Promise<OpenedSession> {
-  callbacks.onProgress?.('sandbox', `sbx exec ${project.sandboxName} echo`)
-  const alive = await sbxLivenessCheck(project.sandboxName)
-  if (!alive) {
-    throw new Error(
-      `サンドボックス "${project.sandboxName}" に到達できません。停止しているか削除されている可能性があります。`
-    )
-  }
-
   const acp = await loadAcpSdk()
   const logger = new SessionLogger(sessionId, project.id)
   const packageSpec = acpPackageSpec(project, agent)

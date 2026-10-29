@@ -31,6 +31,10 @@ function readPath(value: unknown, dotPath: string): unknown {
 
 export async function checkAuthStatus(projectId: string): Promise<AuthStatus> {
   const { project, agent } = requireProjectAndAgent(projectId)
+  return checkAgentAuthStatus(project, agent)
+}
+
+export async function checkAgentAuthStatus(project: Project, agent: AgentEntry): Promise<AuthStatus> {
   const result = await sbxExecCapture(project.sandboxName, agent.auth.statusCommand, {
     cwd: project.sandboxPath
   })

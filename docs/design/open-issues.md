@@ -33,6 +33,7 @@
 | **V-23** | 対応表の各エージェントのテンプレート（claude 以外も含む）に `python3` が入っているか | TTY モードを使えないテンプレートがどれだけあるか。代替（`script` など）を再検討するか |
 | **V-24** | 実際に TUI を求めるツール（MCP の設定・認証など）が TTY モードで最後まで操作できるか（矢印キーの方式、Space での複数選択、ブラウザを開く OAuth との組み合わせ） | xterm.js の設定やラッパーに追加が要るか |
 | **V-25** | CodeMirror 6 のエディタ（decisions.md N-3-1「改訂（2026-10-17）」）で、日本語 IME の変換中の入力・確定・取り消しが崩れないか（macOS / Windows の実機。変換中の Enter・Tab・Cmd/Ctrl+F、自動保存や外部変更の読み直しと変換中が重なったとき、選択とカーソルを CodeMirror が描く `drawSelection` との組み合わせ）。開発用サンドボックス（Xvfb）では IME を確かめられない | CodeMirror に回避の設定が要るか。変換中は自動保存・読み直しを遅らせる必要があるか |
+| ~~**V-26**~~ | ~~Docker に未サインインのとき `sbx exec <name> echo` が非0で終わるか~~ | ✅ **解決（2026-10-29）。終わらない。** `sbx logout` 後に `sbx exec <name> echo` を実行すると、ブラウザで Docker のログイン URL が開き、コールバックを待ったまま止まる（標準出力をパイプにしても同じ。Ctrl+C で 130）。一方 `sbx ls --json` は待たずに `error: not signed in to Docker` / `try: sbx login` を出して終了コード 1 で終わる。`sbx diagnose --json` は 0.18 秒程度（未サインイン時）。`sbx exec --help` / `sbx --help` にログインを促さないためのフラグは無い。→ 接続前の確認の先頭に `sbx ls --json` を置き、`sbx exec` は Docker にサインイン済みと分かってから実行する（flows.md §3「接続できないと分かったとき」）。サンドボックスが見当たらない・ワークスペースが無いときの `sbx exec` の失敗の仕方は、`sbx ls` で先に止めるので確かめていない |
 
 ---
 
