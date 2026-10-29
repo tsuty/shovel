@@ -256,7 +256,13 @@
     "state": {
       "localOnly": "The agent no longer remembers this conversation (view only)",
       "agentOnly": "No record in this app (exists only on the agent side)"
-    }
+    },
+    "deletedBackupBar": "Deleted backup · {{date}}",
+    "deletedBackupTag": "Backup",
+    "deleteBackup": "Delete this backup",
+    "deleteAllBackups": "Delete all backups",
+    "confirmDeleteBackup": "Delete this backup? It will disappear from the backup list, but the record can still be opened read-only via \"Show deleted\".",
+    "confirmDeleteAllBackups": "Delete all {{count}} backups of this session? They will disappear from the backup list, but the records can still be opened read-only via \"Show deleted\"."
   },
   "commands": {
     "title": "Console",
@@ -354,7 +360,8 @@
     "results": "Results",
     "noResults": "No matching sessions.",
     "backupDate": "Backup · {{date}}",
-    "deletedDate": "Deleted · {{date}}"
+    "deletedDate": "Deleted · {{date}}",
+    "deletedBackupDate": "Deleted backup · {{date}}"
   },
   "fileSearch": {
     "title": "Search files",

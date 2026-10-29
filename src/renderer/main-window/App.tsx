@@ -606,6 +606,19 @@ export function App(): React.JSX.Element {
     })
   }
 
+  /** ソフトデリートしたローカル記録を開いている Read Only タブを閉じる。 */
+  function closeRecordTabs(fileNames: string[]): void {
+    const deleted = new Set(fileNames)
+    const remains = (tab: Tab): boolean =>
+      !(tab.kind === 'history' && tab.recordFileName !== undefined && deleted.has(tab.recordFileName))
+    const next = tabs.filter(remains)
+    if (next.length === tabs.length) return
+    setTabs((prev) => prev.filter(remains))
+    if (!next.some((tab) => tab.sessionId === activeSessionId)) {
+      setActiveSessionId(next.length > 0 ? next[next.length - 1]!.sessionId : null)
+    }
+  }
+
   /**
    * ファイルのタブをまとめて閉じる（チャット・履歴のタブは残す）。`keepId` を渡すとそのタブは残して
    * 前面に出す。ファイルのタブは main 側に後始末がないので、`closeTab` を経由しない。
@@ -721,6 +734,7 @@ export function App(): React.JSX.Element {
           onOpenLocalRecord={(record) => void openLocalRecord(record)}
           onRenameTab={renameTab}
           onCloseTab={(id) => void closeTab(id)}
+          onRecordsDeleted={closeRecordTabs}
           onAddToContext={addToContext}
           onAttachFile={attachFile}
           canAttachFile={canAttachFile}

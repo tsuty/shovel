@@ -8,15 +8,24 @@ import type { LocalRecordKind, LocalRecordSummary, SessionSnapshot } from '@shar
  * セッションのトランスクリプトスナップショット。
  * 保存先は `userData/snapshots/{projectId}`、書き込みは一時ファイル経由のアトミックな move。
  *
- * 各ディレクトリに3種類のファイルが並ぶ:
- *   - `{sessionId}.json`                       現行の記録
- *   - `{sessionId}.json.{epochMillis}.backup`  食い違い検出時の退避
- *   - `{sessionId}.json.{epochMillis}.deleted` ソフトデリート
+ * 各ディレクトリに4種類のファイルが並ぶ:
+ *   - `{sessionId}.json`                              現行の記録
+ *   - `{sessionId}.json.{epochMillis}.backup`         食い違い検出時の退避
+ *   - `{sessionId}.json.{epochMillis}.deleted`        ソフトデリート
+ *   - `{sessionId}.json.{epochMillis}.deleted-backup` ソフトデリートしたバックアップ（epochMillis はバックアップの時刻）
  */
 
 const SCHEMA_VERSION = 1
 
-const RECORD_FILE_RE = /^(.+)\.json(?:\.(\d+)\.(backup|deleted))?$/
+const RECORD_FILE_RE = /^(.+)\.json(?:\.(\d+)\.(backup|deleted|deleted-backup))?$/
+
+type TimestampedSuffix = 'backup' | 'deleted' | 'deleted-backup'
+
+const KIND_BY_SUFFIX: Record<TimestampedSuffix, LocalRecordKind> = {
+  backup: 'backup',
+  deleted: 'deleted',
+  'deleted-backup': 'deletedBackup'
+}
 
 function snapshotRootDir(): string {
   return path.join(app.getPath('userData'), 'snapshots')
@@ -41,7 +50,7 @@ function snapshotPath(projectId: string, sessionId: string): string {
 export interface ParsedRecordName {
   sessionId: string
   kind: LocalRecordKind
-  /** `backup` / `deleted` のときのファイル名の epochMillis。 */
+  /** `current` 以外のときのファイル名の epochMillis。 */
   epochMillis?: number
 }
 
@@ -51,7 +60,7 @@ export function parseRecordName(fileName: string): ParsedRecordName | null {
   if (!m) return null
   const sessionId = m[1]!
   if (!m[3]) return { sessionId, kind: 'current' }
-  return { sessionId, kind: m[3] as LocalRecordKind, epochMillis: Number(m[2]) }
+  return { sessionId, kind: KIND_BY_SUFFIX[m[3] as TimestampedSuffix], epochMillis: Number(m[2]) }
 }
 
 /**
@@ -83,7 +92,7 @@ async function availableTimestampedPath(
   projectId: string,
   sessionId: string,
   epochMillis: number,
-  suffix: 'backup' | 'deleted'
+  suffix: TimestampedSuffix
 ): Promise<string> {
   const dir = snapshotDir(projectId)
   for (let ms = epochMillis; ; ms++) {
@@ -166,6 +175,53 @@ export async function softDeleteSnapshot(projectId: string, sessionId: string): 
   }
 }
 
+/**
+ * バックアップのソフトデリート。`fileNames` を渡せばそのバックアップだけ、省略すれば
+ * `sessionId` のバックアップすべてを `{sessionId}.json.{バックアップの epochMillis}.deleted-backup` へ
+ * リネームする。`sessionId` のバックアップでないファイル名は拒否する。リネームした元のファイル名を返す。
+ */
+export async function softDeleteBackups(
+  projectId: string,
+  sessionId: string,
+  fileNames?: string[]
+): Promise<string[]> {
+  const dir = snapshotDir(projectId)
+  let targets: string[]
+  if (fileNames) {
+    for (const fileName of fileNames) {
+      const parsed = path.basename(fileName) === fileName ? parseRecordName(fileName) : null
+      if (!parsed || parsed.kind !== 'backup' || parsed.sessionId !== sessionId) {
+        throw new Error(`not a backup of ${sessionId}: ${fileName}`)
+      }
+    }
+    targets = fileNames
+  } else {
+    let all: string[]
+    try {
+      all = await readdir(dir)
+    } catch {
+      return []
+    }
+    targets = all.filter((fileName) => {
+      const parsed = parseRecordName(fileName)
+      return parsed?.kind === 'backup' && parsed.sessionId === sessionId
+    })
+  }
+
+  const renamed: string[] = []
+  for (const fileName of targets) {
+    const target = await availableTimestampedPath(
+      projectId,
+      sessionId,
+      parseRecordName(fileName)!.epochMillis!,
+      'deleted-backup'
+    )
+    await rename(path.join(dir, fileName), target)
+    renamed.push(fileName)
+  }
+  return renamed
+}
+
 /** 永続化済みのスナップショットがあれば、その `title` を書き換える。 */
 export async function renameSnapshotTitle(projectId: string, sessionId: string, title: string): Promise<void> {
   const existing = await loadSnapshot(projectId, sessionId)
@@ -182,7 +238,7 @@ export async function listSnapshotsForProject(projectId: string): Promise<Sessio
     .sort((a, b) => b.savedAt - a.savedAt)
 }
 
-/** プロジェクトのローカル記録（現在・バックアップ・削除済み）をすべて要約として返す（新しい順）。 */
+/** プロジェクトのローカル記録（現在・バックアップ・削除済み・削除したバックアップ）をすべて要約として返す（新しい順）。 */
 export async function listLocalRecords(projectId: string): Promise<LocalRecordSummary[]> {
   const records = await readRecordsForProject(projectId, () => true)
   return records.map(({ summary }) => summary).sort((a, b) => b.timestamp - a.timestamp)

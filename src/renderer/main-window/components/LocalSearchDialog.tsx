@@ -60,6 +60,7 @@ export function LocalSearchDialog({
     const date = formatShortDate(record.timestamp, i18n.language)
     if (record.kind === 'backup') return t('search.backupDate', { date })
     if (record.kind === 'deleted') return t('search.deletedDate', { date })
+    if (record.kind === 'deletedBackup') return t('search.deletedBackupDate', { date })
     return date
   }
 

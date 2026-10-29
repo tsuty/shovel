@@ -3,7 +3,7 @@ import { markdownToPlainText, sentenceAround } from '@shared/plainText'
 import { readRecordsForProject } from '../persistence/snapshot'
 
 /**
- * プロジェクトの全ローカル記録（`.json`・`.backup`、指定があれば `.deleted` も）を対象に、
+ * プロジェクトの全ローカル記録（`.json`・`.backup`、指定があれば `.deleted`・`.deleted-backup` も）を対象に、
  * Markdown 記法を落とした平文へ大文字小文字を無視した部分一致をかける。
  *
  * 呼び出し元（webContents）ごとに世代番号を持ち、ファイルを1つ読むたびに自分が最新か確かめる。
@@ -27,7 +27,9 @@ export async function searchLocalRecords(
   const needle = query.trim().toLowerCase()
   if (!needle) return []
 
-  const kinds = new Set<LocalRecordKind>(includeDeleted ? ['current', 'backup', 'deleted'] : ['current', 'backup'])
+  const kinds = new Set<LocalRecordKind>(
+    includeDeleted ? ['current', 'backup', 'deleted', 'deletedBackup'] : ['current', 'backup']
+  )
   const records = await readRecordsForProject(projectId, isLatest, kinds)
   if (!isLatest()) return null
 

@@ -43,11 +43,13 @@ function TabKindIcon({ kind, failed }: { kind: TabInfo['kind']; failed?: boolean
 interface ContextMenuState {
   x: number
   y: number
-  kind: 'tab' | 'history'
+  kind: 'tab' | 'history' | 'backup'
   sessionId: string
   currentTitle: string
   /** `kind: 'history'` のときの行。 */
   entry?: HistoryEntry
+  /** `kind: 'history'` のときのその行のバックアップ。`kind: 'backup'` のときは右クリックした1件。 */
+  backups?: LocalRecordSummary[]
 }
 
 /**
@@ -70,7 +72,8 @@ export function ChatHistoryPanel({
   onOpenHistory,
   onOpenLocalRecord,
   onRenameTab,
-  onCloseTab
+  onCloseTab,
+  onRecordsDeleted
 }: {
   projectId: string
   tabs: TabInfo[]
@@ -80,6 +83,8 @@ export function ChatHistoryPanel({
   onOpenLocalRecord: (record: LocalRecordSummary) => void
   onRenameTab: (sessionId: string, title: string) => void
   onCloseTab: (sessionId: string) => void
+  /** ローカル記録をソフトデリートしたとき。引数は退避した元のファイル名。 */
+  onRecordsDeleted: (fileNames: string[]) => void
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const [history, setHistory] = useState<HistoryListing>({ entries: [], canDeleteAgentSessions: false })
@@ -122,7 +127,7 @@ export function ChatHistoryPanel({
     list.push(record)
     backupsBySession.set(record.sessionId, list)
   }
-  const deletedRecords = records.filter((record) => record.kind === 'deleted')
+  const deletedRecords = records.filter((record) => record.kind === 'deleted' || record.kind === 'deletedBackup')
 
   function toggleExpanded(sessionId: string): void {
     setExpanded((prev) => {
@@ -152,6 +157,22 @@ export function ChatHistoryPanel({
       snapshotId: entry.snapshotId,
       acpSessionId: entry.acpSessionId
     })
+    refreshHistory()
+  }
+
+  /** バックアップをソフトデリートする。`all` ならそのセッションのバックアップすべて。 */
+  async function deleteBackups(snapshotId: string, backups: LocalRecordSummary[], all: boolean): Promise<void> {
+    setMenu(null)
+    const message = all
+      ? t('history.confirmDeleteAllBackups', { count: backups.length })
+      : t('history.confirmDeleteBackup')
+    if (!confirm(message)) return
+    const deleted = await window.shovel.session.deleteBackups(
+      projectId,
+      snapshotId,
+      all ? undefined : backups.map((backup) => backup.fileName)
+    )
+    onRecordsDeleted(deleted)
     refreshHistory()
   }
 
@@ -254,7 +275,8 @@ export function ChatHistoryPanel({
                               kind: 'history',
                               sessionId: entry.key,
                               currentTitle: entry.title,
-                              entry
+                              entry,
+                              backups
                             })
                           }}
                           title={[
@@ -278,6 +300,18 @@ export function ChatHistoryPanel({
                             <button
                               className="flex w-full items-center justify-between gap-2 rounded-md px-1.5 py-0.5 text-left text-xs text-muted-foreground hover:bg-accent"
                               onClick={() => onOpenLocalRecord(backup)}
+                              onContextMenu={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setMenu({
+                                  x: e.clientX,
+                                  y: e.clientY,
+                                  kind: 'backup',
+                                  sessionId: backup.sessionId,
+                                  currentTitle: entry.title,
+                                  backups: [backup]
+                                })
+                              }}
                             >
                               <span className="truncate">{new Date(backup.timestamp).toLocaleString(i18n.language)}</span>
                               <span className="shrink-0 tabular-nums">{formatSize(backup.sizeBytes)}</span>
@@ -310,8 +344,15 @@ export function ChatHistoryPanel({
                         title={new Date(record.timestamp).toLocaleString(i18n.language)}
                         onClick={() => onOpenLocalRecord(record)}
                       >
-                        <Trash2 size={13} className="shrink-0" />
+                        {record.kind === 'deletedBackup' ? (
+                          <History size={13} className="shrink-0" />
+                        ) : (
+                          <Trash2 size={13} className="shrink-0" />
+                        )}
                         <span className="flex-1 truncate">{record.title || t('history.untitled')}</span>
+                        {record.kind === 'deletedBackup' && (
+                          <span className="shrink-0 text-xs">{t('history.deletedBackupTag')}</span>
+                        )}
                         <span className="shrink-0 text-xs">{new Date(record.timestamp).toLocaleDateString(i18n.language)}</span>
                       </button>
                     </li>
@@ -330,7 +371,19 @@ export function ChatHistoryPanel({
         onOpenRecord={onOpenLocalRecord}
       />
 
-      {menu && (
+      {menu?.kind === 'backup' && (
+        <div
+          className="fixed z-50 min-w-36 rounded-md border bg-popover p-1 text-sm shadow-md"
+          style={{ left: menu.x, top: menu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MenuItem icon={<Trash2 size={14} />} onClick={() => void deleteBackups(menu.sessionId, menu.backups ?? [], false)}>
+            {t('history.deleteBackup')}
+          </MenuItem>
+        </div>
+      )}
+
+      {menu && menu.kind !== 'backup' && (
         <div
           className="fixed z-50 min-w-36 rounded-md border bg-popover p-1 text-sm shadow-md"
           style={{ left: menu.x, top: menu.y }}
@@ -369,6 +422,14 @@ export function ChatHistoryPanel({
               }}
             >
               {t('common.delete')}
+            </MenuItem>
+          )}
+          {menu.kind === 'history' && menu.entry?.snapshotId && (menu.backups?.length ?? 0) > 0 && (
+            <MenuItem
+              icon={<History size={14} />}
+              onClick={() => void deleteBackups(menu.entry!.snapshotId!, menu.backups ?? [], true)}
+            >
+              {t('history.deleteAllBackups')}
             </MenuItem>
           )}
         </div>

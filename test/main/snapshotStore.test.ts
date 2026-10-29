@@ -81,6 +81,60 @@ describe('snapshot store', () => {
     expect(await files()).toEqual(['s1.json.5000.backup'])
   })
 
+  it('バックアップのソフトデリートは指定した1件だけを、バックアップの時刻のまま .deleted-backup にする', async () => {
+    vi.useFakeTimers({ now: 5000, toFake: ['Date'] })
+    await store.saveSnapshot(snapshot('s1'))
+    await store.backupSnapshot(PROJECT, 's1')
+    await store.backupSnapshot(PROJECT, 's1')
+    vi.setSystemTime(9000)
+    expect(await store.softDeleteBackups(PROJECT, 's1', ['s1.json.5000.backup'])).toEqual(['s1.json.5000.backup'])
+    expect(await files()).toEqual(['s1.json', 's1.json.5000.deleted-backup', 's1.json.5001.backup'])
+    expect((await store.listLocalRecords(PROJECT)).find((r) => r.fileName === 's1.json.5000.deleted-backup')).toMatchObject({
+      kind: 'deletedBackup',
+      sessionId: 's1',
+      timestamp: 5000
+    })
+  })
+
+  it('ファイル名を省略すると、そのセッションのバックアップだけをすべてソフトデリートする', async () => {
+    vi.useFakeTimers({ now: 5000, toFake: ['Date'] })
+    await store.saveSnapshot(snapshot('s1'))
+    await store.saveSnapshot(snapshot('s2'))
+    await store.backupSnapshot(PROJECT, 's1')
+    await store.backupSnapshot(PROJECT, 's1')
+    await store.backupSnapshot(PROJECT, 's2')
+    expect((await store.softDeleteBackups(PROJECT, 's1')).sort()).toEqual(['s1.json.5000.backup', 's1.json.5001.backup'])
+    expect(await files()).toEqual([
+      's1.json',
+      's1.json.5000.deleted-backup',
+      's1.json.5001.deleted-backup',
+      's2.json',
+      's2.json.5000.backup'
+    ])
+  })
+
+  it('別セッションのバックアップ・バックアップ以外のファイル名は拒否する', async () => {
+    vi.useFakeTimers({ now: 5000, toFake: ['Date'] })
+    await store.saveSnapshot(snapshot('s1'))
+    await store.saveSnapshot(snapshot('s2'))
+    await store.backupSnapshot(PROJECT, 's2')
+    await expect(store.softDeleteBackups(PROJECT, 's1', ['s2.json.5000.backup'])).rejects.toThrow()
+    await expect(store.softDeleteBackups(PROJECT, 's1', ['s1.json'])).rejects.toThrow()
+    await expect(store.softDeleteBackups(PROJECT, 's1', ['../s1.json.5000.backup'])).rejects.toThrow()
+    expect(await files()).toEqual(['s1.json', 's2.json', 's2.json.5000.backup'])
+  })
+
+  it('セッションのソフトデリートは、削除済みのバックアップには触らない', async () => {
+    vi.useFakeTimers({ now: 5000, toFake: ['Date'] })
+    await store.saveSnapshot(snapshot('s1'))
+    await store.backupSnapshot(PROJECT, 's1')
+    await store.backupSnapshot(PROJECT, 's1')
+    await store.softDeleteBackups(PROJECT, 's1', ['s1.json.5000.backup'])
+    vi.setSystemTime(9000)
+    await store.softDeleteSnapshot(PROJECT, 's1')
+    expect(await files()).toEqual(['s1.json.5000.deleted-backup', 's1.json.5001.deleted', 's1.json.9000.deleted'])
+  })
+
   it('listLocalRecords は種類・タイムスタンプ付きで新しい順に返す', async () => {
     vi.useFakeTimers({ now: 3000, toFake: ['Date'] })
     await store.saveSnapshot(snapshot('s1', { savedAt: 1000 }))

@@ -136,7 +136,11 @@ Known, deliberate scope-narrowings worth knowing about before extending this cod
   `agent_message` `messageId` (`compareByMessageId`/`reconcileReplay`), and only on a mismatch is
   the local file moved to `{id}.json.{ms}.backup` and the display replaced (plus a `notice`
   transcript line). The comparison is guarded by a `restoreEpoch` counter (new turn / ↻ / close
-  discard it). Snapshots carry `acpSessionId` and per-AGENT-entry `messageId`. The **tab id**
+  discard it). Backups can be soft-deleted by the user from the history panel's right-click
+  (one backup, or all of a session's) → `{id}.json.{backupMs}.deleted-backup` (`deletedBackup`
+  kind, shown under "show deleted"; open Read Only tabs of them are closed —
+  `softDeleteBackups` in `snapshot.ts`, decisions.md C-4 「バックアップの手動削除」).
+  Snapshots carry `acpSessionId` and per-AGENT-entry `messageId`. The **tab id**
   (`sessionId`, event routing) and the **snapshot id** (`{id}.json`) are separate:
   they start equal, but ↻ closes the current record and starts a new snapshot id, so a refreshed
   tab never overwrites its previous conversation (`OpenedSession.snapshotId`, `TabInfo.snapshotId`;

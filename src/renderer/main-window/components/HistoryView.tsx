@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { SessionSnapshot } from '@shared/types/session'
+import type { ReadOnlyRecordKind, SessionSnapshot } from '@shared/types/session'
 import type { DiffLayout } from '@shared/types/settings'
 import { isRestoreUnsupportedMessage } from '@shared/restoreMarker'
 import { snapshotEntriesToEvents } from '@shared/snapshotEvents'
@@ -10,13 +10,19 @@ import { friendlyErrorMessage, needsSbxLogin } from '../../shared/friendlyError'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
 import { Transcript } from './Transcript'
 
-export type ReadOnlyKind = 'backup' | 'deleted'
+export type ReadOnlyKind = ReadOnlyRecordKind
+
+const BAR_LABEL_KEY: Record<ReadOnlyKind, string> = {
+  backup: 'history.backupBar',
+  deleted: 'history.deletedBar',
+  deletedBackup: 'history.deletedBackupBar'
+}
 
 /**
  * 過去セッションのスナップショットを表示する。「再開」でライブのタブに切り替えられる。
  *
- * `readOnlyKind` を渡すと、バックアップ／削除済みの記録を開く Read Only タブになる。
- * 「再開」「新規開始」を隠し、上部バーの文言を `Backup · {日時}` / `Deleted · {日時}` に切り替える。
+ * `readOnlyKind` を渡すと、バックアップ／削除済み／削除したバックアップの記録を開く Read Only タブになる。
+ * 「再開」「新規開始」を隠し、上部バーの文言を種別に応じて切り替える。
  */
 export function HistoryView({
   snapshot,
@@ -31,7 +37,7 @@ export function HistoryView({
 }: {
   snapshot: SessionSnapshot
   readOnlyKind?: ReadOnlyKind
-  /** `readOnlyKind` のとき上部バーに出す日時（退避・削除した時刻）。 */
+  /** `readOnlyKind` のとき上部バーに出す日時（退避・削除した時刻。削除したバックアップは退避した時刻）。 */
   recordTimestamp?: number
   /** ローカル記録が無く `session/list` にだけある行。中身の代わりに説明を出す。 */
   agentOnly?: boolean
@@ -79,7 +85,7 @@ export function HistoryView({
     <div className="flex h-full flex-col">
       {readOnlyKind ? (
         <div className="border-b border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          {t(readOnlyKind === 'backup' ? 'history.backupBar' : 'history.deletedBar', {
+          {t(BAR_LABEL_KEY[readOnlyKind], {
             date: new Date(recordTimestamp ?? snapshot.savedAt).toLocaleString(i18n.language)
           })}
         </div>

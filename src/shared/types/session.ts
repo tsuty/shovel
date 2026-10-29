@@ -100,8 +100,12 @@ export interface SnapshotEntry {
  *   - `current`: `{sessionId}.json`（現行の記録）
  *   - `backup`:  `{sessionId}.json.{epochMillis}.backup`（食い違い検出時の退避）
  *   - `deleted`: `{sessionId}.json.{epochMillis}.deleted`（ソフトデリート）
+ *   - `deletedBackup`: `{sessionId}.json.{epochMillis}.deleted-backup`（ソフトデリートしたバックアップ）
  */
-export type LocalRecordKind = 'current' | 'backup' | 'deleted'
+export type LocalRecordKind = 'current' | 'backup' | 'deleted' | 'deletedBackup'
+
+/** Read Only タブで開くローカル記録の種別。 */
+export type ReadOnlyRecordKind = Exclude<LocalRecordKind, 'current'>
 
 /**
  * ウィンドウを閉じても残しておく、開いていたタブ。配列の並びはタブバーの表示順。
@@ -131,8 +135,8 @@ export type RestoredTab =
   | {
       kind: 'history'
       snapshot: SessionSnapshot
-      /** バックアップ／削除済みの記録。 */
-      readOnly?: { kind: 'backup' | 'deleted'; timestamp: number; fileName: string }
+      /** バックアップ／削除済み／削除したバックアップの記録。 */
+      readOnly?: { kind: ReadOnlyRecordKind; timestamp: number; fileName: string }
       agentOnly?: boolean
       attachedFile?: string
     }

@@ -154,6 +154,7 @@ V-2 / V-3 / V-10 / V-11 の検証を待って埋める（[open-issues.md](./open
 | セッションのスナップショット | **個別 JSON ファイル**（`{sessionId}.json`） |
 | セッションのバックアップ（decisions.md C-4。自動削除しない） | `{sessionId}.json.{epochMillis}.backup` |
 | 削除済みセッション（ソフトデリート。decisions.md C-5。自動削除しない） | `{sessionId}.json.{epochMillis}.deleted` |
+| 削除したバックアップ（ソフトデリート。decisions.md C-4。epochMillis はバックアップの時刻） | `{sessionId}.json.{epochMillis}.deleted-backup` |
 | ACP トラフィックログ | **セッションごとのファイル**（`{timestamp}_{sessionId}.log`） |
 
 ### 状態の真実の所在

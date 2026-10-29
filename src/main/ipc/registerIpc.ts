@@ -75,7 +75,7 @@ import {
   sendInput,
   unpinCommand
 } from '../domain/commandService'
-import { listLocalRecords, readLocalRecord } from '../persistence/snapshot'
+import { listLocalRecords, readLocalRecord, softDeleteBackups } from '../persistence/snapshot'
 import { searchLocalRecords } from '../domain/localSearch'
 import { restoreOpenTabs, saveOpenTabs } from '../domain/openTabsService'
 import { getAcpUpdateOffer, resolveAcpUpdate, rollbackAcpVersion } from '../domain/acpVersionService'
@@ -197,6 +197,11 @@ export function registerIpc(): void {
     IpcChannel.SessionDeleteHistory,
     (_event, projectId: string, target: { snapshotId?: string; acpSessionId?: string }) =>
       deleteHistorySession(projectId, target)
+  )
+  ipcMain.handle(
+    IpcChannel.SessionDeleteBackups,
+    (_event, projectId: string, sessionId: string, fileNames?: string[]) =>
+      softDeleteBackups(projectId, sessionId, fileNames)
   )
   ipcMain.handle(IpcChannel.SessionListLocalRecords, (_event, projectId: string) => listLocalRecords(projectId))
   ipcMain.handle(IpcChannel.SessionReadLocalRecord, (_event, projectId: string, fileName: string) =>

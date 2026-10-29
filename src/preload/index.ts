@@ -91,6 +91,8 @@ const api: RendererApi = {
     listHistory: (projectId) => ipcRenderer.invoke(IpcChannel.SessionListHistory, projectId),
     rename: (projectId, sessionId, title) => ipcRenderer.invoke(IpcChannel.SessionRename, projectId, sessionId, title),
     deleteHistory: (projectId, target) => ipcRenderer.invoke(IpcChannel.SessionDeleteHistory, projectId, target),
+    deleteBackups: (projectId, snapshotId, fileNames) =>
+      ipcRenderer.invoke(IpcChannel.SessionDeleteBackups, projectId, snapshotId, fileNames),
     listLocalRecords: (projectId) => ipcRenderer.invoke(IpcChannel.SessionListLocalRecords, projectId),
     readLocalRecord: (projectId, fileName) => ipcRenderer.invoke(IpcChannel.SessionReadLocalRecord, projectId, fileName),
     searchLocal: (projectId, query, includeDeleted) =>

@@ -32,6 +32,7 @@ export function Sidebar({
   onOpenLocalRecord,
   onRenameTab,
   onCloseTab,
+  onRecordsDeleted,
   onAddToContext,
   onAttachFile,
   canAttachFile
@@ -49,6 +50,7 @@ export function Sidebar({
   onOpenLocalRecord: (record: LocalRecordSummary) => void
   onRenameTab: (sessionId: string, title: string) => void
   onCloseTab: (sessionId: string) => void
+  onRecordsDeleted: (fileNames: string[]) => void
   onAddToContext: (relPath: string) => void
   onAttachFile: (relPath: string) => void
   canAttachFile: boolean
@@ -103,6 +105,7 @@ export function Sidebar({
               onOpenLocalRecord={onOpenLocalRecord}
               onRenameTab={onRenameTab}
               onCloseTab={onCloseTab}
+              onRecordsDeleted={onRecordsDeleted}
             />
           )}
           {panel === 'filer' && (

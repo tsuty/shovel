@@ -254,7 +254,13 @@
     "state": {
       "localOnly": "エージェントはこの会話を覚えていません（記録の閲覧のみ）",
       "agentOnly": "このアプリに記録がありません（エージェント側にのみ存在）"
-    }
+    },
+    "deletedBackupBar": "削除したバックアップ · {{date}}",
+    "deletedBackupTag": "バックアップ",
+    "deleteBackup": "このバックアップを削除",
+    "deleteAllBackups": "バックアップをすべて削除",
+    "confirmDeleteBackup": "このバックアップを削除しますか？バックアップの一覧からは消えますが、記録は「削除済みを表示」から読み取り専用で開けます。",
+    "confirmDeleteAllBackups": "このセッションのバックアップ {{count}} 件をすべて削除しますか？バックアップの一覧からは消えますが、記録は「削除済みを表示」から読み取り専用で開けます。"
   },
   "commands": {
     "title": "コンソール",
@@ -351,7 +357,8 @@
     "results": "結果",
     "noResults": "一致するセッションはありません。",
     "backupDate": "バックアップ・{{date}}",
-    "deletedDate": "削除済み・{{date}}"
+    "deletedDate": "削除済み・{{date}}",
+    "deletedBackupDate": "削除したバックアップ・{{date}}"
   },
   "fileSearch": {
     "title": "ファイルを検索",

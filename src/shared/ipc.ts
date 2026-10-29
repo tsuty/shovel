@@ -71,6 +71,7 @@ export const IpcChannel = {
   SessionListHistory: 'session:listHistory',
   SessionRename: 'session:rename',
   SessionDeleteHistory: 'session:deleteHistory',
+  SessionDeleteBackups: 'session:deleteBackups',
   SessionListLocalRecords: 'session:listLocalRecords',
   SessionReadLocalRecord: 'session:readLocalRecord',
   SessionSearchLocal: 'session:searchLocal',
@@ -291,7 +292,12 @@ export interface RendererApi {
     rename(projectId: string, snapshotId: string, title: string): Promise<void>
     /** ソフトデリート（`.deleted` へ退避。バックアップも一緒に）。 */
     deleteHistory(projectId: string, target: { snapshotId?: string; acpSessionId?: string }): Promise<void>
-    /** 現在・バックアップ・削除済みを含む、このプロジェクトの全ローカル記録の要約。 */
+    /**
+     * バックアップのソフトデリート（`.deleted-backup` へ退避）。`fileNames` を省略すると
+     * そのスナップショット id のバックアップすべて。退避した元のファイル名を返す。
+     */
+    deleteBackups(projectId: string, snapshotId: string, fileNames?: string[]): Promise<string[]>
+    /** 現在・バックアップ・削除済み・削除したバックアップを含む、このプロジェクトの全ローカル記録の要約。 */
     listLocalRecords(projectId: string): Promise<LocalRecordSummary[]>
     /** ファイル名で指定したローカル記録（バックアップ・削除済みを含む）を読む。 */
     readLocalRecord(projectId: string, fileName: string): Promise<SessionSnapshot | null>
