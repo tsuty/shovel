@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Bot, Clock3, Columns2, CopyX, File, FileX, Loader2, Plus, SquareSplitHorizontal, X } from 'lucide-react'
+import { AlertTriangle, Bot, Clock3, Columns2, CopyX, File, FileX, Globe, Loader2, Plus, SquareSplitHorizontal, X } from 'lucide-react'
 import { cn } from '../../shared/lib/utils'
 import { MenuItem } from './MenuItem'
 
@@ -9,7 +9,7 @@ export interface TabInfo {
   title: string
   /** タブ名のツールチップ（ファイルのタブはプロジェクト内のパス）。無ければ `title`。 */
   tooltip?: string
-  kind: 'session' | 'file' | 'history' | 'connecting'
+  kind: 'session' | 'file' | 'history' | 'connecting' | 'browser'
   /**
    * セッションタブがいま書き込んでいるスナップショットの id。↻ で新しい会話を
    * 始めると変わる（タブ id の `sessionId` は変わらない）。
@@ -216,6 +216,7 @@ export function TabBar({
           {tab.kind === 'file' && <File size={12} className="shrink-0" />}
           {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
           {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
+          {tab.kind === 'browser' && <Globe size={12} className="shrink-0" />}
           {tab.kind === 'connecting' &&
             (tab.failed ? (
               <AlertTriangle size={12} className="shrink-0 text-destructive" />

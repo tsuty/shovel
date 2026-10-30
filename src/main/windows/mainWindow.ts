@@ -21,7 +21,7 @@ export function openProjectWindow(projectId: string): void {
     return
   }
 
-  const win = createSecureWindow({ width: 1200, height: 800, title: projectWindowTitle(projectId) })
+  const win = createSecureWindow({ width: 1200, height: 800, title: projectWindowTitle(projectId), webviewTag: true })
   // macOS の Dock メニューなどはウィンドウタイトルで一覧するので、プロジェクト名を入れておき、
   // HTML の <title>（固定の "shovel"）で上書きされないようにする。
   win.on('page-title-updated', (event) => event.preventDefault())

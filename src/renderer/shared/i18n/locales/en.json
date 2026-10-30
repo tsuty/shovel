@@ -99,7 +99,23 @@
     "tabs": "Chats",
     "filer": "Files",
     "commands": "Run command",
+    "browser": "Browser",
     "comingSoon": "Coming soon"
+  },
+  "browser": {
+    "newTab": "New browser tab",
+    "newTabTitle": "New tab",
+    "back": "Back",
+    "forward": "Forward",
+    "reload": "Reload",
+    "stop": "Stop loading",
+    "addressPlaceholder": "Enter a URL or search",
+    "addBookmark": "Add bookmark",
+    "removeBookmark": "Remove bookmark",
+    "editBookmark": "Edit bookmark",
+    "bookmarkTitle": "Title",
+    "noBookmarks": "No bookmarks yet",
+    "openExternal": "Open in external browser"
   },
   "tabBar": {
     "close": "Close",

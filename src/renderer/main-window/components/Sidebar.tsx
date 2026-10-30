@@ -1,22 +1,24 @@
 import { useEffect, useState } from 'react'
-import { FolderTree, MessageSquare, SquareTerminal } from 'lucide-react'
+import { FolderTree, Globe, MessageSquare, SquareTerminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { HistoryEntry, LocalRecordSummary } from '@shared/types/session'
+import type { Bookmark } from '@shared/types/browser'
 import { cn } from '../../shared/lib/utils'
 import type { TabInfo } from './TabBar'
 import { Filer } from './Filer'
 import type { FileReveal } from '../revealMatch'
 import { ChatHistoryPanel } from './ChatHistoryPanel'
 import { ResizablePanel } from './ResizablePanel'
+import { BrowserPanel } from './BrowserPanel'
 
-export type SidebarPanel = 'tabs' | 'filer'
+export type SidebarPanel = 'tabs' | 'filer' | 'browser'
 
-const PANEL_ORDER: SidebarPanel[] = ['tabs', 'filer']
+const PANEL_ORDER: SidebarPanel[] = ['tabs', 'filer', 'browser']
 const DEFAULT_PANEL_WIDTH = 224
 
 /**
  * サイドバー。メニューバー（アイコンのみ）と、開いているサイドコンテンツを固定順
- * （チャット履歴→ファイラー）で左から並べる。コマンド実行ドロワーはトグルボタンだけを持つ。
+ * （チャット履歴→ファイラー→ブラウザ）で左から並べる。コマンド実行ドロワーはトグルボタンだけを持つ。
  */
 export function Sidebar({
   projectId,
@@ -35,7 +37,13 @@ export function Sidebar({
   onRecordsDeleted,
   onAddToContext,
   onOpenSplitRight,
-  canOpenSplitRight
+  canOpenSplitRight,
+  bookmarks,
+  onNewBrowserTab,
+  onOpenBookmark,
+  onAddBookmark,
+  onEditBookmark,
+  onDeleteBookmark
 }: {
   projectId: string
   openPanels: Set<SidebarPanel>
@@ -54,6 +62,12 @@ export function Sidebar({
   onAddToContext: (relPath: string) => void
   onOpenSplitRight: (relPath: string) => void
   canOpenSplitRight: (relPath: string) => boolean
+  bookmarks: Bookmark[]
+  onNewBrowserTab: () => void
+  onOpenBookmark: (bookmark: Bookmark) => void
+  onAddBookmark: () => void
+  onEditBookmark: (bookmark: Bookmark) => void
+  onDeleteBookmark: (bookmark: Bookmark) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [widths, setWidths] = useState<Record<string, number>>({})
@@ -83,6 +97,13 @@ export function Sidebar({
           title={t('sidebar.filer')}
         >
           <FolderTree size={18} />
+        </IconButton>
+        <IconButton
+          active={openPanels.has('browser')}
+          onClick={() => onTogglePanel('browser')}
+          title={t('sidebar.browser')}
+        >
+          <Globe size={18} />
         </IconButton>
         <div className="flex-1" />
         <IconButton active={commandsOpen} onClick={onToggleCommands} title={t('sidebar.commands')}>
@@ -115,6 +136,16 @@ export function Sidebar({
               onAddToContext={onAddToContext}
               onOpenSplitRight={onOpenSplitRight}
               canOpenSplitRight={canOpenSplitRight}
+            />
+          )}
+          {panel === 'browser' && (
+            <BrowserPanel
+              bookmarks={bookmarks}
+              onNewTab={onNewBrowserTab}
+              onOpenBookmark={onOpenBookmark}
+              onAddBookmark={onAddBookmark}
+              onEditBookmark={onEditBookmark}
+              onDeleteBookmark={onDeleteBookmark}
             />
           )}
         </ResizablePanel>

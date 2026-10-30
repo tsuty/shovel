@@ -181,7 +181,7 @@ export function ChatHistoryPanel({
       <div className="mb-2 text-xs font-medium text-muted-foreground">{t('sidebar.tabs')}</div>
       <ul className="flex flex-col gap-1">
         {/* 会話（セッション・履歴）だけを並べる。 */}
-        {tabs.filter((tab) => tab.kind !== 'file').map((tab) => (
+        {tabs.filter((tab) => tab.kind !== 'file' && tab.kind !== 'browser').map((tab) => (
           <li key={tab.sessionId}>
             {renamingId === tab.sessionId ? (
               <RenameInput

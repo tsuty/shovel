@@ -89,6 +89,10 @@ OS のリソースとプロセスを扱うものはすべてここに置く。
 - `nodeIntegration: false`
 - CSP を設定する
 - `will-navigate` と `setWindowOpenHandler` を塞ぐ。リンクは外部ブラウザへ渡す
+- ブラウザのタブ（`<webview>`、decisions.md G-1-20）はプロジェクトのウィンドウだけで有効にし、main の
+  `will-attach-webview` で preload なし・`nodeIntegration: false`・`contextIsolation: true`・`sandbox: true`・
+  専用の保存領域（`persist:shovel-browser`）を強制する。開けるのは `http:` / `https:` だけ、権限の要求はすべて断る。
+  ブラウザはホストで動き、サンドボックスの隔離（§6 ①）の外にある。エージェントからは操作できない
 - Markdown 中の生 HTML を通さない（`rehype-raw` を使わない）
   - 例外: Markdown ファイルの表示（エディタのプレビュー・印刷用表示）に限り、`<details>` / `<summary>` だけを
     自前の remark プラグインで要素にする。トランスクリプトには適用しない（decisions.md D-5 追記）

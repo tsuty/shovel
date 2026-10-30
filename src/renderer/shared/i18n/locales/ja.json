@@ -98,7 +98,23 @@
     "tabs": "チャット",
     "filer": "ファイル",
     "commands": "コマンド実行",
+    "browser": "ブラウザ",
     "comingSoon": "近日対応"
+  },
+  "browser": {
+    "newTab": "新しいブラウザタブ",
+    "newTabTitle": "新しいタブ",
+    "back": "戻る",
+    "forward": "進む",
+    "reload": "再読み込み",
+    "stop": "読み込みを中止",
+    "addressPlaceholder": "URL を入力、または検索",
+    "addBookmark": "ブックマークを追加",
+    "removeBookmark": "ブックマークから外す",
+    "editBookmark": "ブックマークを編集",
+    "bookmarkTitle": "タイトル",
+    "noBookmarks": "ブックマークはまだありません",
+    "openExternal": "外部のブラウザで開く"
   },
   "tabBar": {
     "close": "閉じる",

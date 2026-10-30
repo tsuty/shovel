@@ -10,6 +10,8 @@ export function createSecureWindow(options: {
   width: number
   height: number
   title: string
+  /** ブラウザのタブ（`<webview>`）を使えるようにする。中身の設定は `browserGuest.ts` が強制する。 */
+  webviewTag?: boolean
 }): BrowserWindow {
   const win = new BrowserWindow({
     width: options.width,
@@ -20,7 +22,8 @@ export function createSecureWindow(options: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      webviewTag: options.webviewTag ?? false
     }
   })
 
@@ -67,7 +70,7 @@ function isSamePage(a: string, b: string): boolean {
   return !!ua && !!ub && isSameOrigin(a, b) && ua.pathname === ub.pathname
 }
 
-function openExternalIfSafe(url: string): void {
+export function openExternalIfSafe(url: string): void {
   let protocol: string
   try {
     protocol = new URL(url).protocol

@@ -110,6 +110,7 @@ export type ReadOnlyRecordKind = Exclude<LocalRecordKind, 'current'>
 /**
  * ウィンドウを閉じても残しておく、開いていたタブ。配列の並びはタブバーの表示順。
  *   - `file`: ファイルのタブ
+ *   - `browser`: ブラウザのタブ（開いていたページの URL とタイトル）
  *   - `record`: セッション・履歴・Read Only のタブ。`fileName` はローカル記録のファイル名
  *   - `agentOnly`: `session/list` にだけあった（ローカル記録の無い）履歴のタブ
  * `split` は分割ビューのグループ（同じ `group` 番号のタブが1つのグループ）と、そのペインの幅の比率。
@@ -117,6 +118,7 @@ export type ReadOnlyRecordKind = Exclude<LocalRecordKind, 'current'>
  */
 export type SavedTab =
   | { kind: 'file'; relPath: string; split?: SavedSplit }
+  | { kind: 'browser'; url: string; title: string; split?: SavedSplit }
   | { kind: 'record'; fileName: string; attachedFile?: string; split?: SavedSplit }
   | {
       kind: 'agentOnly'
@@ -139,6 +141,7 @@ export interface SavedSplit {
  */
 export type RestoredTab =
   | { kind: 'file'; relPath: string; split?: SavedSplit }
+  | { kind: 'browser'; url: string; title: string; split?: SavedSplit }
   | {
       kind: 'history'
       snapshot: SessionSnapshot

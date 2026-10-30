@@ -78,6 +78,10 @@ import {
 import { listLocalRecords, readLocalRecord, softDeleteBackups } from '../persistence/snapshot'
 import { searchLocalRecords } from '../domain/localSearch'
 import { restoreOpenTabs, saveOpenTabs } from '../domain/openTabsService'
+import { listBookmarks, saveBookmarks } from '../domain/bookmarkService'
+import { openExternalIfSafe } from '../windows/createSecureWindow'
+import { isWebUrl } from '@shared/browserUrl'
+import type { Bookmark } from '@shared/types/browser'
 import { getAcpUpdateOffer, resolveAcpUpdate, rollbackAcpVersion } from '../domain/acpVersionService'
 
 export function registerIpc(): void {
@@ -97,6 +101,13 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IpcChannel.TabsRestore, (_event, projectId: string) => restoreOpenTabs(projectId))
   ipcMain.handle(IpcChannel.TabsSave, (_event, projectId: string, tabs: SavedTab[]) => saveOpenTabs(projectId, tabs))
+  ipcMain.handle(IpcChannel.BrowserOpenExternal, (_event, url: string) => {
+    if (typeof url === 'string' && isWebUrl(url)) openExternalIfSafe(url)
+  })
+  ipcMain.handle(IpcChannel.BookmarksList, (_event, projectId: string) => listBookmarks(projectId))
+  ipcMain.handle(IpcChannel.BookmarksSave, (_event, projectId: string, bookmarks: Bookmark[]) =>
+    saveBookmarks(projectId, bookmarks)
+  )
 
   ipcMain.handle(IpcChannel.AuthStatus, (_event, projectId: string) => checkAuthStatus(projectId))
   ipcMain.handle(IpcChannel.AuthSetApiKey, (_event, projectId: string, apiKey: string) =>

@@ -1,4 +1,4 @@
-import { Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
+import { Menu, type BrowserWindow, type ContextMenuParams, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import { resolveLocale } from '../locale'
 
 const labels = {
@@ -29,28 +29,33 @@ const labels = {
 export function installEditContextMenu(win: BrowserWindow): void {
   win.webContents.on('context-menu', (_event, params) => {
     if (!params.isEditable) return
-    const t = labels[resolveLocale()]
-    const flags = params.editFlags
-    const template: MenuItemConstructorOptions[] = []
-    if (params.misspelledWord) {
-      if (params.dictionarySuggestions.length === 0) {
-        template.push({ label: t.noSuggestions, enabled: false })
-      }
-      for (const suggestion of params.dictionarySuggestions) {
-        template.push({ label: suggestion, click: () => win.webContents.replaceMisspelling(suggestion) })
-      }
-      template.push({ type: 'separator' })
-    }
-    template.push(
-      { role: 'undo', label: t.undo, enabled: flags.canUndo },
-      { role: 'redo', label: t.redo, enabled: flags.canRedo },
-      { type: 'separator' },
-      { role: 'cut', label: t.cut, enabled: flags.canCut },
-      { role: 'copy', label: t.copy, enabled: flags.canCopy },
-      { role: 'paste', label: t.paste, enabled: flags.canPaste },
-      { type: 'separator' },
-      { role: 'selectAll', label: t.selectAll, enabled: flags.canSelectAll }
-    )
-    Menu.buildFromTemplate(template).popup({ window: win })
+    Menu.buildFromTemplate(editMenuTemplate(win.webContents, params)).popup({ window: win })
   })
+}
+
+/** 編集できる場所の右クリックメニューの中身（スペルの候補・元に戻す・切り取り・コピー・貼り付けなど）。 */
+export function editMenuTemplate(webContents: WebContents, params: ContextMenuParams): MenuItemConstructorOptions[] {
+  const t = labels[resolveLocale()]
+  const flags = params.editFlags
+  const template: MenuItemConstructorOptions[] = []
+  if (params.misspelledWord) {
+    if (params.dictionarySuggestions.length === 0) {
+      template.push({ label: t.noSuggestions, enabled: false })
+    }
+    for (const suggestion of params.dictionarySuggestions) {
+      template.push({ label: suggestion, click: () => webContents.replaceMisspelling(suggestion) })
+    }
+    template.push({ type: 'separator' })
+  }
+  template.push(
+    { role: 'undo', label: t.undo, enabled: flags.canUndo },
+    { role: 'redo', label: t.redo, enabled: flags.canRedo },
+    { type: 'separator' },
+    { role: 'cut', label: t.cut, enabled: flags.canCut },
+    { role: 'copy', label: t.copy, enabled: flags.canCopy },
+    { role: 'paste', label: t.paste, enabled: flags.canPaste },
+    { type: 'separator' },
+    { role: 'selectAll', label: t.selectAll, enabled: flags.canSelectAll }
+  )
+  return template
 }

@@ -36,6 +36,9 @@ import { editorLanguageFor, type EditorLanguage } from '@shared/fileKinds'
 import { ConnectingView, type ConnectingStepRecord } from './components/ConnectingView'
 import { FindBar } from './components/FindBar'
 import type { FileReveal } from './revealMatch'
+import type { Bookmark } from '@shared/types/browser'
+import { BrowserView } from './components/BrowserView'
+import { BookmarkDialog } from './components/BookmarkDialog'
 import {
   canSplitRight,
   groupOf,
@@ -86,6 +89,15 @@ type Tab =
     }
   | { kind: 'file'; sessionId: string; title: string; relPath: string; editor: EditorLanguage | null }
   | {
+      kind: 'browser'
+      sessionId: string
+      title: string
+      /** 最初に開くページ。中身の `<webview>` はこれを最初の1回だけ使う。 */
+      initialUrl: string
+      /** 今表示しているページ（保存とブックマークの判定に使う）。まだ開いていなければ空。 */
+      url: string
+    }
+  | {
       kind: 'history'
       sessionId: string
       title: string
@@ -115,9 +127,14 @@ function fileTab(relPath: string): Tab {
   return { kind: 'file', sessionId: `file:${relPath}`, title: relPath.split('/').pop() ?? relPath, relPath, editor: editorLanguageFor(relPath) }
 }
 
+function browserTab(url: string, title = ''): Tab {
+  return { kind: 'browser', sessionId: `browser:${crypto.randomUUID()}`, title: title || url, initialUrl: url, url }
+}
+
 /** 保存しておいたタブを、開き直すタブにする。 */
 function tabFromRestored(restored: RestoredTab, untitled: string): Tab {
   if (restored.kind === 'file') return fileTab(restored.relPath)
+  if (restored.kind === 'browser') return browserTab(restored.url, restored.title)
   const { snapshot, readOnly, agentOnly } = restored
   const title = snapshot.title || untitled
   if (readOnly) {
@@ -139,6 +156,8 @@ function savedFromTab(tab: Tab, split: SavedSplit | undefined): SavedTab[] {
   switch (tab.kind) {
     case 'file':
       return [{ kind: 'file', relPath: tab.relPath, split }]
+    case 'browser':
+      return tab.url ? [{ kind: 'browser', url: tab.url, title: tab.title, split }] : []
     case 'session':
       return [{ kind: 'record', fileName: `${tab.snapshotId}.json`, split }]
     case 'history': {
@@ -190,6 +209,10 @@ export function App(): React.JSX.Element {
   const [lastOpenedFilePath, setLastOpenedFilePath] = useState<string | null>(null)
   /** ウィンドウを開いたときに尋ねる ACP アダプタの更新。答えるまで最初のタブは開かない。 */
   const [acpUpdateOffer, setAcpUpdateOffer] = useState<AcpUpdateOffer | null>(null)
+  /** このプロジェクトのブラウザのブックマーク。 */
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+  /** ブックマークの追加・編集ダイアログ。`id` があれば編集。 */
+  const [bookmarkDraft, setBookmarkDraft] = useState<{ id?: string; title: string; url: string } | null>(null)
   const [commandsHeight, setCommandsHeight] = useState(COMMANDS_DEFAULT_HEIGHT)
   const [tabStatuses, setTabStatuses] = useState<
     Record<string, { sending: boolean; hasPendingPermission: boolean }>
@@ -404,6 +427,59 @@ export function App(): React.JSX.Element {
     // 重複判定は updater の中で行う。
     setTabs((prev) => (prev.some((tab) => tab.sessionId === id) ? prev : [...prev, fileTab(relPath)]))
     setActiveSessionId(id)
+  }
+
+  /** ブラウザのタブを開いて前面に出す。`url` が無ければ空のページで開く。 */
+  function openBrowserTab(url = ''): void {
+    const tab = browserTab(url, url ? undefined : t('browser.newTabTitle'))
+    setTabs((prev) => [...prev, tab])
+    setActiveSessionId(tab.sessionId)
+  }
+
+  // ページが新しいウィンドウを開こうとしたら、新しいブラウザのタブで開く。
+  const openBrowserTabRef = useRef(openBrowserTab)
+  openBrowserTabRef.current = openBrowserTab
+  useEffect(() => window.shovel.browser.onOpenUrl((url) => openBrowserTabRef.current(url)), [])
+
+  function updateBrowserTab(id: string, patch: { url?: string; title?: string }): void {
+    setTabs((prev) =>
+      prev.map((tab) => {
+        if (tab.sessionId !== id || tab.kind !== 'browser') return tab
+        const next = { ...tab, ...patch }
+        return next.url === tab.url && next.title === tab.title ? tab : next
+      })
+    )
+  }
+
+  useEffect(() => {
+    if (projectId) void window.shovel.bookmarks.list(projectId).then(setBookmarks).catch(() => {})
+  }, [projectId])
+
+  function saveBookmarks(next: Bookmark[]): void {
+    setBookmarks(next)
+    if (projectId) void window.shovel.bookmarks.save(projectId, next).then(setBookmarks).catch(() => {})
+  }
+
+  /** ブラウザのツールバーの ☆。今のページがブックマークにあれば外し、無ければ足す。 */
+  function toggleBookmark(url: string, title: string): void {
+    if (bookmarks.some((b) => b.url === url)) saveBookmarks(bookmarks.filter((b) => b.url !== url))
+    else saveBookmarks([...bookmarks, { id: crypto.randomUUID(), title, url }])
+  }
+
+  /** ブックマークの追加ダイアログ。前面がブラウザのタブなら、そのページで埋めておく。 */
+  function openAddBookmark(): void {
+    const active = tabs.find((tab) => tab.sessionId === activeSessionId)
+    setBookmarkDraft(active?.kind === 'browser' && active.url ? { title: active.title, url: active.url } : { title: '', url: '' })
+  }
+
+  function commitBookmark(title: string, url: string): void {
+    const id = bookmarkDraft?.id
+    saveBookmarks(
+      id
+        ? bookmarks.map((b) => (b.id === id ? { ...b, title, url } : b))
+        : [...bookmarks, { id: crypto.randomUUID(), title, url }]
+    )
+    setBookmarkDraft(null)
   }
 
   /**
@@ -731,7 +807,7 @@ export function App(): React.JSX.Element {
   const tabInfos: TabInfo[] = tabs.map((tab) => ({
     sessionId: tab.sessionId,
     title: tab.title,
-    tooltip: tab.kind === 'file' ? tab.relPath : undefined,
+    tooltip: tab.kind === 'file' ? tab.relPath : tab.kind === 'browser' ? tab.url || undefined : undefined,
     kind: tab.kind,
     snapshotId: tab.kind === 'session' ? tab.snapshotId : undefined,
     failed: tab.kind === 'connecting' ? tab.error !== undefined : undefined,
@@ -777,6 +853,12 @@ export function App(): React.JSX.Element {
           onAddToContext={addToContext}
           onOpenSplitRight={openFileSplitRight}
           canOpenSplitRight={(relPath) => !!activeSessionId && canSplitRight(splitGroups, activeSessionId, `file:${relPath}`)}
+          bookmarks={bookmarks}
+          onNewBrowserTab={() => openBrowserTab()}
+          onOpenBookmark={(bookmark) => openBrowserTab(bookmark.url)}
+          onAddBookmark={openAddBookmark}
+          onEditBookmark={(bookmark) => setBookmarkDraft({ ...bookmark })}
+          onDeleteBookmark={(bookmark) => saveBookmarks(bookmarks.filter((b) => b.id !== bookmark.id))}
         />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TabBar
@@ -853,6 +935,15 @@ export function App(): React.JSX.Element {
                         onRetry={() => void connectTab(tab.sessionId)}
                         onClose={() => void closeTab(tab.sessionId)}
                       />
+                    ) : tab.kind === 'browser' ? (
+                      <BrowserView
+                        initialUrl={tab.initialUrl}
+                        bookmarked={!!tab.url && bookmarks.some((b) => b.url === tab.url)}
+                        onNavigate={(url) => updateBrowserTab(tab.sessionId, { url })}
+                        onTitleChange={(title) => updateBrowserTab(tab.sessionId, { title })}
+                        onToggleBookmark={toggleBookmark}
+                        onFocus={() => setActiveSessionId(tab.sessionId)}
+                      />
                     ) : tab.editor ? (
                       <TextFileEditor
                         projectId={projectId}
@@ -910,6 +1001,12 @@ export function App(): React.JSX.Element {
         offer={acpUpdateOffer}
         onAnswer={(update) => void answerAcpUpdate(update)}
         onDismiss={() => void answerAcpUpdate(null)}
+      />
+      <BookmarkDialog
+        initial={bookmarkDraft}
+        editing={bookmarkDraft?.id !== undefined}
+        onSave={commitBookmark}
+        onCancel={() => setBookmarkDraft(null)}
       />
       <AuthDialog
         open={authOpen}

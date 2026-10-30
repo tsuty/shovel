@@ -4,6 +4,7 @@ import type { AppSettings } from '@shared/types/settings'
 import type { AcpRegistryEntry } from '@shared/acpVersion'
 import type { CommandHistory } from '@shared/types/command'
 import type { SavedTab } from '@shared/types/session'
+import type { Bookmark } from '@shared/types/browser'
 
 /** `electron-store`（JSON）に保存する設定・プロジェクト・履歴。 */
 export type { AppSettings }
@@ -21,6 +22,8 @@ interface StoreSchema {
   acpRegistryEntries: Record<string, AcpRegistryEntry>
   /** プロジェクトごとの、開いていたタブ（表示順）。 */
   openTabs: Record<string, SavedTab[]>
+  /** プロジェクトごとの、ブラウザのブックマーク。 */
+  bookmarks: Record<string, Bookmark[]>
 }
 
 const defaults: StoreSchema = {
@@ -40,7 +43,8 @@ const defaults: StoreSchema = {
   sidebar: { widths: {} },
   lastPickedDirectory: null,
   acpRegistryEntries: {},
-  openTabs: {}
+  openTabs: {},
+  bookmarks: {}
 }
 
 const store = new Store<StoreSchema>({ defaults })
@@ -194,6 +198,21 @@ export const openTabsStore = {
     if (tabs.length > 0) map[projectId] = tabs
     else delete map[projectId]
     store.set('openTabs', map)
+  },
+  remove(projectId: string): void {
+    this.set(projectId, [])
+  }
+}
+
+export const bookmarksStore = {
+  get(projectId: string): Bookmark[] {
+    return store.get('bookmarks')[projectId] ?? []
+  },
+  set(projectId: string, bookmarks: Bookmark[]): void {
+    const map = store.get('bookmarks')
+    if (bookmarks.length > 0) map[projectId] = bookmarks
+    else delete map[projectId]
+    store.set('bookmarks', map)
   },
   remove(projectId: string): void {
     this.set(projectId, [])

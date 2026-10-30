@@ -156,6 +156,28 @@ const api: RendererApi = {
     openPreview: (projectId, relPath) => ipcRenderer.invoke(IpcChannel.PrintOpenPreview, projectId, relPath),
     run: () => ipcRenderer.invoke(IpcChannel.PrintRun),
     runHtml: (html) => ipcRenderer.invoke(IpcChannel.PrintRunHtml, html)
+  },
+  browser: {
+    openExternal: (url) => ipcRenderer.invoke(IpcChannel.BrowserOpenExternal, url),
+    onOpenUrl: (cb) => {
+      const listener = (_event: unknown, url: string): void => cb(url)
+      ipcRenderer.on(IpcChannel.BrowserOpenUrl, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserOpenUrl, listener)
+    },
+    onFindRequested: (cb) => {
+      const listener = (_event: unknown, webContentsId: number): void => cb(webContentsId)
+      ipcRenderer.on(IpcChannel.BrowserFindRequested, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserFindRequested, listener)
+    },
+    onFocused: (cb) => {
+      const listener = (_event: unknown, webContentsId: number): void => cb(webContentsId)
+      ipcRenderer.on(IpcChannel.BrowserFocused, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserFocused, listener)
+    }
+  },
+  bookmarks: {
+    list: (projectId) => ipcRenderer.invoke(IpcChannel.BookmarksList, projectId),
+    save: (projectId, bookmarks) => ipcRenderer.invoke(IpcChannel.BookmarksSave, projectId, bookmarks)
   }
 }
 

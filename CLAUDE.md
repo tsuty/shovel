@@ -93,7 +93,18 @@ created via tab right-click "split to the right" / Filer "open split to the righ
 dragging the tab out of the group; pane dividers are draggable (min 240px, chats 320px) and the ratios are saved per tab
 (`SavedTab.split`) with the open tabs. Pure group logic lives in `src/renderer/main-window/splitGroups.ts` (unit-tested);
 panes are positioned with flex `order` over the mount-order DOM so iframes never reload; Cmd/Ctrl+F and "add to context"
-target the focused pane; the editor toolbar collapses to icons below 640px. A command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete, and a
+target the focused pane; the editor toolbar collapses to icons below 640px. **Browser tabs** (decisions.md G-1-20,
+`BrowserView.tsx`): an Electron `<webview>` created imperatively (not by React) with back/forward/reload, an address bar
+(`addressToUrl` in `src/shared/browserUrl.ts`: scheme added for domain-like input, else Google search), ☆ bookmark toggle,
+open-externally and an in-tab find bar (`findInPage`); not counted toward the tab limit, restored by URL. Main
+(`src/main/windows/browserGuest.ts`) forces every guest to no preload / no Node / sandbox / the app-wide
+`persist:shovel-browser` partition (cookies shared by all projects, kept across restarts), allows only http(s), denies all
+permission requests, turns popups into new browser tabs, and forwards the guest's Cmd/Ctrl+F, focus and mouse-down to the
+host (`browser:findRequested` / `browser:focused`) since guest input never reaches the host window. Bookmarks are
+per project (`electron-store` `bookmarks`, `bookmarkService.ts`), managed from a "browser" sidebar panel
+(`BrowserPanel.tsx`/`BookmarkDialog.tsx`). The browser runs on the host, outside the sandbox, and the agent can't drive
+it. Playwright's synthetic mouse/keys don't reach a `<webview>` guest — use real X input (`xdotool` + a window manager
+such as openbox under Xvfb) when testing it. A command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete, and a
 per-run "TTY" toggle that swaps the output for an `@xterm/xterm` terminal backed by a PTY created inside the sandbox by
 `src/main/sbx/ptyWrapper.ts` — needs `python3` there, decisions.md N-4「TTY モード」), a
 session-history panel backed by local snapshots with rename/delete, a per-tab refresh action

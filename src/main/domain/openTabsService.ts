@@ -1,12 +1,13 @@
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { RestoredTab, SavedSplit, SavedTab } from '@shared/types/session'
+import { isWebUrl } from '@shared/browserUrl'
 import { openTabsStore, projectsStore } from '../persistence/store'
 import { parseRecordName, readLocalRecord } from '../persistence/snapshot'
 
 /**
  * プロジェクトのウィンドウで開いていたタブの保存と復元。
- * 復元では、消えたファイル・記録のタブを何も言わずに外す。
+ * 復元では、消えたファイル・記録のタブと、開けない URL のブラウザのタブを何も言わずに外す。
  */
 
 export function saveOpenTabs(projectId: string, tabs: SavedTab[]): void {
@@ -35,6 +36,8 @@ export async function restoreOpenTabs(projectId: string): Promise<RestoredTab[]>
     switch (saved.kind) {
       case 'file':
         return (await isExistingFile(saved.relPath)) ? { kind: 'file', relPath: saved.relPath, split } : null
+      case 'browser':
+        return isWebUrl(saved.url) ? { kind: 'browser', url: saved.url, title: String(saved.title), split } : null
       case 'record': {
         const parsed = parseRecordName(saved.fileName)
         if (!parsed) return null

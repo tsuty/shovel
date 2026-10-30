@@ -21,6 +21,7 @@ import type { AppSettings } from './types/settings'
 import type { SbxLsEntry } from './types/sbx'
 import type { NetworkBlocks } from './types/network'
 import type { NewFileKind } from './fileKinds'
+import type { Bookmark } from './types/browser'
 
 export const IpcChannel = {
   // renderer -> main (invoke/handle)
@@ -104,6 +105,10 @@ export const IpcChannel = {
   PrintRun: 'print:run',
   PrintRunHtml: 'print:runHtml',
 
+  BrowserOpenExternal: 'browser:openExternal',
+  BookmarksList: 'bookmarks:list',
+  BookmarksSave: 'bookmarks:save',
+
   // main -> renderer (send)
   TranscriptEvent: 'transcript:event',
   ProjectsProgress: 'projects:progress',
@@ -112,7 +117,10 @@ export const IpcChannel = {
   CommandTtyOutput: 'command:ttyOutput',
   CommandExit: 'command:exit',
   SessionLocalRecordsChanged: 'session:localRecordsChanged',
-  SessionOpenProgress: 'session:openProgress'
+  SessionOpenProgress: 'session:openProgress',
+  BrowserOpenUrl: 'browser:openUrl',
+  BrowserFindRequested: 'browser:findRequested',
+  BrowserFocused: 'browser:focused'
 } as const
 
 export interface CreateNewDirRequest {
@@ -349,5 +357,20 @@ export interface RendererApi {
     run(): Promise<void>
     /** HTML をそのページだけで（JavaScript を無効にして）OS の印刷ダイアログで印刷する。キャンセルされても resolve する。 */
     runHtml(html: string): Promise<void>
+  }
+  browser: {
+    /** `http:` / `https:` の URL を外部のブラウザで開く。それ以外は何もしない。 */
+    openExternal(url: string): Promise<void>
+    /** ブラウザのタブのページが新しいウィンドウを開こうとした（`target="_blank"`・`window.open`・右クリック）。 */
+    onOpenUrl(cb: (url: string) => void): () => void
+    /** ページにフォーカスがあるときに Cmd/Ctrl+F が押された。`webContentsId` はそのページ。 */
+    onFindRequested(cb: (webContentsId: number) => void): () => void
+    /** ブラウザのタブのページにフォーカスが移った。ページを押してもホストのウィンドウにはイベントが来ないため。 */
+    onFocused(cb: (webContentsId: number) => void): () => void
+  }
+  bookmarks: {
+    list(projectId: string): Promise<Bookmark[]>
+    /** 一覧をまるごと置き換え、保存した一覧を返す。 */
+    save(projectId: string, bookmarks: Bookmark[]): Promise<Bookmark[]>
   }
 }
