@@ -7,6 +7,9 @@ import { cn } from '../../shared/lib/utils'
 /** 表示する段階の順番。 */
 export const SESSION_OPEN_STEPS: readonly SessionOpenStep[] = ['docker', 'auth', 'sandbox', 'adapter', 'session']
 
+/** 実行されたときだけ表示する段階。 */
+const ON_DEMAND_STEPS: readonly SessionOpenStep[] = ['sandbox']
+
 /** 始まった段階1つ分。終わった時刻は次の段階が始まった時刻（または接続の完了）。 */
 export interface ConnectingStepRecord {
   step: SessionOpenStep
@@ -38,6 +41,9 @@ export function ConnectingView({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [now, setNow] = useState(() => Date.now())
+  const visibleSteps = SESSION_OPEN_STEPS.filter(
+    (step) => !ON_DEMAND_STEPS.includes(step) || steps.some((record) => record.step === step)
+  )
 
   // 実行中の段階の経過時間を進める。
   useEffect(() => {
@@ -53,7 +59,7 @@ export function ConnectingView({
           {error ? t('connecting.failedTitle') : t('connecting.title')}
         </div>
         <ol className="flex flex-col gap-2">
-          {SESSION_OPEN_STEPS.map((step) => {
+          {visibleSteps.map((step) => {
             const index = steps.findIndex((record) => record.step === step)
             const record = steps[index]
             const next = steps[index + 1]

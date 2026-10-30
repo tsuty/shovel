@@ -16,7 +16,8 @@ import { checkAgentAuthStatus } from './authService'
  * ACP アダプタを起動する前の確認。新しいチャットでも履歴の再開でも同じ順に行う。
  *   1. Docker へのサインインとサンドボックスの有無（`sbx ls --json`。失敗したら `sbx diagnose` で原因を調べる）
  *   2. エージェントのログイン状態（未ログインなら `AUTH_REQUIRED`。確認自体の失敗は止めない）
- *   3. サンドボックスへの到達（`sbx exec <name> echo`）
+ *   3. 2 のコマンドが非0で終わったときだけ、サンドボックスへの到達（`sbx exec <name> echo`）。
+ *      非0の原因が `sbx exec` 自体か statusCommand かを見分ける
  */
 export async function runConnectPreflight(
   project: Project,
@@ -29,6 +30,7 @@ export async function runConnectPreflight(
   onProgress?.('auth', `sbx exec ${project.sandboxName} ${agent.auth.statusCommand.join(' ')}`)
   const status = await checkAgentAuthStatus(project, agent)
   if (!status.checkFailed && !status.loggedIn) throw new Error(AUTH_REQUIRED_MARKER)
+  if (status.exitedZero) return
 
   onProgress?.('sandbox', `sbx exec ${project.sandboxName} echo`)
   if (await sbxLivenessCheck(project.sandboxName)) return

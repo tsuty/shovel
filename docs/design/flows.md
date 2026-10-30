@@ -158,8 +158,10 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
        │
        ├─ 0b. 認証状態の確認 sbx exec <name> claude auth status --json（1-2 節）
        │                   未ログイン → 認証画面。確認自体の失敗（非0終了・壊れた JSON）は止めない
+       │                   終了コード 0 なら sandbox には届いているので 1 を飛ばす
        │
-       ├─ 1. 生存確認     sbx exec <name> echo           終了コードのみで判定
+       ├─ 1. 生存確認     sbx exec <name> echo           0b が非0で終わったときだけ。終了コードのみで判定
+       │                   （非0の原因が sbx exec 自体か、エージェントのコマンドかを見分ける）
        │                   失敗 → 原因と次の行動を出す。接続を試みない
        │
        ├─ 2. プロセス起動  sbx exec -i <name> npx -y <acpPackage>@<version>
@@ -179,12 +181,12 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
 
 ### 接続中タブ
 
-「+」を押してから接続が終わるまでには、`sbx ls` 1回と `sbx exec` 2回（認証確認・生存確認）と
+「+」を押してから接続が終わるまでには、`sbx ls` 1回と `sbx exec` 1回（認証確認。非0で終わったときは生存確認でもう1回）と
 `npx` によるアダプタの起動を直列に待つため、数秒〜数十秒かかる。接続を待ってからタブを出すと
 押しても何も起きないように見えるので、**タブは押した直後に出し、いま何を実行しているかを正直に見せる**。
 
 - 段階は「Docker へのサインインとサンドボックスの確認 → ログイン状態の確認 → サンドボックスへの到達確認 →
-  エージェント（ACP アダプタ）の起動 → セッションの開始」の5つ（`SessionOpenStep`）。各段階で実行しているコマンド／メソッド
+  エージェント（ACP アダプタ）の起動 → セッションの開始」の5つ（`SessionOpenStep`）。到達確認は実行したときだけ並べる。各段階で実行しているコマンド／メソッド
   （`sbx ls --json`、`sbx exec <name> claude auth status --json`、`sbx exec <name> echo`、`npx -y <package>@<version>`、
   `session/new` など）と経過秒数を出す。認証確認もサンドボックス内で実行していると分かるよう `sbx exec` から見せる
 - どの段階も main が `session:openProgress` で知らせる（`openTab` に渡した `requestId` で接続中タブと対応づける）
@@ -202,7 +204,7 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
 
 ### 接続前の確認はすべての接続で同じ
 
-Docker の確認・認証状態の確認・生存確認は、新しいチャット（「+」・ウィンドウを開いたとき）でも
+Docker の確認・認証状態の確認（・必要なら生存確認）は、新しいチャット（「+」・ウィンドウを開いたとき）でも
 履歴の再開（§6、`session/load` / `session/resume`）でも、**ACP アダプタを起動する接続では必ず同じ順に行う**
 （main の `runConnectPreflight`）。すでに別のタブが接続していても省かない——トークンの期限切れなどで、
 前に確かめた状態は嘘になりうる。
@@ -343,7 +345,7 @@ Stop ボタンで `session/cancel`（通知）を送る。`session/prompt` は
        └─ 無し/空       × 非対応        → 選択を拒否し、現在のセッションを維持
 ```
 
-再開で新しい接続を張るときも、§3 と同じく認証状態の確認 → 生存確認から行う
+再開で新しい接続を張るときも、§3 と同じく Docker の確認 → 認証状態の確認から行う
 （§3「接続前の確認はすべての接続で同じ」）。
 
 ローカルスナップショットが1件でもあれば、それを `session/load` の replay で

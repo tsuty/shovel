@@ -14,6 +14,11 @@ export interface AuthStatus {
   checkFailed: boolean
 }
 
+/** `AuthStatus` に、statusCommand が終了コード 0 で終わったか（= `sbx exec` がサンドボックスに届いたか）を添えたもの。 */
+export interface AgentAuthCheck extends AuthStatus {
+  exitedZero: boolean
+}
+
 function requireProjectAndAgent(projectId: string): { project: Project; agent: AgentEntry } {
   const project = projectsStore.list().find((p) => p.id === projectId)
   if (!project) throw new Error(`project not found: ${projectId}`)
@@ -31,20 +36,21 @@ function readPath(value: unknown, dotPath: string): unknown {
 
 export async function checkAuthStatus(projectId: string): Promise<AuthStatus> {
   const { project, agent } = requireProjectAndAgent(projectId)
-  return checkAgentAuthStatus(project, agent)
+  const { loggedIn, checkFailed } = await checkAgentAuthStatus(project, agent)
+  return { loggedIn, checkFailed }
 }
 
-export async function checkAgentAuthStatus(project: Project, agent: AgentEntry): Promise<AuthStatus> {
+export async function checkAgentAuthStatus(project: Project, agent: AgentEntry): Promise<AgentAuthCheck> {
   const result = await sbxExecCapture(project.sandboxName, agent.auth.statusCommand, {
     cwd: project.sandboxPath
   })
-  if (result.code !== 0) return { loggedIn: false, checkFailed: true }
+  if (result.code !== 0) return { loggedIn: false, checkFailed: true, exitedZero: false }
   try {
     const parsed: unknown = JSON.parse(result.stdout)
     const loggedIn = readPath(parsed, agent.auth.loggedInPath)
-    return { loggedIn: loggedIn === true, checkFailed: false }
+    return { loggedIn: loggedIn === true, checkFailed: false, exitedZero: true }
   } catch {
-    return { loggedIn: false, checkFailed: true }
+    return { loggedIn: false, checkFailed: true, exitedZero: true }
   }
 }
 

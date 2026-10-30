@@ -152,7 +152,7 @@ export interface ProjectProgress {
  * 新しいタブを開くまでの段階。
  *   - docker: Docker へのサインインとサンドボックスの有無の確認（`sbx ls --json`）
  *   - auth: エージェントの認証状態の確認（`sbx exec <name> <statusCommand>`）
- *   - sandbox: サンドボックスの生存確認（`sbx exec <name> echo`。失敗したら原因を調べる）
+ *   - sandbox: サンドボックスの生存確認（`sbx exec <name> echo`。auth のコマンドが非0で終わったときだけ）
  *   - adapter: ACP アダプタの起動と `initialize`（`npx` によるパッケージ取得を含む）
  *   - session: `session/new`（復元時は `session/load` / `session/resume`）
  */
