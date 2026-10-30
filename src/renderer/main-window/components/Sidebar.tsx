@@ -34,8 +34,8 @@ export function Sidebar({
   onCloseTab,
   onRecordsDeleted,
   onAddToContext,
-  onAttachFile,
-  canAttachFile
+  onOpenSplitRight,
+  canOpenSplitRight
 }: {
   projectId: string
   openPanels: Set<SidebarPanel>
@@ -52,8 +52,8 @@ export function Sidebar({
   onCloseTab: (sessionId: string) => void
   onRecordsDeleted: (fileNames: string[]) => void
   onAddToContext: (relPath: string) => void
-  onAttachFile: (relPath: string) => void
-  canAttachFile: boolean
+  onOpenSplitRight: (relPath: string) => void
+  canOpenSplitRight: (relPath: string) => boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [widths, setWidths] = useState<Record<string, number>>({})
@@ -113,8 +113,8 @@ export function Sidebar({
               projectId={projectId}
               onOpenFile={onOpenFile}
               onAddToContext={onAddToContext}
-              onAttachFile={onAttachFile}
-              canAttachFile={canAttachFile}
+              onOpenSplitRight={onOpenSplitRight}
+              canOpenSplitRight={canOpenSplitRight}
             />
           )}
         </ResizablePanel>

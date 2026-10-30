@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardCopy,
   ClipboardPaste,
+  Columns2,
   File,
   FileBraces,
   FileCode,
@@ -18,7 +19,6 @@ import {
   FolderPlus,
   FolderSearch,
   Link,
-  PanelRight,
   RefreshCw,
   Search,
   SquarePen,
@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FsEntry } from '@shared/types/filer'
-import { editorLanguageFor, type NewFileKind } from '@shared/fileKinds'
+import type { NewFileKind } from '@shared/fileKinds'
 import { cn } from '../../shared/lib/utils'
 import { MERMAID_BRAND_COLOR, MermaidIcon } from '../../shared/components/icons/MermaidIcon'
 import { MenuItem, SubMenu } from './MenuItem'
@@ -112,16 +112,16 @@ export function Filer({
   projectId,
   onOpenFile,
   onAddToContext,
-  onAttachFile,
-  canAttachFile
+  onOpenSplitRight,
+  canOpenSplitRight
 }: {
   projectId: string
   /** `at` があれば、開いた後にその位置（コンテンツ検索の一致箇所）へ移る。 */
   onOpenFile: (relPath: string, at?: Omit<FileReveal, 'nonce'>) => void
   onAddToContext: (relPath: string) => void
-  /** 編集できるファイルを今のチャットタブの右に添える。 */
-  onAttachFile: (relPath: string) => void
-  canAttachFile: boolean
+  /** ファイルを開き、いま表示しているタブの右に分割して並べる。 */
+  onOpenSplitRight: (relPath: string) => void
+  canOpenSplitRight: (relPath: string) => boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [data, setDataState] = useState<FsNode[]>([])
@@ -473,16 +473,16 @@ export function Filer({
               {t('filer.addToContext')}
             </MenuItem>
           )}
-          {menu.node && !menu.node.isDir && editorLanguageFor(menu.node.name) !== null && (
+          {menu.node && !menu.node.isDir && (
             <MenuItem
-              icon={<PanelRight size={14} />}
-              disabled={!canAttachFile}
+              icon={<Columns2 size={14} />}
+              disabled={!canOpenSplitRight(menu.node.relPath)}
               onClick={() => {
-                onAttachFile(menu.node!.relPath)
+                onOpenSplitRight(menu.node!.relPath)
                 setMenu(null)
               }}
             >
-              {t('filer.attachToChat')}
+              {t('filer.openSplitRight')}
             </MenuItem>
           )}
           {(!menu.node || menu.node.isDir) && (

@@ -112,11 +112,12 @@ export type ReadOnlyRecordKind = Exclude<LocalRecordKind, 'current'>
  *   - `file`: ファイルのタブ
  *   - `record`: セッション・履歴・Read Only のタブ。`fileName` はローカル記録のファイル名
  *   - `agentOnly`: `session/list` にだけあった（ローカル記録の無い）履歴のタブ
- * `attachedFile` はチャットの右に添えていたファイル。
+ * `split` は分割ビューのグループ（同じ `group` 番号のタブが1つのグループ）と、そのペインの幅の比率。
+ * `attachedFile` はチャットの右に添えていたファイル（以前の形式。読み込むだけで、もう書き込まない）。
  */
 export type SavedTab =
-  | { kind: 'file'; relPath: string }
-  | { kind: 'record'; fileName: string; attachedFile?: string }
+  | { kind: 'file'; relPath: string; split?: SavedSplit }
+  | { kind: 'record'; fileName: string; attachedFile?: string; split?: SavedSplit }
   | {
       kind: 'agentOnly'
       key: string
@@ -124,21 +125,29 @@ export type SavedTab =
       title: string
       savedAt: number
       attachedFile?: string
+      split?: SavedSplit
     }
+
+export interface SavedSplit {
+  group: number
+  weight: number
+}
 
 /**
  * 保存しておいたタブを開き直すための中身。消えたファイル・記録はここに含めない。
  * セッションのタブも接続はせず、履歴のタブとして開き直す。
  */
 export type RestoredTab =
-  | { kind: 'file'; relPath: string }
+  | { kind: 'file'; relPath: string; split?: SavedSplit }
   | {
       kind: 'history'
       snapshot: SessionSnapshot
       /** バックアップ／削除済み／削除したバックアップの記録。 */
       readOnly?: { kind: ReadOnlyRecordKind; timestamp: number; fileName: string }
       agentOnly?: boolean
+      /** 以前の形式で、チャットの右に添えていたファイル。 */
       attachedFile?: string
+      split?: SavedSplit
     }
 
 /**

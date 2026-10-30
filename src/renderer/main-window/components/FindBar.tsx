@@ -10,12 +10,12 @@ const HIGHLIGHT_ACTIVE = 'shovel-find-active'
 const RESCAN_DEBOUNCE_MS = 150
 
 /**
- * ページ内検索バー（Cmd/Ctrl+F）。`root` の中の、いま見えているテキスト（textarea / input・エディタの中身は除く）を探す。
+ * ページ内検索バー（Cmd/Ctrl+F）。`root`（分割ビューでは前面のペイン）の中の、いま見えているテキスト（textarea / input・エディタの中身は除く）を探す。
  * ヒット箇所は CSS Custom Highlight API で塗る（DOM を書き換えないので React の描画と衝突しない）。
  * フォーカスがエディタにあるときはエディタが自分で検索パネルを開き、ソースが見えているエディタが
  * 検索を登録していればそちらへ渡す（`editorSearch.ts`）。
  */
-export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> }): React.JSX.Element | null {
+export function FindBar({ root }: { root: HTMLElement | null }): React.JSX.Element | null {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -31,7 +31,7 @@ export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> })
       if (!modifierPressed || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'f') return
       if (event.defaultPrevented || (event.target instanceof Element && event.target.closest('.cm-editor'))) return
       event.preventDefault()
-      if (root.current && openEditorSearchIn(root.current)) {
+      if (root && openEditorSearchIn(root)) {
         setOpen(false)
         return
       }
@@ -49,7 +49,7 @@ export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> })
   useEffect(() => onCloseFindBar(() => setOpen(false)), [])
 
   const scan = useCallback((): Range[] => {
-    const container = root.current
+    const container = root
     if (!container || !query) return []
     const nodes = collectVisibleTextNodes(container, barRef.current)
     return findTextMatches(
@@ -77,7 +77,7 @@ export function FindBar({ root }: { root: React.RefObject<HTMLElement | null> })
 
   // 開いている間は、本文の変化（ストリーミング・タブ切り替え・折り畳み）に合わせて照合し直す。
   useEffect(() => {
-    const container = root.current
+    const container = root
     if (!open || !query || !container) return
     let timer: ReturnType<typeof setTimeout> | undefined
     const observer = new MutationObserver((records) => {

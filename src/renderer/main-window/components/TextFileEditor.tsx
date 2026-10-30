@@ -6,13 +6,11 @@ import {
   Columns2,
   ExternalLink,
   Eye,
-  PanelRight,
   Printer,
   SquareCode,
   SquarePen,
   Table,
-  TableOfContents,
-  X
+  TableOfContents
 } from 'lucide-react'
 import { InfoTip } from '../../shared/components/InfoTip'
 import { Markdown } from '../../shared/components/Markdown'
@@ -49,9 +47,8 @@ type ViewMode = 'split' | 'source' | 'preview' | 'view' | 'edit'
 const MODE_ICONS = { split: Columns2, source: SquareCode, preview: Eye, view: Eye, edit: SquarePen } as const
 
 /** 種類と表示場所ごとに選べるモード。先頭が既定。 */
-function modesFor(language: EditorLanguage, variant: 'tab' | 'attached'): [ViewMode, ...ViewMode[]] {
-  if (usesViewEditModes(language)) return ['view', 'edit']
-  return variant === 'attached' ? ['source', 'preview'] : ['split', 'source', 'preview']
+function modesFor(language: EditorLanguage): [ViewMode, ...ViewMode[]] {
+  return usesViewEditModes(language) ? ['view', 'edit'] : ['split', 'source', 'preview']
 }
 
 /**
@@ -99,6 +96,8 @@ const MAX_TABLE_FILE_BYTES = 10 * 1024 * 1024
 
 /** 本文の幅がこれ以上なら、アウトラインを左に並べて置ける。狭ければボタンから開く一覧にする。 */
 const OUTLINE_PANE_MIN_WIDTH = 600
+/** 本文の幅がこれより狭ければ、ツールバーのボタンをアイコンだけにする。 */
+const TOOLBAR_COMPACT_WIDTH = 640
 /** アウトラインの一覧の幅（px）。 */
 const OUTLINE_DEFAULT_WIDTH = 224
 const OUTLINE_MIN_WIDTH = 140
@@ -136,7 +135,7 @@ const EDITOR_PHRASE_KEYS: Record<string, string> = {
 }
 
 /**
- * アプリ内で編集できるテキストファイルのエディタ。`variant: 'attached'` はチャットタブの右に添えたとき。
+ * アプリ内で編集できるテキストファイルのエディタ。
  *
  * `reveal`（中身検索の一致箇所）が来たら、ソースが見えていればそこを選択し、「表示」ならその行へ移って
  * 塗る。Markdown / Mermaid / HTML のプレビューだけのときは、ソースが見えるモードへ切り替えてから選択する。
@@ -168,25 +167,15 @@ export function TextFileEditor({
   projectId,
   relPath,
   language = 'markdown',
-  variant = 'tab',
-  onAttachToChat,
-  canAttachToChat = false,
-  onClose,
   reveal
 }: {
   projectId: string
   relPath: string
   language?: EditorLanguage
-  variant?: 'tab' | 'attached'
-  /** タブとして開いているとき: チャットの右に添える。 */
-  onAttachToChat?: () => void
-  canAttachToChat?: boolean
-  /** チャットに添えているとき: 右ペインを閉じる。 */
-  onClose?: () => void
   reveal?: FileReveal
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const modes = modesFor(language, variant)
+  const modes = modesFor(language)
   const [mode, setMode] = useState<ViewMode>(modes[0])
   const showSource = mode === 'split' || mode === 'source' || mode === 'edit'
   const showPreview = mode === 'split' || mode === 'preview' || mode === 'view'
@@ -374,20 +363,20 @@ export function TextFileEditor({
     )
   }, [t, loaded, deleted])
 
-  // タブで開いていてソースが見えている間は、Cmd/Ctrl+F をこのエディタの検索パネルで受ける。
+  // ソースが見えている間は、Cmd/Ctrl+F をこのエディタの検索パネルで受ける。
   useEffect(() => {
     const editor = editorRef.current
-    if (variant !== 'tab' || !showSource || !editor) return
+    if (!showSource || !editor) return
     return registerEditorSearch({ element: editor.view.dom, open: () => openSearchPanel(editor.view) })
-  }, [variant, showSource, loaded, deleted, language])
+  }, [showSource, loaded, deleted, language])
 
-  // タブで開いているときは、表示を切り替えたらページ内検索を閉じる。
+  // 表示を切り替えたらページ内検索を閉じる。
   const previousModeRef = useRef(mode)
   useEffect(() => {
     if (previousModeRef.current === mode) return
     previousModeRef.current = mode
-    if (variant === 'tab') closeFindBar()
-  }, [mode, variant])
+    closeFindBar()
+  }, [mode])
 
   // JSON は書式の誤りをステータスバーに出し、押すとその位置を編集できるようにする。
   const jsonProblem = useMemo(() => (language === 'json' ? findJsonProblem(text) : null), [language, text])
@@ -493,6 +482,7 @@ export function TextFileEditor({
     return () => observer.disconnect()
   }, [loaded, deleted, tooLarge])
   const outlineAsPane = bodyWidth >= OUTLINE_PANE_MIN_WIDTH
+  const compactToolbar = bodyWidth > 0 && bodyWidth < TOOLBAR_COMPACT_WIDTH
   const previewRef = useRef<HTMLDivElement>(null)
   /** ソースが隠れている間に見出しへ移ったとき、見えるようになってからカーソルの行を上端へ寄せる。 */
   const revealCaretOnShowRef = useRef(false)
@@ -611,17 +601,18 @@ export function TextFileEditor({
               size="sm"
               variant={mode === m ? 'secondary' : 'ghost'}
               className="gap-1.5"
+              title={compactToolbar ? t(`editor.mode.${m}`) : undefined}
               onClick={() => setMode(m)}
             >
               <Icon size={14} />
-              {t(`editor.mode.${m}`)}
+              {!compactToolbar && t(`editor.mode.${m}`)}
             </Button>
           )
         })}
         {language === 'markdown' &&
           (!outlineAsPane ? (
             <OutlineMenu items={outline} onSelect={jumpToHeading} />
-          ) : variant === 'attached' ? (
+          ) : compactToolbar ? (
             <button
               className={cn(
                 'flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -652,8 +643,7 @@ export function TextFileEditor({
         )}
         <div className="flex-1" />
         {(language === 'markdown' || language === 'html') &&
-          (variant === 'attached' ? (
-            // チャットの横では幅が狭いので、アイコンだけにする。
+          (compactToolbar ? (
             <button
               className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
               title={t('editor.printPreview')}
@@ -667,33 +657,10 @@ export function TextFileEditor({
               {t('editor.printPreview')}
             </Button>
           ))}
-        {variant === 'attached' ? (
-          <>
-            <span className="truncate text-xs text-muted-foreground" title={relPath}>
-              {relPath.split('/').pop()}
-            </span>
-            <button
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-              title={t('common.close')}
-              onClick={onClose}
-            >
-              <X size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            {onAttachToChat && (
-              <Button size="sm" variant="ghost" className="gap-1.5" disabled={!canAttachToChat} onClick={onAttachToChat}>
-                <PanelRight size={14} />
-                {t('editor.attachToChat')}
-              </Button>
-            )}
-            {!readOnly && (
-              <span className="ml-1 flex">
-                <InfoTip icon={CircleHelp} size={14} text={shortcutsHelpText(t, language)} />
-              </span>
-            )}
-          </>
+        {!readOnly && (
+          <span className="ml-1 flex">
+            <InfoTip icon={CircleHelp} size={14} text={shortcutsHelpText(t, language)} />
+          </span>
         )}
       </div>
       <div ref={bodyRef} className="flex flex-1 overflow-hidden">

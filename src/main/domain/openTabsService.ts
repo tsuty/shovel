@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
-import type { RestoredTab, SavedTab } from '@shared/types/session'
+import type { RestoredTab, SavedSplit, SavedTab } from '@shared/types/session'
 import { openTabsStore, projectsStore } from '../persistence/store'
 import { parseRecordName, readLocalRecord } from '../persistence/snapshot'
 
@@ -31,9 +31,10 @@ export async function restoreOpenTabs(projectId: string): Promise<RestoredTab[]>
   }
 
   async function restoreOne(saved: SavedTab): Promise<RestoredTab | null> {
+    const split = splitOf(saved)
     switch (saved.kind) {
       case 'file':
-        return (await isExistingFile(saved.relPath)) ? { kind: 'file', relPath: saved.relPath } : null
+        return (await isExistingFile(saved.relPath)) ? { kind: 'file', relPath: saved.relPath, split } : null
       case 'record': {
         const parsed = parseRecordName(saved.fileName)
         if (!parsed) return null
@@ -43,13 +44,14 @@ export async function restoreOpenTabs(projectId: string): Promise<RestoredTab[]>
         if (parsed.kind === 'current') {
           // 一度も送信していないセッションの記録は開き直さない。
           if (snapshot.entries.length === 0) return null
-          return { kind: 'history', snapshot, attachedFile }
+          return { kind: 'history', snapshot, attachedFile, split }
         }
         return {
           kind: 'history',
           snapshot,
           readOnly: { kind: parsed.kind, timestamp: parsed.epochMillis ?? 0, fileName: saved.fileName },
-          attachedFile
+          attachedFile,
+          split
         }
       }
       case 'agentOnly':
@@ -65,11 +67,19 @@ export async function restoreOpenTabs(projectId: string): Promise<RestoredTab[]>
             entries: []
           },
           agentOnly: true,
-          attachedFile: await attachedFileOf(saved)
+          attachedFile: await attachedFileOf(saved),
+          split
         }
       default:
         return null
     }
+  }
+
+  /** 分割の情報。形が崩れていれば捨てる。 */
+  function splitOf(saved: { split?: SavedSplit }): SavedSplit | undefined {
+    const { split } = saved
+    if (!split || !Number.isInteger(split.group) || !(typeof split.weight === 'number' && split.weight > 0)) return undefined
+    return { group: split.group, weight: split.weight }
   }
 
   const restored = await Promise.all(openTabsStore.get(projectId).map((saved) => restoreOne(saved).catch(() => null)))

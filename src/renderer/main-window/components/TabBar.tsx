@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Bot, Clock3, CopyX, File, FileX, Loader2, Plus, X } from 'lucide-react'
+import { AlertTriangle, Bot, Clock3, Columns2, CopyX, File, FileX, Loader2, Plus, SquareSplitHorizontal, X } from 'lucide-react'
 import { cn } from '../../shared/lib/utils'
 import { MenuItem } from './MenuItem'
 
@@ -19,6 +19,12 @@ export interface TabInfo {
   status?: { sending: boolean; hasPendingPermission: boolean }
   /** 接続中タブの接続が失敗した。 */
   failed?: boolean
+  /** 分割ビューのグループの id。グループに入っていなければ `undefined`。 */
+  splitGroupId?: string
+  /** 前面ではないが、前面のタブと同じグループとして表示されている。 */
+  shown?: boolean
+  /** 「右に分割して表示」を押せる。 */
+  canSplitRight?: boolean
 }
 
 /** 押したまま、この距離（px）を超えて動かしたらドラッグとみなす。 */
@@ -36,6 +42,8 @@ export function TabBar({
   onCloseFiles,
   onNew,
   onMove,
+  onSplitRight,
+  onUnsplit,
   canAddTab
 }: {
   tabs: TabInfo[]
@@ -47,6 +55,10 @@ export function TabBar({
   onNew: () => void
   /** タブ `id` を `beforeId` のタブの左（`null` なら一番右）へ動かす。 */
   onMove: (id: string, beforeId: string | null) => void
+  /** タブを、いま表示しているタブ（グループならその右端）の右に分割して並べる。 */
+  onSplitRight: (sessionId: string) => void
+  /** タブを分割ビューのグループから外す。 */
+  onUnsplit: (sessionId: string) => void
   canAddTab: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -165,6 +177,76 @@ export function TabBar({
     }
   }, [menu])
 
+  function renderTab(tab: TabInfo): React.JSX.Element {
+    const isActive = tab.sessionId === activeSessionId
+    // 通知は前面にないタブにだけ出す。
+    const showPendingBadge = !isActive && tab.status?.hasPendingPermission
+    const showPulse = !isActive && tab.status?.sending
+    return (
+      <div
+        key={tab.sessionId}
+        data-tab-id={tab.sessionId}
+        className={cn(
+          'relative flex h-7 max-w-40 shrink-0 items-center gap-1.5 rounded-t-md border border-transparent px-2 text-xs',
+          isActive
+            ? 'border-border border-b-background bg-background text-foreground'
+            : tab.shown
+              ? 'text-foreground hover:bg-accent'
+              : 'text-muted-foreground hover:bg-accent',
+          drag?.id === tab.sessionId && 'opacity-50'
+        )}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenu({ x: e.clientX, y: e.clientY, tab })
+        }}
+        onPointerDown={(e) => startDragWatch(e, tab.sessionId)}
+        onClickCapture={(e) => {
+          if (!suppressClickRef.current) return
+          e.preventDefault()
+          e.stopPropagation()
+        }}
+      >
+        {showPendingBadge && (
+          <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
+        )}
+        <button
+          className={cn('flex min-w-0 items-center gap-1.5 truncate', showPulse && 'animate-tab-pulse')}
+          onClick={() => onSelect(tab.sessionId)}
+        >
+          {tab.kind === 'file' && <File size={12} className="shrink-0" />}
+          {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
+          {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
+          {tab.kind === 'connecting' &&
+            (tab.failed ? (
+              <AlertTriangle size={12} className="shrink-0 text-destructive" />
+            ) : (
+              <Loader2 size={12} className="shrink-0 animate-spin" />
+            ))}
+          <span className="truncate" title={tab.tooltip ?? tab.title}>
+            {tab.title}
+          </span>
+        </button>
+        <button
+          className="opacity-60 hover:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation()
+            onClose(tab.sessionId)
+          }}
+        >
+          <X size={12} />
+        </button>
+      </div>
+    )
+  }
+
+  /** タブバーの並びを、分割ビューのグループごとのまとまりに分ける。 */
+  const runs: TabInfo[][] = []
+  for (const tab of tabs) {
+    const last = runs[runs.length - 1]
+    if (last && tab.splitGroupId !== undefined && last[0]!.splitGroupId === tab.splitGroupId) last.push(tab)
+    else runs.push([tab])
+  }
+
   return (
     <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border px-2">
       {/*
@@ -178,65 +260,19 @@ export function TabBar({
           if (e.deltaX === 0 && e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY
         }}
       >
-      {tabs.map((tab) => {
-        const isActive = tab.sessionId === activeSessionId
-        // 通知は前面にないタブにだけ出す。
-        const showPendingBadge = !isActive && tab.status?.hasPendingPermission
-        const showPulse = !isActive && tab.status?.sending
-        return (
+      {runs.map((run) =>
+        run[0]!.splitGroupId === undefined ? (
+          renderTab(run[0]!)
+        ) : (
+          // 分割ビューのグループのタブは、共通の枠で囲む。
           <div
-            key={tab.sessionId}
-            data-tab-id={tab.sessionId}
-            className={cn(
-              'relative flex h-7 max-w-40 shrink-0 items-center gap-1.5 rounded-t-md border border-transparent px-2 text-xs',
-              isActive
-                ? 'border-border border-b-background bg-background text-foreground'
-                : 'text-muted-foreground hover:bg-accent',
-              drag?.id === tab.sessionId && 'opacity-50'
-            )}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              setMenu({ x: e.clientX, y: e.clientY, tab })
-            }}
-            onPointerDown={(e) => startDragWatch(e, tab.sessionId)}
-            onClickCapture={(e) => {
-              if (!suppressClickRef.current) return
-              e.preventDefault()
-              e.stopPropagation()
-            }}
+            key={run[0]!.splitGroupId}
+            className="flex h-8 shrink-0 items-center gap-1 rounded-md bg-muted/60 px-0.5 ring-1 ring-inset ring-border/70"
           >
-            {showPendingBadge && (
-              <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
-            )}
-            <button
-              className={cn('flex min-w-0 items-center gap-1.5 truncate', showPulse && 'animate-tab-pulse')}
-              onClick={() => onSelect(tab.sessionId)}
-            >
-              {tab.kind === 'file' && <File size={12} className="shrink-0" />}
-              {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
-              {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
-              {tab.kind === 'connecting' &&
-                (tab.failed ? (
-                  <AlertTriangle size={12} className="shrink-0 text-destructive" />
-                ) : (
-                  <Loader2 size={12} className="shrink-0 animate-spin" />
-                ))}
-              <span className="truncate" title={tab.tooltip ?? tab.title}>
-                {tab.title}
-              </span>
-            </button>
-            <button
-              className="opacity-60 hover:opacity-100"
-              onClick={(e) => {
-                e.stopPropagation()
-                onClose(tab.sessionId)
-              }}
-            >
-              <X size={12} />
-            </button>
+            {run.map(renderTab)}
           </div>
         )
-      })}
+      )}
       {drag && (
         <div
           className="pointer-events-none absolute top-1 bottom-1 w-0.5 rounded-full bg-primary"
@@ -299,6 +335,28 @@ export function TabBar({
             >
               {t('tabBar.closeAllFiles')}
             </MenuItem>
+            <div className="-mx-1 my-1 h-px bg-border" />
+            <MenuItem
+              icon={<Columns2 size={14} />}
+              disabled={!menu.tab.canSplitRight}
+              onClick={() => {
+                onSplitRight(menu.tab.sessionId)
+                setMenu(null)
+              }}
+            >
+              {t('tabBar.splitRight')}
+            </MenuItem>
+            {menu.tab.splitGroupId !== undefined && (
+              <MenuItem
+                icon={<SquareSplitHorizontal size={14} />}
+                onClick={() => {
+                  onUnsplit(menu.tab.sessionId)
+                  setMenu(null)
+                }}
+              >
+                {t('tabBar.unsplit')}
+              </MenuItem>
+            )}
           </div>
         </>
       )}

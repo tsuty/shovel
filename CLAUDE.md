@@ -82,14 +82,18 @@ line ending, BOM and encoding — Shift_JIS is written back as CP932 via `iconv-
 autosave with a clickable status-bar entry (`WriteTextResult`) instead of being replaced; files that are neither UTF-8 nor
 Shift_JIS are view-only, see decisions.md N-3-2), a Markdown outline (headings from the same remark plugins as the
 preview via `markdownOutline.ts`; clicking one moves both the visible source and the preview — the preview's headings carry
-`data-source-line`; a left pane when the editor body is ≥600px wide, else a dropdown, also beside a chat; the pane's width and
+`data-source-line`; a left pane when the editor body is ≥600px wide, else a dropdown (same rule inside a split-view pane); the pane's width and
 the split view's source/preview divider are mouse-draggable, and neither they nor the pane's open state are persisted;
 decisions.md N-3-14)
-and a split-view Markdown
-editor (any editable file type, not just Markdown) that can also be attached to the right of a chat tab or an un-resumed history tab
-(decisions.md G-1-9: bound to that tab, not in the tab bar, closes with it, carried over on
-Resume, source/preview only; if the target isn't obvious — active tab isn't a chat and there are
-several chat/history tabs — a picker dialog asks which one), a command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete, and a
+and a **split view** that shows 2–4 tabs of any kind side by side (decisions.md G-1-19, replacing the old
+"attach an editor beside a chat" G-1-9 — `attachedFile`/`AttachTargetDialog`/`variant="attached"` are gone; saved
+`attachedFile` entries are migrated on restore into a [chat, file] group): a group is a run of adjacent tabs in the single
+tab bar, framed together; selecting any member shows the whole group with that member as the focused pane (top border);
+created via tab right-click "split to the right" / Filer "open split to the right", removed via "remove from split" or by
+dragging the tab out of the group; pane dividers are draggable (min 240px, chats 320px) and the ratios are saved per tab
+(`SavedTab.split`) with the open tabs. Pure group logic lives in `src/renderer/main-window/splitGroups.ts` (unit-tested);
+panes are positioned with flex `order` over the mount-order DOM so iframes never reload; Cmd/Ctrl+F and "add to context"
+target the focused pane; the editor toolbar collapses to icons below 640px. A command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete, and a
 per-run "TTY" toggle that swaps the output for an `@xterm/xterm` terminal backed by a PTY created inside the sandbox by
 `src/main/sbx/ptyWrapper.ts` — needs `python3` there, decisions.md N-4「TTY モード」), a
 session-history panel backed by local snapshots with rename/delete, a per-tab refresh action

@@ -103,7 +103,9 @@
   "tabBar": {
     "close": "閉じる",
     "closeOtherFiles": "他のファイルを閉じる",
-    "closeAllFiles": "すべてのファイルを閉じる"
+    "closeAllFiles": "すべてのファイルを閉じる",
+    "splitRight": "右に分割して表示",
+    "unsplit": "分割から外す"
   },
   "filer": {
     "copyPath": "パスをコピー",
@@ -127,7 +129,7 @@
     "openInFinder": "Finder で開く",
     "openInExplorer": "エクスプローラーで開く",
     "openInFileManager": "ファイルマネージャーで開く",
-    "attachToChat": "チャットの横で開く"
+    "openSplitRight": "右に分割して開く"
   },
   "fileStatus": {
     "copyPath": "押すとパスをコピー",
@@ -165,7 +167,6 @@
       "edit": "編集"
     },
     "conflict": "AI がこのファイルを変更したため、あなたの編集を {{path}} に保存しました。",
-    "attachToChat": "チャットの横に表示",
     "shortcutsHelp": "編集中のキー操作:\n・{{mod}}Z / {{redo}}: 元に戻す / やり直し\n・{{mod}}F: 検索・置換（{{mod}}G で次へ）\n・{{alt}}{{mod}}G: 指定した行へ移動\n・Tab / {{shift}}Tab: インデントを増やす / 減らす\n・{{alt}}↑ / {{alt}}↓: 行を上下に移動\n・{{shift}}{{alt}}↑ / {{shift}}{{alt}}↓: 行を上下に複製\n・{{shift}}{{mod}}K: 行を削除\n・{{mod}}D: 同じ文字列を次も選択\n・{{mod}}+クリック: カーソルを追加\n・{{alt}}+ドラッグ: 矩形選択\n・Esc のあと Tab: エディタの外へ移動{{foldHelp}}\n※ 入力中は {{mod}}← / {{mod}}→ でタブを切り替えません",
     "shortcutsHelpFold": "\n・行番号の右の ▾（行番号の列にマウスを乗せると出ます）/ ▸: 折りたたむ / 展開する\n・{{fold}} / {{unfold}}: カーソルの位置を折りたたむ / 展開する\n・{{foldAll}} / {{unfoldAll}}: すべて折りたたむ / 展開する",
     "jsonInvalid": "JSON の書式に誤りがあります",
@@ -175,10 +176,6 @@
     "firstRowIsHeader": "1行目を見出しにする",
     "tableSize": "{{rows}} 行 × {{columns}} 列",
     "tableTooLarge": "このファイルは大きすぎるため（{{size}}）、アプリ内では表示できません（上限 {{limit}}）。",
-    "attachTarget": {
-      "title": "どのチャットの横に表示しますか？",
-      "description": "{{path}} を横に表示するチャットを選んでください。"
-    },
     "printPreview": "印刷用表示",
     "outline": "アウトライン",
     "outlineEmpty": "見出しがありません",
