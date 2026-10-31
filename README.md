@@ -9,9 +9,19 @@ Docker Sandboxes の中で動く AI エージェントを、ACP（Agent Client P
 * プロジェクトに関係なく AI と壁打ちできる
 * コードの編集権限がない人でも、AI との対話でコードや仕様を理解できる
 
-主な機能は [docs/FEATURES.md](./docs/FEATURES.md) を参照。
-
 設計は [docs/design/](./docs/design/) を参照。
+
+## 主な機能
+
+* [プロジェクト一覧](./docs/FEATURES.md#プロジェクト一覧) — 1 プロジェクト = 1 サンドボックス。作成・状態の確認・診断
+* [チャット](./docs/FEATURES.md#チャット) — サンドボックス内のエージェントと ACP で対話。最大 10 タブ、履歴からの再開
+* [差分の表示](./docs/FEATURES.md#差分の表示) — エージェントが編集したファイルの変更を左右／1 列で確認
+* [ファイラーとエディタ](./docs/FEATURES.md#ファイラーとエディタ) — ファイルの操作・検索、Markdown・Mermaid などの編集とプレビュー
+* [分割ビュー](./docs/FEATURES.md#分割ビュー) — タブの領域を左右に最大 4 つのペインに分割
+* [ブラウザ](./docs/FEATURES.md#ブラウザ) — アプリ内のブラウザのタブ。ブックマークはプロジェクトごと
+* [権限の確認とテーマ](./docs/FEATURES.md#権限の確認とテーマ) — 操作ごとの許可カード、ライト／ダークテーマ
+
+詳しくはスクリーンショット付きの [docs/FEATURES.md](./docs/FEATURES.md) を参照。
 
 ## 採用技術
 
