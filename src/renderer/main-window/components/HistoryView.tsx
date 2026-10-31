@@ -9,6 +9,8 @@ import { isAuthRequiredMessage } from '@shared/authMarker'
 import { friendlyErrorMessage, needsSbxLogin } from '../../shared/friendlyError'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
 import { Transcript } from './Transcript'
+import { TAB_TOOLBAR_CLASS } from '../tabToolbar'
+import { cn } from '../../shared/lib/utils'
 
 export type ReadOnlyKind = ReadOnlyRecordKind
 
@@ -84,14 +86,14 @@ export function HistoryView({
   return (
     <div className="flex h-full flex-col">
       {readOnlyKind ? (
-        <div className="border-b border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <div className={cn(TAB_TOOLBAR_CLASS, 'bg-muted/30 px-3 text-xs text-muted-foreground')}>
           {t(BAR_LABEL_KEY[readOnlyKind], {
             date: new Date(recordTimestamp ?? snapshot.savedAt).toLocaleString(i18n.language)
           })}
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          <span>{t(agentOnly ? 'history.agentOnlyNotice' : 'history.readOnlyNotice')}</span>
+        <div className={cn(TAB_TOOLBAR_CLASS, 'justify-between gap-2 bg-muted/30 px-3 text-xs text-muted-foreground')}>
+          <span className="truncate">{t(agentOnly ? 'history.agentOnlyNotice' : 'history.readOnlyNotice')}</span>
           <div className="flex shrink-0 gap-2">
             <Button size="sm" disabled={resuming || !snapshot.acpSessionId} onClick={() => void resume()}>
               {resuming ? t('history.resuming') : t('history.resume')}

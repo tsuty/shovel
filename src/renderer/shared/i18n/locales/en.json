@@ -121,8 +121,7 @@
     "close": "Close",
     "closeOtherFiles": "Close other files",
     "closeAllFiles": "Close all files",
-    "splitRight": "Split to the right",
-    "unsplit": "Remove from split"
+    "splitRight": "Split and move right"
   },
   "filer": {
     "copyPath": "Copy path",
@@ -145,8 +144,7 @@
     "refresh": "Refresh",
     "openInFinder": "Open in Finder",
     "openInExplorer": "Open in Explorer",
-    "openInFileManager": "Open in file manager",
-    "openSplitRight": "Open split to the right"
+    "openInFileManager": "Open in file manager"
   },
   "fileStatus": {
     "copyPath": "Click to copy the path",

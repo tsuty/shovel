@@ -120,8 +120,7 @@
     "close": "閉じる",
     "closeOtherFiles": "他のファイルを閉じる",
     "closeAllFiles": "すべてのファイルを閉じる",
-    "splitRight": "右に分割して表示",
-    "unsplit": "分割から外す"
+    "splitRight": "右に分割して移動"
   },
   "filer": {
     "copyPath": "パスをコピー",
@@ -144,8 +143,7 @@
     "refresh": "更新",
     "openInFinder": "Finder で開く",
     "openInExplorer": "エクスプローラーで開く",
-    "openInFileManager": "ファイルマネージャーで開く",
-    "openSplitRight": "右に分割して開く"
+    "openInFileManager": "ファイルマネージャーで開く"
   },
   "fileStatus": {
     "copyPath": "押すとパスをコピー",

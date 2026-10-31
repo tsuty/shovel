@@ -36,8 +36,6 @@ export function Sidebar({
   onCloseTab,
   onRecordsDeleted,
   onAddToContext,
-  onOpenSplitRight,
-  canOpenSplitRight,
   bookmarks,
   onNewBrowserTab,
   onOpenBookmark,
@@ -60,8 +58,6 @@ export function Sidebar({
   onCloseTab: (sessionId: string) => void
   onRecordsDeleted: (fileNames: string[]) => void
   onAddToContext: (relPath: string) => void
-  onOpenSplitRight: (relPath: string) => void
-  canOpenSplitRight: (relPath: string) => boolean
   bookmarks: Bookmark[]
   onNewBrowserTab: () => void
   onOpenBookmark: (bookmark: Bookmark) => void
@@ -134,8 +130,6 @@ export function Sidebar({
               projectId={projectId}
               onOpenFile={onOpenFile}
               onAddToContext={onAddToContext}
-              onOpenSplitRight={onOpenSplitRight}
-              canOpenSplitRight={canOpenSplitRight}
             />
           )}
           {panel === 'browser' && (

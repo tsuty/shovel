@@ -11,6 +11,7 @@ import { registerAttachHandler } from '../attachmentRegistry'
 import { subscribeSessionEvents } from '../sessionEvents'
 import { LiveThoughtArea, Transcript } from './Transcript'
 import { Composer } from './Composer'
+import { TAB_TOOLBAR_CLASS } from '../tabToolbar'
 
 function chipFromRelPath(relPath: string): AttachmentChip {
   return { key: relPath, label: relPath.split('/').pop() ?? relPath, path: relPath }
@@ -113,7 +114,7 @@ export function SessionView({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-7 shrink-0 items-center border-b border-border px-1">
+      <div className={TAB_TOOLBAR_CLASS}>
         <button
           className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
           title={t('mainWindow.refreshTab')}

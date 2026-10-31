@@ -85,14 +85,16 @@ preview via `markdownOutline.ts`; clicking one moves both the visible source and
 `data-source-line`; a left pane when the editor body is ≥600px wide, else a dropdown (same rule inside a split-view pane); the pane's width and
 the split view's source/preview divider are mouse-draggable, and neither they nor the pane's open state are persisted;
 decisions.md N-3-14)
-and a **split view** that shows 2–4 tabs of any kind side by side (decisions.md G-1-19, replacing the old
-"attach an editor beside a chat" G-1-9 — `attachedFile`/`AttachTargetDialog`/`variant="attached"` are gone; saved
-`attachedFile` entries are migrated on restore into a [chat, file] group): a group is a run of adjacent tabs in the single
-tab bar, framed together; selecting any member shows the whole group with that member as the focused pane (top border);
-created via tab right-click "split to the right" / Filer "open split to the right", removed via "remove from split" or by
-dragging the tab out of the group; pane dividers are draggable (min 240px, chats 320px) and the ratios are saved per tab
-(`SavedTab.split`) with the open tabs. Pure group logic lives in `src/renderer/main-window/splitGroups.ts` (unit-tested);
-panes are positioned with flex `order` over the mount-order DOM so iframes never reload; Cmd/Ctrl+F and "add to context"
+and a **split view** modeled on JetBrains editor splitting (decisions.md G-1-19, revised 2026-10-31; it replaced the
+old "attach an editor beside a chat" G-1-9): the tab area is 1–4 side-by-side panes, each with its own tab bar ("+"
+opens a chat in that pane), its own active tab, and a focused pane (last interacted; top border on its tab bar). Tab
+right-click "split and move right" halves that pane and moves the tab into a new pane on its right (disabled when the
+pane has one tab or there are 4 panes); tabs drag between panes' tab bars; an emptied pane collapses and gives its
+width to its neighbor. Filer/history/bookmarks open into the focused pane, and anything already open is just brought
+to front. Cmd/Ctrl+digits and ←/→ count only the focused pane's tabs. Pane layout, widths and active tabs are saved
+per tab (`SavedTab.pane`). Pure logic lives in `src/renderer/main-window/paneLayout.ts` (unit-tested); the tab area is
+a CSS grid (row 1 tab bars, row 2 contents) and tab contents stay in mount order and are only placed by grid column,
+so moving a tab across panes never moves its DOM (no iframe/webview reload); Cmd/Ctrl+F and "add to context"
 target the focused pane; the editor toolbar collapses to icons below 640px. **Browser tabs** (decisions.md G-1-20,
 `BrowserView.tsx`): an Electron `<webview>` created imperatively (not by React) with back/forward/reload, an address bar
 (`addressToUrl` in `src/shared/browserUrl.ts`: scheme added for domain-like input, else Google search), ☆ bookmark toggle,

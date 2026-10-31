@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
-import type { RestoredTab, SavedSplit, SavedTab } from '@shared/types/session'
+import type { RestoredTab, SavedPane, SavedTab } from '@shared/types/session'
 import { isWebUrl } from '@shared/browserUrl'
 import { openTabsStore, projectsStore } from '../persistence/store'
 import { parseRecordName, readLocalRecord } from '../persistence/snapshot'
@@ -32,12 +32,12 @@ export async function restoreOpenTabs(projectId: string): Promise<RestoredTab[]>
   }
 
   async function restoreOne(saved: SavedTab): Promise<RestoredTab | null> {
-    const split = splitOf(saved)
+    const pane = paneOf(saved)
     switch (saved.kind) {
       case 'file':
-        return (await isExistingFile(saved.relPath)) ? { kind: 'file', relPath: saved.relPath, split } : null
+        return (await isExistingFile(saved.relPath)) ? { kind: 'file', relPath: saved.relPath, pane } : null
       case 'browser':
-        return isWebUrl(saved.url) ? { kind: 'browser', url: saved.url, title: String(saved.title), split } : null
+        return isWebUrl(saved.url) ? { kind: 'browser', url: saved.url, title: String(saved.title), pane } : null
       case 'record': {
         const parsed = parseRecordName(saved.fileName)
         if (!parsed) return null
@@ -47,14 +47,14 @@ export async function restoreOpenTabs(projectId: string): Promise<RestoredTab[]>
         if (parsed.kind === 'current') {
           // 一度も送信していないセッションの記録は開き直さない。
           if (snapshot.entries.length === 0) return null
-          return { kind: 'history', snapshot, attachedFile, split }
+          return { kind: 'history', snapshot, attachedFile, pane }
         }
         return {
           kind: 'history',
           snapshot,
           readOnly: { kind: parsed.kind, timestamp: parsed.epochMillis ?? 0, fileName: saved.fileName },
           attachedFile,
-          split
+          pane
         }
       }
       case 'agentOnly':
@@ -71,18 +71,25 @@ export async function restoreOpenTabs(projectId: string): Promise<RestoredTab[]>
           },
           agentOnly: true,
           attachedFile: await attachedFileOf(saved),
-          split
+          pane
         }
       default:
         return null
     }
   }
 
-  /** 分割の情報。形が崩れていれば捨てる。 */
-  function splitOf(saved: { split?: SavedSplit }): SavedSplit | undefined {
-    const { split } = saved
-    if (!split || !Number.isInteger(split.group) || !(typeof split.weight === 'number' && split.weight > 0)) return undefined
-    return { group: split.group, weight: split.weight }
+  /** ペインの情報。形が崩れていれば捨てる。 */
+  function paneOf(saved: { pane?: SavedPane }): SavedPane | undefined {
+    const { pane } = saved
+    if (!pane || !Number.isInteger(pane.index) || pane.index < 0 || !(typeof pane.weight === 'number' && pane.weight > 0)) {
+      return undefined
+    }
+    return {
+      index: pane.index,
+      weight: pane.weight,
+      ...(pane.active === true ? { active: true } : {}),
+      ...(pane.focused === true ? { focused: true } : {})
+    }
   }
 
   const restored = await Promise.all(openTabsStore.get(projectId).map((saved) => restoreOne(saved).catch(() => null)))

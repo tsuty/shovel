@@ -6,7 +6,7 @@ import type {
   HistoryEntry,
   LocalRecordSummary,
   RestoredTab,
-  SavedSplit,
+  SavedPane,
   SavedTab,
   SessionMeta,
   SessionSnapshot
@@ -30,7 +30,6 @@ import { useTabSwitchShortcuts } from './useTabShortcuts'
 import { addAttachmentToSession } from './attachmentRegistry'
 import { discardSessionEvents } from './sessionEvents'
 import { ResizablePanel } from './components/ResizablePanel'
-import { cn } from '../shared/lib/utils'
 import { friendlyErrorMessage, needsSbxLogin } from '../shared/friendlyError'
 import { editorLanguageFor, type EditorLanguage } from '@shared/fileKinds'
 import { ConnectingView, type ConnectingStepRecord } from './components/ConnectingView'
@@ -40,24 +39,28 @@ import type { Bookmark } from '@shared/types/browser'
 import { BrowserView } from './components/BrowserView'
 import { BookmarkDialog } from './components/BookmarkDialog'
 import {
+  activateTab,
   canSplitRight,
-  groupOf,
-  groupsFromSaved,
+  focusPane,
+  focusedPane,
+  focusedTabId,
+  initialLayout,
+  layoutFromSaved,
   moveTab as moveTabInLayout,
-  neighborInGroup,
-  normalizeGroups,
+  normalizeLayout,
+  paneOf,
+  removeTab,
   replaceTabId,
   resizeAdjacent,
-  savedSplitOf,
+  savedPanesOf,
   setPaneWeights,
   splitRight,
-  unsplit,
-  type SplitGroup,
-  type SplitLayout
-} from './splitGroups'
+  type Pane,
+  type PaneLayout
+} from './paneLayout'
 
 const MAX_SESSION_TABS = 10
-/** 分割ビューのペインの最小幅（px）。チャットはトランスクリプトを読める幅を残す。 */
+/** 分割ビューのペインの最小幅（px）。前面のタブがチャットならトランスクリプトを読める幅を残す。 */
 const PANE_MIN_WIDTH = 240
 const CHAT_PANE_MIN_WIDTH = 320
 /** コンソール（下部ドロワー）の既定の高さ（px）。 */
@@ -152,21 +155,21 @@ function tabFromRestored(restored: RestoredTab, untitled: string): Tab {
 }
 
 /** 次にウィンドウを開いたときに開き直すための、タブの控え。接続中のタブは残さない。 */
-function savedFromTab(tab: Tab, split: SavedSplit | undefined): SavedTab[] {
+function savedFromTab(tab: Tab, pane: SavedPane | undefined): SavedTab[] {
   switch (tab.kind) {
     case 'file':
-      return [{ kind: 'file', relPath: tab.relPath, split }]
+      return [{ kind: 'file', relPath: tab.relPath, pane }]
     case 'browser':
-      return tab.url ? [{ kind: 'browser', url: tab.url, title: tab.title, split }] : []
+      return tab.url ? [{ kind: 'browser', url: tab.url, title: tab.title, pane }] : []
     case 'session':
-      return [{ kind: 'record', fileName: `${tab.snapshotId}.json`, split }]
+      return [{ kind: 'record', fileName: `${tab.snapshotId}.json`, pane }]
     case 'history': {
       if (!tab.agentOnly) {
         const fileName = tab.recordFileName ?? `${tab.snapshot.sessionId}.json`
-        return [{ kind: 'record', fileName, split }]
+        return [{ kind: 'record', fileName, pane }]
       }
       const { sessionId: key, acpSessionId, title, savedAt } = tab.snapshot
-      return acpSessionId ? [{ kind: 'agentOnly', key, acpSessionId, title, savedAt, split }] : []
+      return acpSessionId ? [{ kind: 'agentOnly', key, acpSessionId, title, savedAt, pane }] : []
     }
     case 'connecting':
       return []
@@ -182,10 +185,13 @@ export function App(): React.JSX.Element {
   const [projectId] = useState(getProjectIdFromQuery)
   const [allProjects, setAllProjects] = useState<ProjectWithStatus[]>([])
   const [project, setProject] = useState<ProjectWithStatus | null>(null)
-  /** タブバーの表示順に並べたタブ。 */
+  /** 開いているタブ（並びは開いた順。タブバーの表示順はペインが持つ）。 */
   const [tabs, setTabs] = useState<Tab[]>([])
-  /** 分割ビューのグループ。閉じたタブが残っていることがあるので、使うときは `normalizeGroups` を通す。 */
-  const [splitGroupsState, setSplitGroups] = useState<SplitGroup[]>([])
+  /**
+   * 分割ビューのペインと、各ペインのタブの並び・前面のタブ。閉じたタブが残っていたり、開いたばかりのタブが
+   * まだ入っていなかったりするので、使うときは `normalizeLayout` を通す（`updateLayout`）。
+   */
+  const [layoutState, setLayout] = useState<PaneLayout>(initialLayout)
   /**
    * タブの中身を描く順（開いた順）。タブを並べ替えても中身の DOM を動かさない
    * （動かすと iframe が読み直しになる）よう、表示順とは別に持つ。
@@ -195,11 +201,10 @@ export function App(): React.JSX.Element {
   const tabsRestoredRef = useRef(false)
   /** 最後に保存したタブの控え（JSON）。同じなら保存し直さない。 */
   const lastSavedTabsRef = useRef<string | null>(null)
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [openPanels, setOpenPanels] = useState<Set<SidebarPanel>>(new Set(['tabs']))
   const [commandsOpen, setCommandsOpen] = useState(false)
-  /** 前面のタブ（分割ビューでは前面のペイン）の中身の要素。ページ内検索の対象。 */
+  /** 前面のペインの前面のタブの中身の要素。ページ内検索の対象。 */
   const [activePaneEl, setActivePaneEl] = useState<HTMLDivElement | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
@@ -240,6 +245,23 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('focus', onFocus)
   }, [projectId])
 
+  const tabIds = tabs.map((tab) => tab.sessionId)
+  const layout = normalizeLayout(layoutState, tabIds)
+  /** 前面のペインの前面のタブ。 */
+  const activeSessionId = focusedTabId(layout)
+  const tabIdsRef = useRef(tabIds)
+  tabIdsRef.current = tabIds
+
+  /** 今のタブの一覧に合わせて整えたレイアウトに、操作を当てる。 */
+  function updateLayout(op: (current: PaneLayout) => PaneLayout): void {
+    setLayout((prev) => op(normalizeLayout(prev, tabIdsRef.current)))
+  }
+
+  /** タブを前面に出す（そのペインが前面になる）。どのペインにも無ければ `paneId`（省略時は前面のペイン）に足す。 */
+  function activate(tabId: string, paneId?: string): void {
+    updateLayout((current) => activateTab(current, tabId, paneId))
+  }
+
   const sessionTabCount = tabs.filter((tab) => tab.kind === 'session' || tab.kind === 'connecting').length
   const limitedTabCount = tabs.filter(countsTowardTabLimit).length
   /** 接続の途中で閉じられた接続中タブの id。接続が終わったら後始末する。 */
@@ -260,8 +282,11 @@ export function App(): React.JSX.Element {
     []
   )
 
-  /** 接続中タブをすぐに出してから接続する。接続できたらその場でセッションタブに差し替える。 */
-  function openNewTab(): void {
+  /**
+   * 接続中タブをすぐに出してから接続する。接続できたらその場でセッションタブに差し替える。
+   * `paneId` のペイン（省略時は前面のペイン）に開く。
+   */
+  function openNewTab(paneId?: string): void {
     if (!projectId || limitedTabCount >= MAX_SESSION_TABS) return
     setError(null)
     const id = `connecting:${crypto.randomUUID()}`
@@ -274,7 +299,7 @@ export function App(): React.JSX.Element {
         steps: []
       }
     ])
-    setActiveSessionId(id)
+    activate(id, paneId)
     void connectTab(id)
   }
 
@@ -308,15 +333,14 @@ export function App(): React.JSX.Element {
             : tab
         )
       )
-      setSplitGroups((prev) => replaceTabId(prev, id, sessionId))
-      setActiveSessionId((prev) => (prev === id ? sessionId : prev))
+      updateLayout((current) => replaceTabId(current, id, sessionId))
     } catch (err) {
       if (abandonedConnectingIdsRef.current.delete(id)) return
       const message = err instanceof Error ? err.message : String(err)
       // 接続前の確認で未ログインと分かったとき・接続時の認証エラーのときは認証画面を出す。
       if (isAuthRequiredMessage(message)) {
         removeConnectingTab(id)
-        openAuthDialog(openNewTab)
+        openAuthDialog(() => openNewTab())
         return
       }
       updateConnectingTab(id, { error: friendlyErrorMessage(message, t), needsSbxLogin: needsSbxLogin(message) })
@@ -330,12 +354,12 @@ export function App(): React.JSX.Element {
   }
 
   function removeConnectingTab(id: string): void {
+    updateLayout((current) => removeTab(current, id))
     setTabs((prev) => prev.filter((tab) => tab.sessionId !== id))
-    setActiveSessionId((prev) => (prev === id ? null : prev))
   }
 
   // StrictMode の二重発火でセッションが2つ開かないよう、ref で一度だけに絞る。
-  // 前回開いていたタブを並べてから、新しいチャットを一番右に開く。
+  // 前回開いていたタブを並べてから、新しいチャットを前面のペインの右端に開く。
   // ACP アダプタの新しい版が出ていれば、新しいチャットを開く前に更新するか尋ねる。
   const didOpenInitialTabRef = useRef(false)
   useEffect(() => {
@@ -357,51 +381,55 @@ export function App(): React.JSX.Element {
   }, [projectId])
 
   /**
-   * 前回開いていたタブを左から並べ、最後のタブを前面に出す。並べたタブを返す。
-   * 以前の形式でチャットの右に添えていたファイルは、チャットのすぐ右に開いて2つのグループにする。
+   * 前回開いていたタブを、保存しておいたペインの構成・幅・前面のタブのとおりに並べ直す。並べたタブを返す。
+   * 以前の形式でチャットの右に添えていたファイルは、チャットと同じペインのすぐ右に開く。
    */
   async function restoreTabs(id: string): Promise<Tab[]> {
     const restored = await window.shovel.tabs.restore(id).catch(() => [])
     const restoredTabs: Tab[] = []
-    const splits = new Map<string, SavedSplit>()
+    const panes = new Map<string, SavedPane>()
     // 同じタブが重複して保存されていたら、最初の1つだけを開く。
     const seen = new Set<string>()
-    const push = (tab: Tab, split: SavedSplit | undefined): boolean => {
+    const push = (tab: Tab, pane: SavedPane | undefined): boolean => {
       if (seen.has(tab.sessionId)) return false
       seen.add(tab.sessionId)
       restoredTabs.push(tab)
-      if (split) splits.set(tab.sessionId, split)
+      if (pane) panes.set(tab.sessionId, pane)
       return true
     }
-    restored.forEach((r, i) => {
+    for (const r of restored) {
       const tab = tabFromRestored(r, t('history.untitled'))
-      const legacyAttached = r.kind === 'history' && !r.split ? r.attachedFile : undefined
-      // 以前の形式のグループは、保存された番号と重ならない負の番号にする。
-      const legacySplit = legacyAttached ? { group: -1 - i, weight: 1 } : undefined
-      if (push(tab, r.split ?? legacySplit) && legacyAttached && legacySplit) push(fileTab(legacyAttached), legacySplit)
-    })
+      const legacyAttached = r.kind === 'history' ? r.attachedFile : undefined
+      if (push(tab, r.pane) && legacyAttached) {
+        push(fileTab(legacyAttached), r.pane ? { index: r.pane.index, weight: r.pane.weight } : undefined)
+      }
+    }
     tabsRestoredRef.current = true
-    // 並べ終える前にファイラーなどから開いたタブは、復元したタブの右に残す。
+    // 並べ終える前にファイラーなどから開いたタブは、前面のペインの右端に残す。
     setTabs((prev) => [
       ...restoredTabs.filter((tab) => !prev.some((p) => p.sessionId === tab.sessionId)),
       ...prev
     ])
-    setSplitGroups(groupsFromSaved(restoredTabs.map((tab) => tab.sessionId), splits))
-    const last = restoredTabs[restoredTabs.length - 1]
-    if (last) setActiveSessionId((prev) => prev ?? last.sessionId)
+    setLayout(layoutFromSaved(restoredTabs.map((tab) => tab.sessionId), panes))
     return restoredTabs
   }
 
-  // タブの構成・並び・分割が変わったら控えを保存する。
+  // タブの構成・並び・ペインが変わったら控えを保存する。タブはペインの左から順に並べる。
   useEffect(() => {
     if (!projectId || !tabsRestoredRef.current) return
-    const splits = savedSplitOf(normalizeGroups(splitGroupsState, tabs.map((tab) => tab.sessionId)))
-    const saved = tabs.flatMap((tab) => savedFromTab(tab, splits.get(tab.sessionId)))
+    const panes = savedPanesOf(layout)
+    const byId = new Map(tabs.map((tab) => [tab.sessionId, tab]))
+    const saved = layout.panes
+      .flatMap((pane) => pane.tabIds)
+      .flatMap((tabId) => {
+        const tab = byId.get(tabId)
+        return tab ? savedFromTab(tab, panes.get(tabId)) : []
+      })
     const json = JSON.stringify(saved)
     if (json === lastSavedTabsRef.current) return
     lastSavedTabsRef.current = json
     void window.shovel.tabs.save(projectId, saved).catch(() => {})
-  }, [projectId, tabs, splitGroupsState])
+  }, [projectId, tabs, layout])
 
   async function answerAcpUpdate(update: boolean | null): Promise<void> {
     setAcpUpdateOffer(null)
@@ -418,7 +446,10 @@ export function App(): React.JSX.Element {
     return reveal?.relPath === relPath ? reveal : undefined
   }
 
-  /** `at` があれば、開いた後にその位置（中身検索の一致箇所）へ移る。 */
+  /**
+   * ファイルを前面のペインに開く。既にどこかのペインで開いていれば、そのペインのタブを前面に出す。
+   * `at` があれば、開いた後にその位置（中身検索の一致箇所）へ移る。
+   */
   function openFile(relPath: string, at?: Omit<FileReveal, 'nonce'>): void {
     setLastOpenedFilePath(relPath)
     // 位置なしで開き直したときに、前の移り先へまた飛ばないよう消しておく。
@@ -426,14 +457,14 @@ export function App(): React.JSX.Element {
     const id = `file:${relPath}`
     // 重複判定は updater の中で行う。
     setTabs((prev) => (prev.some((tab) => tab.sessionId === id) ? prev : [...prev, fileTab(relPath)]))
-    setActiveSessionId(id)
+    activate(id)
   }
 
   /** ブラウザのタブを開いて前面に出す。`url` が無ければ空のページで開く。 */
   function openBrowserTab(url = ''): void {
     const tab = browserTab(url, url ? undefined : t('browser.newTabTitle'))
     setTabs((prev) => [...prev, tab])
-    setActiveSessionId(tab.sessionId)
+    activate(tab.sessionId)
   }
 
   // ページが新しいウィンドウを開こうとしたら、新しいブラウザのタブで開く。
@@ -483,12 +514,11 @@ export function App(): React.JSX.Element {
   }
 
   /**
-   * ファイラーの「コンテキストに追加」。前面のタブがセッションならそこへ、そうでなければ
-   * 表示中のグループで最も左のセッションへ渡す。
+   * ファイラーの「コンテキストに追加」。前面のペインの前面のタブがセッションならそこへ、そうでなければ
+   * 表示中の（各ペインの前面の）セッションのうち最も左のものへ渡す。
    */
   function addToContext(relPath: string): void {
-    const shown = groupOf(splitGroups, activeSessionId)
-    const candidates = shown ? [activeSessionId, ...shown.panes.map((pane) => pane.tabId)] : [activeSessionId]
+    const candidates = [activeSessionId, ...layout.panes.map((pane) => pane.activeTabId)]
     const target = candidates.find((id) => tabs.some((tab) => tab.sessionId === id && tab.kind === 'session'))
     if (target) addAttachmentToSession(target, relPath)
   }
@@ -500,7 +530,7 @@ export function App(): React.JSX.Element {
         ? prev
         : [...prev, { kind: 'history', sessionId: id, title: snapshot.title || t('history.untitled'), snapshot, agentOnly }]
     )
-    setActiveSessionId(id)
+    activate(id)
   }
 
   /**
@@ -544,7 +574,7 @@ export function App(): React.JSX.Element {
           tab.sessionId === `history:${record.sessionId}`
       )?.sessionId
       if (openId) {
-        setActiveSessionId(openId)
+        activate(openId)
         return
       }
     } else if (limitedTabCount >= MAX_SESSION_TABS) {
@@ -576,7 +606,7 @@ export function App(): React.JSX.Element {
         }
       ]
     })
-    setActiveSessionId(id)
+    activate(id)
   }
 
   /**
@@ -604,8 +634,7 @@ export function App(): React.JSX.Element {
           : tab
       )
     )
-    setSplitGroups((prev) => replaceTabId(prev, `history:${snapshot.sessionId}`, sessionId))
-    setActiveSessionId(sessionId)
+    updateLayout((current) => activateTab(replaceTabId(current, `history:${snapshot.sessionId}`, sessionId), sessionId))
   }
 
   // mermaid をウィンドウが開いた後の空き時間に読み込んでおく。
@@ -617,43 +646,9 @@ export function App(): React.JSX.Element {
     })
   }, [])
 
-  const tabIds = tabs.map((tab) => tab.sessionId)
-  const splitGroups = normalizeGroups(splitGroupsState, tabIds)
-
-  /** 並べ替えた順にタブを並べ直し、グループを差し替える。 */
-  function applyLayout(layout: SplitLayout): void {
-    setTabs((prev) => {
-      const byId = new Map(prev.map((tab) => [tab.sessionId, tab]))
-      const ordered = layout.order.flatMap((id) => byId.get(id) ?? [])
-      const rest = prev.filter((tab) => !layout.order.includes(tab.sessionId))
-      const next = [...ordered, ...rest]
-      return next.every((tab, i) => tab === prev[i]) ? prev : next
-    })
-    setSplitGroups(layout.groups)
-  }
-
-  /** タブを、いま表示しているタブ（グループならその右端）の右に分割して並べ、前面のペインにする。 */
+  /** タブのあるペインを半分に分け、そのタブを右の新しいペインへ移す。 */
   function splitTabRight(id: string): void {
-    if (!activeSessionId || !canSplitRight(splitGroups, activeSessionId, id)) return
-    applyLayout(splitRight({ order: tabIds, groups: splitGroups }, activeSessionId, id))
-    setActiveSessionId(id)
-  }
-
-  function unsplitTab(id: string): void {
-    applyLayout(unsplit({ order: tabIds, groups: splitGroups }, id))
-    setActiveSessionId(id)
-  }
-
-  /** ファイラーの「右に分割して開く」: ファイルを開いて（無ければタブを作り）、表示中のタブの右に並べる。 */
-  function openFileSplitRight(relPath: string): void {
-    const id = `file:${relPath}`
-    if (!activeSessionId || !canSplitRight(splitGroups, activeSessionId, id)) return
-    setLastOpenedFilePath(relPath)
-    setReveal(null)
-    const order = tabIds.includes(id) ? tabIds : [...tabIds, id]
-    if (!tabIds.includes(id)) setTabs((prev) => (prev.some((tab) => tab.sessionId === id) ? prev : [...prev, fileTab(relPath)]))
-    applyLayout(splitRight({ order, groups: splitGroups }, activeSessionId, id))
-    setActiveSessionId(id)
+    updateLayout((current) => splitRight(current, id))
   }
 
   async function closeTab(id: string): Promise<void> {
@@ -664,15 +659,8 @@ export function App(): React.JSX.Element {
     }
     // 接続の途中なら、接続が終わったところで後始末する（失敗済みなら何も残っていない）。
     if (tab?.kind === 'connecting' && !tab.error) abandonedConnectingIdsRef.current.add(id)
-    // 分割ビューのグループのタブなら、同じグループの隣のペインを前面にする。
-    const neighbor = neighborInGroup(splitGroups, id)
-    setTabs((prev) => {
-      const next = prev.filter((t) => t.sessionId !== id)
-      if (activeSessionId === id) {
-        setActiveSessionId(neighbor ?? (next.length > 0 ? next[next.length - 1]!.sessionId : null))
-      }
-      return next
-    })
+    updateLayout((current) => removeTab(current, id))
+    setTabs((prev) => prev.filter((t) => t.sessionId !== id))
     setTabStatuses((prev) => {
       if (!(id in prev)) return prev
       const next = { ...prev }
@@ -686,26 +674,25 @@ export function App(): React.JSX.Element {
     const deleted = new Set(fileNames)
     const remains = (tab: Tab): boolean =>
       !(tab.kind === 'history' && tab.recordFileName !== undefined && deleted.has(tab.recordFileName))
-    const next = tabs.filter(remains)
-    if (next.length === tabs.length) return
+    const closing = tabs.filter((tab) => !remains(tab)).map((tab) => tab.sessionId)
+    if (closing.length === 0) return
+    updateLayout((current) => closing.reduce(removeTab, current))
     setTabs((prev) => prev.filter(remains))
-    if (!next.some((tab) => tab.sessionId === activeSessionId)) {
-      setActiveSessionId(next.length > 0 ? next[next.length - 1]!.sessionId : null)
-    }
   }
 
   /**
-   * ファイルのタブをまとめて閉じる（チャット・履歴のタブは残す）。`keepId` を渡すとそのタブは残して
-   * 前面に出す。ファイルのタブは main 側に後始末がないので、`closeTab` を経由しない。
+   * `pane` のファイルのタブをまとめて閉じる（チャット・履歴のタブと、他のペインのタブは残す）。`keepId` を
+   * 渡すとそのタブは残して前面に出す。ファイルのタブは main 側に後始末がないので、`closeTab` を経由しない。
    */
-  function closeFileTabs(keepId: string | null): void {
-    const remains = (tab: Tab): boolean => tab.kind !== 'file' || tab.sessionId === keepId
-    const next = tabs.filter(remains)
-    setTabs((prev) => prev.filter(remains))
-    if (keepId) setActiveSessionId(keepId)
-    else if (!next.some((tab) => tab.sessionId === activeSessionId)) {
-      setActiveSessionId(next.length > 0 ? next[next.length - 1]!.sessionId : null)
-    }
+  function closeFileTabs(pane: Pane, keepId: string | null): void {
+    const closing = tabs
+      .filter((tab) => tab.kind === 'file' && tab.sessionId !== keepId && pane.tabIds.includes(tab.sessionId))
+      .map((tab) => tab.sessionId)
+    updateLayout((current) => {
+      const next = closing.reduce(removeTab, current)
+      return keepId ? activateTab(next, keepId) : next
+    })
+    setTabs((prev) => prev.filter((tab) => !closing.includes(tab.sessionId)))
   }
 
   /** 背景タブの通知状態。変化がなければ同一参照を返す。 */
@@ -733,11 +720,9 @@ export function App(): React.JSX.Element {
     )
   }
 
-  /** タブバーでドラッグしたタブを、`beforeId` のタブの左（`null` なら一番右）へ動かす。 */
-  function moveTab(id: string, beforeId: string | null): void {
-    const layout = { order: tabIds, groups: splitGroups }
-    const next = moveTabInLayout(layout, id, beforeId)
-    if (next !== layout) applyLayout(next)
+  /** タブバーでドラッグしたタブを、`toPaneId` のペインの `beforeId` のタブの左（`null` なら右端）へ動かす。 */
+  function moveTab(id: string, toPaneId: string, beforeId: string | null): void {
+    updateLayout((current) => moveTabInLayout(current, id, toPaneId, beforeId))
   }
 
   function renameTab(sessionId: string, title: string): void {
@@ -753,58 +738,62 @@ export function App(): React.JSX.Element {
     })
   }
 
-  useTabSwitchShortcuts(tabIds, activeSessionId, setActiveSessionId)
+  useTabSwitchShortcuts(focusedPane(layout).tabIds, activeSessionId, activate)
 
   if (!projectId) {
     return <div className="p-4 text-sm text-muted-foreground">{t('mainWindow.noProject')}</div>
   }
 
-  /** いま表示している分割ビューのグループ。前面のタブがグループに入っていなければ `undefined`。 */
-  const shownGroup = groupOf(splitGroups, activeSessionId)
-  const paneMinWidth = (tab: Tab): number => (isChatTab(tab) ? CHAT_PANE_MIN_WIDTH : PANE_MIN_WIDTH)
+  const tabsById = new Map(tabs.map((tab) => [tab.sessionId, tab]))
+  const panes = layout.panes
+  /** ペインの最小幅。前面のタブがチャットならチャットの最小幅。 */
+  const paneMinWidth = (pane: Pane): number => {
+    const tab = pane.activeTabId ? tabsById.get(pane.activeTabId) : undefined
+    return tab && isChatTab(tab) ? CHAT_PANE_MIN_WIDTH : PANE_MIN_WIDTH
+  }
+  const gridColumns = (weights: number[]): string =>
+    panes.flatMap((pane, i) => [`minmax(${paneMinWidth(pane)}px, ${weights[i] ?? 1}fr)`, ...(i < panes.length - 1 ? ['4px'] : [])]).join(' ')
 
   /**
-   * ペインの境目のドラッグ。ドラッグ中は DOM の flex-grow を直接書き換え、離したところで比率を保存する
+   * ペインの境目のドラッグ。ドラッグ中は grid の列幅を DOM に直接書き、離したところで比率を保存する
    * （動かすたびにウィンドウ全体を描き直さないため）。
    */
-  function startPaneResize(e: React.PointerEvent<HTMLDivElement>, group: SplitGroup, leftIndex: number): void {
+  function startPaneResize(e: React.PointerEvent<HTMLDivElement>, leftIndex: number): void {
     if (e.button !== 0) return
     e.preventDefault()
     const handle = e.currentTarget
-    const container = handle.parentElement
-    if (!container) return
-    const els = group.panes.map((pane) => container.querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(pane.tabId)}"]`))
-    if (els.some((el) => !el)) return
-    const widths = els.map((el) => el!.getBoundingClientRect().width)
-    els.forEach((el, i) => (el!.style.flexGrow = String(widths[i])))
-    const minWidths = group.panes.map((pane) => {
-      const tab = tabsById.get(pane.tabId)
-      return tab ? paneMinWidth(tab) : PANE_MIN_WIDTH
-    })
+    const grid = handle.parentElement
+    if (!grid) return
+    const bars = panes.map((pane) => grid.querySelector<HTMLElement>(`[data-pane-col="${CSS.escape(pane.id)}"]`))
+    if (bars.some((el) => !el)) return
+    const widths = bars.map((el) => el!.getBoundingClientRect().width)
+    const minWidths = panes.map(paneMinWidth)
     const startX = e.clientX
     handle.setPointerCapture(e.pointerId)
+    const current = [...widths]
     const onMove = (ev: PointerEvent): void => {
       const next = resizeAdjacent(
         { width: widths[leftIndex]!, minWidth: minWidths[leftIndex]! },
         { width: widths[leftIndex + 1]!, minWidth: minWidths[leftIndex + 1]! },
         ev.clientX - startX
       )
-      els[leftIndex]!.style.flexGrow = String(next.left)
-      els[leftIndex + 1]!.style.flexGrow = String(next.right)
+      current[leftIndex] = next.left
+      current[leftIndex + 1] = next.right
+      grid.style.gridTemplateColumns = gridColumns(current)
     }
     const onUp = (): void => {
       handle.removeEventListener('pointermove', onMove)
       handle.removeEventListener('pointerup', onUp)
       handle.removeEventListener('pointercancel', onUp)
-      const finalWidths = Object.fromEntries(group.panes.map((pane, i) => [pane.tabId, Number(els[i]!.style.flexGrow)]))
-      setSplitGroups((prev) => setPaneWeights(normalizeGroups(prev, tabIds), group.id, finalWidths))
+      const weights = Object.fromEntries(panes.map((pane, i) => [pane.id, current[i]!]))
+      updateLayout((layoutNow) => setPaneWeights(layoutNow, weights))
     }
     handle.addEventListener('pointermove', onMove)
     handle.addEventListener('pointerup', onUp)
     handle.addEventListener('pointercancel', onUp)
   }
 
-  const tabInfos: TabInfo[] = tabs.map((tab) => ({
+  const tabInfoOf = (tab: Tab): TabInfo => ({
     sessionId: tab.sessionId,
     title: tab.title,
     tooltip: tab.kind === 'file' ? tab.relPath : tab.kind === 'browser' ? tab.url || undefined : undefined,
@@ -812,13 +801,15 @@ export function App(): React.JSX.Element {
     snapshotId: tab.kind === 'session' ? tab.snapshotId : undefined,
     failed: tab.kind === 'connecting' ? tab.error !== undefined : undefined,
     status: tab.kind === 'session' ? tabStatuses[tab.sessionId] : undefined,
-    splitGroupId: groupOf(splitGroups, tab.sessionId)?.id,
-    shown: tab.sessionId !== activeSessionId && shownGroup?.panes.some((pane) => pane.tabId === tab.sessionId),
-    canSplitRight: canSplitRight(splitGroups, activeSessionId, tab.sessionId)
+    canSplitRight: canSplitRight(layout, tab.sessionId)
+  })
+  /** サイドバーのタブ一覧用。ペインの左から順に並べる。 */
+  const tabInfos: TabInfo[] = panes.flatMap((pane) => pane.tabIds.flatMap((id) => {
+    const tab = tabsById.get(id)
+    return tab ? [tabInfoOf(tab)] : []
   }))
-  const activeTab = tabs.find((tab) => tab.sessionId === activeSessionId) ?? null
+  const focusedIndex = panes.findIndex((pane) => pane.id === layout.focusedPaneId)
 
-  const tabsById = new Map(tabs.map((tab) => [tab.sessionId, tab]))
   const mountOrder = mountOrderRef.current.filter((id) => tabsById.has(id))
   for (const tab of tabs) if (!mountOrder.includes(tab.sessionId)) mountOrder.push(tab.sessionId)
   mountOrderRef.current = mountOrder
@@ -843,7 +834,7 @@ export function App(): React.JSX.Element {
           onToggleCommands={() => setCommandsOpen((v) => !v)}
           tabs={tabInfos}
           activeSessionId={activeSessionId}
-          onSelectTab={setActiveSessionId}
+          onSelectTab={(id) => activate(id)}
           onOpenFile={openFile}
           onOpenHistory={(entry) => void openHistoryEntry(entry)}
           onOpenLocalRecord={(record) => void openLocalRecord(record)}
@@ -851,8 +842,6 @@ export function App(): React.JSX.Element {
           onCloseTab={(id) => void closeTab(id)}
           onRecordsDeleted={closeRecordTabs}
           onAddToContext={addToContext}
-          onOpenSplitRight={openFileSplitRight}
-          canOpenSplitRight={(relPath) => !!activeSessionId && canSplitRight(splitGroups, activeSessionId, `file:${relPath}`)}
           bookmarks={bookmarks}
           onNewBrowserTab={() => openBrowserTab()}
           onOpenBookmark={(bookmark) => openBrowserTab(bookmark.url)}
@@ -861,115 +850,135 @@ export function App(): React.JSX.Element {
           onDeleteBookmark={(bookmark) => saveBookmarks(bookmarks.filter((b) => b.id !== bookmark.id))}
         />
         <div className="flex flex-1 flex-col overflow-hidden">
-          <TabBar
-            tabs={tabInfos}
-            activeSessionId={activeSessionId}
-            onSelect={setActiveSessionId}
-            onClose={(id) => void closeTab(id)}
-            onCloseFiles={closeFileTabs}
-            onMove={moveTab}
-            onSplitRight={splitTabRight}
-            onUnsplit={unsplitTab}
-            onNew={openNewTab}
-            canAddTab={limitedTabCount < MAX_SESSION_TABS}
-          />
           {error && (
             <div className="flex items-start gap-2 border-b border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span className="flex-1">{error}</span>
             </div>
           )}
-          <div className="relative flex flex-1 flex-col overflow-hidden">
-            <FindBar root={activePaneEl} />
-            <div className={cn('flex flex-1', shownGroup ? 'overflow-x-auto overflow-y-hidden' : 'overflow-hidden')}>
-              {tabsInMountOrder.map((tab) => {
-                const isActive = tab.sessionId === activeTab?.sessionId
-                const paneIndex = shownGroup ? shownGroup.panes.findIndex((pane) => pane.tabId === tab.sessionId) : -1
-                const pane = shownGroup?.panes[paneIndex]
-                const visible = pane !== undefined || (!shownGroup && isActive)
-                return (
-                  <div
-                    key={tab.sessionId}
-                    ref={isActive ? setActivePaneEl : undefined}
-                    data-pane-id={tab.sessionId}
-                    className={
-                      !visible
-                        ? 'hidden'
-                        : pane
-                          ? cn('flex flex-col overflow-hidden border-t-2', isActive ? 'border-primary' : 'border-transparent')
-                          : 'flex min-w-0 flex-1 flex-col overflow-hidden'
-                    }
-                    // 開いた順に描いたまま、表示するペインだけを `order` で並べる（DOM を動かすと iframe が読み直しになる）。
-                    style={pane ? { order: paneIndex * 2, flexGrow: pane.weight, flexBasis: 0, minWidth: paneMinWidth(tab) } : undefined}
-                    onPointerDownCapture={pane && !isActive ? () => setActiveSessionId(tab.sessionId) : undefined}
-                  >
-                    {tab.kind === 'session' ? (
-                      <SessionView
-                        sessionId={tab.sessionId}
-                        initialMeta={tab.meta}
-                        initialAttachments={tab.initialAttachments}
-                        sendKey={settings?.sendKey ?? 'enter'}
-                        diffLayout={settings?.diffLayout}
-                        onOpenFile={openFile}
-                        onStatusChange={(status) => updateTabStatus(tab.sessionId, status)}
-                        onRefreshed={(snapshotId) => handleRefreshed(tab.sessionId, snapshotId)}
-                        onTitleChange={(title) => renameTab(tab.sessionId, title)}
-                      />
-                    ) : tab.kind === 'history' ? (
-                      <HistoryView
-                        snapshot={tab.snapshot}
-                        readOnlyKind={tab.readOnlyKind}
-                        recordTimestamp={tab.recordTimestamp}
-                        agentOnly={tab.agentOnly}
-                        onResume={() => resumeHistory(tab.snapshot, tab.agentOnly)}
-                        onAuthRequired={openAuthDialog}
-                        onStartNew={openNewTab}
-                        onOpenFile={openFile}
-                        diffLayout={settings?.diffLayout}
-                      />
-                    ) : tab.kind === 'connecting' ? (
-                      <ConnectingView
-                        steps={tab.steps}
-                        error={tab.error}
-                        onSbxLogin={tab.needsSbxLogin ? () => void window.shovel.projects.openSbxLogin() : undefined}
-                        onRetry={() => void connectTab(tab.sessionId)}
-                        onClose={() => void closeTab(tab.sessionId)}
-                      />
-                    ) : tab.kind === 'browser' ? (
-                      <BrowserView
-                        initialUrl={tab.initialUrl}
-                        bookmarked={!!tab.url && bookmarks.some((b) => b.url === tab.url)}
-                        onNavigate={(url) => updateBrowserTab(tab.sessionId, { url })}
-                        onTitleChange={(title) => updateBrowserTab(tab.sessionId, { title })}
-                        onToggleBookmark={toggleBookmark}
-                        onFocus={() => setActiveSessionId(tab.sessionId)}
-                      />
-                    ) : tab.editor ? (
-                      <TextFileEditor
-                        projectId={projectId}
-                        relPath={tab.relPath}
-                        language={tab.editor}
-                        reveal={revealFor(tab.relPath)}
-                      />
-                    ) : (
-                      <FileViewer projectId={projectId} relPath={tab.relPath} reveal={revealFor(tab.relPath)} />
-                    )}
-                  </div>
-                )
-              })}
-              {shownGroup?.panes.slice(0, -1).map((pane, i) => (
-                <div
-                  key={`divider:${pane.tabId}`}
-                  className="w-1 shrink-0 cursor-col-resize bg-border hover:bg-primary/50"
-                  style={{ order: i * 2 + 1 }}
-                  onPointerDown={(e) => startPaneResize(e, shownGroup, i)}
+          {/*
+            1行目に各ペインのタブバー、2行目にタブの中身を置く grid。タブの中身は開いた順に描いたまま、列の指定だけで
+            ペインに置く（ペインをまたいで動かしても DOM を動かさないので、iframe・webview が読み直しにならない）。
+          */}
+          <div
+            className="grid min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
+            style={{ gridTemplateColumns: gridColumns(panes.map((pane) => pane.weight)), gridTemplateRows: 'auto minmax(0, 1fr)' }}
+          >
+            {panes.map((pane, i) => (
+              <div
+                key={pane.id}
+                data-pane-col={pane.id}
+                className="min-w-0"
+                style={{ gridColumn: i * 2 + 1, gridRow: 1 }}
+                onPointerDownCapture={() => updateLayout((current) => focusPane(current, pane.id))}
+              >
+                <TabBar
+                  paneId={pane.id}
+                  tabs={pane.tabIds.flatMap((id) => {
+                    const tab = tabsById.get(id)
+                    return tab ? [tabInfoOf(tab)] : []
+                  })}
+                  activeId={pane.activeTabId}
+                  focused={pane.id === layout.focusedPaneId}
+                  showFocus={panes.length > 1}
+                  onSelect={(id) => activate(id)}
+                  onClose={(id) => void closeTab(id)}
+                  onCloseFiles={(keepId) => closeFileTabs(pane, keepId)}
+                  onMove={moveTab}
+                  onSplitRight={splitTabRight}
+                  onNew={() => openNewTab(pane.id)}
+                  canAddTab={limitedTabCount < MAX_SESSION_TABS}
                 />
-              ))}
-              {tabs.length === 0 && !error && (
-                <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                  {t('mainWindow.connecting')}
+              </div>
+            ))}
+            {panes.slice(0, -1).map((pane, i) => (
+              <div
+                key={`divider:${pane.id}`}
+                className="cursor-col-resize bg-border hover:bg-primary/50"
+                style={{ gridColumn: i * 2 + 2, gridRow: '1 / 3' }}
+                onPointerDown={(e) => startPaneResize(e, i)}
+              />
+            ))}
+            {tabsInMountOrder.map((tab) => {
+              const pane = paneOf(layout, tab.sessionId)
+              const column = pane ? panes.indexOf(pane) : -1
+              const visible = !!pane && pane.activeTabId === tab.sessionId
+              const inFocusedPane = pane?.id === layout.focusedPaneId
+              return (
+                <div
+                  key={tab.sessionId}
+                  ref={visible && inFocusedPane ? setActivePaneEl : undefined}
+                  className={visible ? 'flex min-h-0 min-w-0 flex-col overflow-hidden' : 'hidden'}
+                  style={visible ? { gridColumn: column * 2 + 1, gridRow: 2 } : undefined}
+                  onPointerDownCapture={
+                    visible && !inFocusedPane ? () => updateLayout((current) => focusPane(current, pane.id)) : undefined
+                  }
+                >
+                  {tab.kind === 'session' ? (
+                    <SessionView
+                      sessionId={tab.sessionId}
+                      initialMeta={tab.meta}
+                      initialAttachments={tab.initialAttachments}
+                      sendKey={settings?.sendKey ?? 'enter'}
+                      diffLayout={settings?.diffLayout}
+                      onOpenFile={openFile}
+                      onStatusChange={(status) => updateTabStatus(tab.sessionId, status)}
+                      onRefreshed={(snapshotId) => handleRefreshed(tab.sessionId, snapshotId)}
+                      onTitleChange={(title) => renameTab(tab.sessionId, title)}
+                    />
+                  ) : tab.kind === 'history' ? (
+                    <HistoryView
+                      snapshot={tab.snapshot}
+                      readOnlyKind={tab.readOnlyKind}
+                      recordTimestamp={tab.recordTimestamp}
+                      agentOnly={tab.agentOnly}
+                      onResume={() => resumeHistory(tab.snapshot, tab.agentOnly)}
+                      onAuthRequired={openAuthDialog}
+                      onStartNew={() => openNewTab(pane?.id)}
+                      onOpenFile={openFile}
+                      diffLayout={settings?.diffLayout}
+                    />
+                  ) : tab.kind === 'connecting' ? (
+                    <ConnectingView
+                      steps={tab.steps}
+                      error={tab.error}
+                      onSbxLogin={tab.needsSbxLogin ? () => void window.shovel.projects.openSbxLogin() : undefined}
+                      onRetry={() => void connectTab(tab.sessionId)}
+                      onClose={() => void closeTab(tab.sessionId)}
+                    />
+                  ) : tab.kind === 'browser' ? (
+                    <BrowserView
+                      initialUrl={tab.initialUrl}
+                      bookmarked={!!tab.url && bookmarks.some((b) => b.url === tab.url)}
+                      onNavigate={(url) => updateBrowserTab(tab.sessionId, { url })}
+                      onTitleChange={(title) => updateBrowserTab(tab.sessionId, { title })}
+                      onToggleBookmark={toggleBookmark}
+                      onFocus={() => activate(tab.sessionId)}
+                    />
+                  ) : tab.editor ? (
+                    <TextFileEditor
+                      projectId={projectId}
+                      relPath={tab.relPath}
+                      language={tab.editor}
+                      reveal={revealFor(tab.relPath)}
+                    />
+                  ) : (
+                    <FileViewer projectId={projectId} relPath={tab.relPath} reveal={revealFor(tab.relPath)} />
+                  )}
                 </div>
-              )}
+              )
+            })}
+            {tabs.length === 0 && !error && (
+              <div
+                className="flex items-center justify-center text-sm text-muted-foreground"
+                style={{ gridColumn: 1, gridRow: 2 }}
+              >
+                {t('mainWindow.connecting')}
+              </div>
+            )}
+            {/* ページ内検索は前面のペインの右上に出す（高さ 0 の枠に絶対配置する）。 */}
+            <div className="relative z-40 h-0 self-start" style={{ gridColumn: focusedIndex * 2 + 1, gridRow: 2 }}>
+              <FindBar root={activePaneEl} />
             </div>
           </div>
           {commandsOpen && (

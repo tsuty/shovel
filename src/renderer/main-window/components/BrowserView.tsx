@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, ExternalLink, RotateCw, 
 import { addressToUrl, BLANK_PAGE, isWebUrl } from '@shared/browserUrl'
 import { cn } from '../../shared/lib/utils'
 import { registerEditorSearch } from '../editorSearch'
+import { TAB_TOOLBAR_CLASS } from '../tabToolbar'
 
 /** ブラウザのタブの保存領域。main の `browserGuest.ts` でも同じ値を強制する。 */
 const BROWSER_PARTITION = 'persist:shovel-browser'
@@ -209,7 +210,7 @@ export function BrowserView({
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex items-center gap-1 border-b border-border px-2 py-1">
+      <div className={TAB_TOOLBAR_CLASS}>
         <button className={iconButton} title={t('browser.back')} disabled={!canGoBack} onClick={() => webview()?.goBack()}>
           <ArrowLeft size={14} />
         </button>

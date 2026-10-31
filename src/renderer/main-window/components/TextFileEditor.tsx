@@ -37,6 +37,7 @@ import { CsvTable } from './CsvTable'
 import { extractOutline, type OutlineItem } from '../markdownOutline'
 import { OutlineMenu, OutlinePane } from './MarkdownOutline'
 import { ResizablePanel } from './ResizablePanel'
+import { TAB_TOOLBAR_CLASS } from '../tabToolbar'
 
 /**
  * 表示の切り替え。Markdown / Mermaid / HTML は「分割・ソース・プレビュー」、
@@ -592,7 +593,7 @@ export function TextFileEditor({
           </button>
         </div>
       )}
-      <div className="flex items-center gap-1 border-b border-border px-2 py-1">
+      <div className={TAB_TOOLBAR_CLASS}>
         {modes.map((m) => {
           const Icon = MODE_ICONS[m]
           return (

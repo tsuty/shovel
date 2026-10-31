@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Bot, Clock3, Columns2, CopyX, File, FileX, Globe, Loader2, Plus, SquareSplitHorizontal, X } from 'lucide-react'
+import { AlertTriangle, Bot, Clock3, Columns2, CopyX, File, FileX, Globe, Loader2, Plus, X } from 'lucide-react'
 import { cn } from '../../shared/lib/utils'
 import { MenuItem } from './MenuItem'
 
@@ -19,12 +19,16 @@ export interface TabInfo {
   status?: { sending: boolean; hasPendingPermission: boolean }
   /** 接続中タブの接続が失敗した。 */
   failed?: boolean
-  /** 分割ビューのグループの id。グループに入っていなければ `undefined`。 */
-  splitGroupId?: string
-  /** 前面ではないが、前面のタブと同じグループとして表示されている。 */
-  shown?: boolean
-  /** 「右に分割して表示」を押せる。 */
+  /** 「右に分割して移動」を押せる。 */
   canSplitRight?: boolean
+}
+
+/** ドラッグで離したときに入る位置。`beforeId` のタブの左（`null` はそのペインの右端）。 */
+interface DropTarget {
+  paneId: string
+  beforeId: string | null
+  /** 入る位置の目印（画面上の座標）。 */
+  indicator: { left: number; top: number; height: number }
 }
 
 /** 押したまま、この距離（px）を超えて動かしたらドラッグとみなす。 */
@@ -34,31 +38,68 @@ const DRAG_SCROLL_EDGE = 32
 /** ドラッグ中の横スクロールの速さ（px／フレーム）。 */
 const DRAG_SCROLL_STEP = 8
 
+/**
+ * ポインタの x 座標から、離したときに入るペインと位置を求める。ペインはタブバーの横の範囲で決め
+ * （範囲外なら近い方の端のペイン）、その中でタブの中央より左ならそのタブの左に入る。
+ */
+function locateDrop(pointerX: number): { target: DropTarget; strip: HTMLElement } | null {
+  const bars = Array.from(document.querySelectorAll<HTMLElement>('[data-pane-bar]'))
+  if (bars.length === 0) return null
+  const bar =
+    bars.find((el) => {
+      const rect = el.getBoundingClientRect()
+      return pointerX >= rect.left && pointerX <= rect.right
+    }) ?? (pointerX < bars[0]!.getBoundingClientRect().left ? bars[0]! : bars[bars.length - 1]!)
+  const strip = bar.querySelector<HTMLElement>('[data-pane-strip]')
+  if (!strip) return null
+  const stripRect = strip.getBoundingClientRect()
+  const indicator = (left: number): DropTarget['indicator'] => ({ left, top: stripRect.top + 4, height: stripRect.height - 8 })
+  const els = Array.from(strip.querySelectorAll<HTMLElement>('[data-tab-id]'))
+  const paneId = bar.dataset.paneBar!
+  for (const el of els) {
+    const rect = el.getBoundingClientRect()
+    if (pointerX < rect.left + rect.width / 2) {
+      return { target: { paneId, beforeId: el.dataset.tabId!, indicator: indicator(rect.left - 3) }, strip }
+    }
+  }
+  const last = els[els.length - 1]
+  const left = last ? last.getBoundingClientRect().right + 1 : stripRect.left + 2
+  return { target: { paneId, beforeId: null, indicator: indicator(left) }, strip }
+}
+
+/**
+ * 分割ビューのペインのタブバー。タブはペインをまたいでドラッグで動かせる。
+ * `focused` はこのペインが前面のペインか（ペインが複数のときだけ印を付ける）。
+ */
 export function TabBar({
+  paneId,
   tabs,
-  activeSessionId,
+  activeId,
+  focused,
+  showFocus,
   onSelect,
   onClose,
   onCloseFiles,
   onNew,
   onMove,
   onSplitRight,
-  onUnsplit,
   canAddTab
 }: {
+  paneId: string
   tabs: TabInfo[]
-  activeSessionId: string | null
+  activeId: string | null
+  focused: boolean
+  showFocus: boolean
   onSelect: (sessionId: string) => void
   onClose: (sessionId: string) => void
-  /** ファイルのタブをまとめて閉じる（チャット・履歴は残す）。`keepId` のタブだけは残す。 */
+  /** このペインのファイルのタブをまとめて閉じる（チャット・履歴は残す）。`keepId` のタブだけは残す。 */
   onCloseFiles: (keepId: string | null) => void
+  /** このペインに新しいチャットを開く。 */
   onNew: () => void
-  /** タブ `id` を `beforeId` のタブの左（`null` なら一番右）へ動かす。 */
-  onMove: (id: string, beforeId: string | null) => void
-  /** タブを、いま表示しているタブ（グループならその右端）の右に分割して並べる。 */
+  /** タブ `id` を `toPaneId` のペインの `beforeId` のタブの左（`null` なら右端）へ動かす。 */
+  onMove: (id: string, toPaneId: string, beforeId: string | null) => void
+  /** このペインを半分に分け、タブを右の新しいペインへ移す。 */
   onSplitRight: (sessionId: string) => void
-  /** タブを分割ビューのグループから外す。 */
-  onUnsplit: (sessionId: string) => void
   canAddTab: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -66,45 +107,38 @@ export function TabBar({
   const fileTabCount = tabs.filter((tab) => tab.kind === 'file').length
   const stripRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  /** ドラッグ中のタブと、離したときに入る位置（`beforeId` のタブの左。`null` は一番右）。 */
-  const [drag, setDrag] = useState<{ id: string; beforeId: string | null; indicatorLeft: number } | null>(null)
+  /** ドラッグ中のタブと、離したときに入る位置。 */
+  const [drag, setDrag] = useState<{ id: string; target: DropTarget | null } | null>(null)
   /** ドラッグを終えた直後のクリックを、タブの切り替えとして扱わないための印。 */
   const suppressClickRef = useRef(false)
 
   /** タブを押したところからドラッグを見張る。動かさずに離せば通常のクリックになる。 */
   function startDragWatch(e: React.PointerEvent, id: string): void {
     if (e.button !== 0) return
-    const strip = stripRef.current
-    if (!strip) return
     const startX = e.clientX
     const startY = e.clientY
     let active = false
     let pointerX = startX
-    let target: { beforeId: string | null; indicatorLeft: number } | null = null
+    let target: DropTarget | null = null
+    let targetStrip: HTMLElement | null = null
     let scrollFrame = 0
 
-    // ポインタの位置から、離したときに入る位置と、その目印の位置（タブ列の中の x）を求める。
-    const locate = (): { beforeId: string | null; indicatorLeft: number } => {
-      const els = Array.from(strip.querySelectorAll<HTMLElement>('[data-tab-id]'))
-      for (const el of els) {
-        const rect = el.getBoundingClientRect()
-        if (pointerX < rect.left + rect.width / 2) return { beforeId: el.dataset.tabId!, indicatorLeft: el.offsetLeft - 3 }
-      }
-      const last = els[els.length - 1]
-      return { beforeId: null, indicatorLeft: last ? last.offsetLeft + last.offsetWidth + 1 : 0 }
-    }
     const update = (): void => {
-      target = locate()
-      setDrag({ id, ...target })
+      const found = locateDrop(pointerX)
+      target = found?.target ?? null
+      targetStrip = found?.strip ?? null
+      setDrag({ id, target })
     }
-    // 端に寄せている間は、ポインタを止めていても横に送り続ける。
+    // 端に寄せている間は、ポインタを止めていても入る先のタブ列を横に送り続ける。
     const autoScroll = (): void => {
-      const rect = strip.getBoundingClientRect()
-      const delta =
-        pointerX < rect.left + DRAG_SCROLL_EDGE ? -DRAG_SCROLL_STEP : pointerX > rect.right - DRAG_SCROLL_EDGE ? DRAG_SCROLL_STEP : 0
-      if (delta !== 0) {
-        strip.scrollLeft += delta
-        update()
+      const strip = targetStrip
+      if (strip) {
+        const rect = strip.getBoundingClientRect()
+        const delta =
+          pointerX < rect.left + DRAG_SCROLL_EDGE ? -DRAG_SCROLL_STEP : pointerX > rect.right - DRAG_SCROLL_EDGE ? DRAG_SCROLL_STEP : 0
+        const before = strip.scrollLeft
+        if (delta !== 0) strip.scrollLeft += delta
+        if (strip.scrollLeft !== before) update()
       }
       scrollFrame = requestAnimationFrame(autoScroll)
     }
@@ -128,7 +162,7 @@ export function TabBar({
       setDrag(null)
       suppressClickRef.current = true
       setTimeout(() => (suppressClickRef.current = false), 0)
-      if (commit && target) onMove(id, target.beforeId)
+      if (commit && target) onMove(id, target.paneId, target.beforeId)
     }
     const onUp = (): void => finish(true)
     const onCancel = (): void => finish(false)
@@ -155,13 +189,13 @@ export function TabBar({
   // 前面のタブがはみ出していたら、タブ列だけを横にスクロールして見せる（Cmd/Ctrl+数字での切り替えなど）。
   useEffect(() => {
     const strip = stripRef.current
-    const el = strip?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeSessionId ?? '')}"]`)
+    const el = strip?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeId ?? '')}"]`)
     if (!strip || !el) return
     if (el.offsetLeft < strip.scrollLeft) strip.scrollLeft = el.offsetLeft
     else if (el.offsetLeft + el.offsetWidth > strip.scrollLeft + strip.clientWidth) {
       strip.scrollLeft = el.offsetLeft + el.offsetWidth - strip.clientWidth
     }
-  }, [activeSessionId, tabs.length])
+  }, [activeId, tabs.length])
 
   useEffect(() => {
     if (!menu) return
@@ -177,109 +211,86 @@ export function TabBar({
     }
   }, [menu])
 
-  function renderTab(tab: TabInfo): React.JSX.Element {
-    const isActive = tab.sessionId === activeSessionId
-    // 通知は前面にないタブにだけ出す。
-    const showPendingBadge = !isActive && tab.status?.hasPendingPermission
-    const showPulse = !isActive && tab.status?.sending
-    return (
-      <div
-        key={tab.sessionId}
-        data-tab-id={tab.sessionId}
-        className={cn(
-          'relative flex h-7 max-w-40 shrink-0 items-center gap-1.5 rounded-t-md border border-transparent px-2 text-xs',
-          isActive
-            ? 'border-border border-b-background bg-background text-foreground'
-            : tab.shown
-              ? 'text-foreground hover:bg-accent'
-              : 'text-muted-foreground hover:bg-accent',
-          drag?.id === tab.sessionId && 'opacity-50'
-        )}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          setMenu({ x: e.clientX, y: e.clientY, tab })
-        }}
-        onPointerDown={(e) => startDragWatch(e, tab.sessionId)}
-        onClickCapture={(e) => {
-          if (!suppressClickRef.current) return
-          e.preventDefault()
-          e.stopPropagation()
-        }}
-      >
-        {showPendingBadge && (
-          <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
-        )}
-        <button
-          className={cn('flex min-w-0 items-center gap-1.5 truncate', showPulse && 'animate-tab-pulse')}
-          onClick={() => onSelect(tab.sessionId)}
-        >
-          {tab.kind === 'file' && <File size={12} className="shrink-0" />}
-          {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
-          {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
-          {tab.kind === 'browser' && <Globe size={12} className="shrink-0" />}
-          {tab.kind === 'connecting' &&
-            (tab.failed ? (
-              <AlertTriangle size={12} className="shrink-0 text-destructive" />
-            ) : (
-              <Loader2 size={12} className="shrink-0 animate-spin" />
-            ))}
-          <span className="truncate" title={tab.tooltip ?? tab.title}>
-            {tab.title}
-          </span>
-        </button>
-        <button
-          className="opacity-60 hover:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation()
-            onClose(tab.sessionId)
-          }}
-        >
-          <X size={12} />
-        </button>
-      </div>
-    )
-  }
-
-  /** タブバーの並びを、分割ビューのグループごとのまとまりに分ける。 */
-  const runs: TabInfo[][] = []
-  for (const tab of tabs) {
-    const last = runs[runs.length - 1]
-    if (last && tab.splitGroupId !== undefined && last[0]!.splitGroupId === tab.splitGroupId) last.push(tab)
-    else runs.push([tab])
-  }
-
   return (
-    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border px-2">
+    <div
+      data-pane-bar={paneId}
+      className={cn(
+        'flex h-9 min-w-0 shrink-0 items-center gap-1 border-b border-t-2 border-b-border px-2',
+        showFocus && focused ? 'border-t-primary' : 'border-t-transparent'
+      )}
+    >
       {/*
         タブが多いときはこの列だけを横スクロールにする（スクロールバーは出さず、ホイールの縦回転も横へ送る）。
         ここで受け止めないと、はみ出したタブへのフォーカスで外側の列全体が横にずれる。
       */}
       <div
         ref={stripRef}
+        data-pane-strip
         className="relative flex h-full min-w-0 items-center gap-1 overflow-x-auto px-0.5 [scrollbar-width:none]"
         onWheel={(e) => {
           if (e.deltaX === 0 && e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY
         }}
       >
-      {runs.map((run) =>
-        run[0]!.splitGroupId === undefined ? (
-          renderTab(run[0]!)
-        ) : (
-          // 分割ビューのグループのタブは、共通の枠で囲む。
-          <div
-            key={run[0]!.splitGroupId}
-            className="flex h-8 shrink-0 items-center gap-1 rounded-md bg-muted/60 px-0.5 ring-1 ring-inset ring-border/70"
-          >
-            {run.map(renderTab)}
-          </div>
-        )
-      )}
-      {drag && (
-        <div
-          className="pointer-events-none absolute top-1 bottom-1 w-0.5 rounded-full bg-primary"
-          style={{ left: drag.indicatorLeft }}
-        />
-      )}
+        {tabs.map((tab) => {
+          const isActive = tab.sessionId === activeId
+          // 通知は前面にないタブにだけ出す。
+          const showPendingBadge = !isActive && tab.status?.hasPendingPermission
+          const showPulse = !isActive && tab.status?.sending
+          return (
+            <div
+              key={tab.sessionId}
+              data-tab-id={tab.sessionId}
+              className={cn(
+                'relative flex h-7 max-w-40 shrink-0 items-center gap-1.5 rounded-t-md border border-transparent px-2 text-xs',
+                isActive
+                  ? 'border-border border-b-background bg-background text-foreground'
+                  : 'text-muted-foreground hover:bg-accent',
+                drag?.id === tab.sessionId && 'opacity-50'
+              )}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setMenu({ x: e.clientX, y: e.clientY, tab })
+              }}
+              onPointerDown={(e) => startDragWatch(e, tab.sessionId)}
+              onClickCapture={(e) => {
+                if (!suppressClickRef.current) return
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+            >
+              {showPendingBadge && (
+                <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
+              )}
+              <button
+                className={cn('flex min-w-0 items-center gap-1.5 truncate', showPulse && 'animate-tab-pulse')}
+                onClick={() => onSelect(tab.sessionId)}
+              >
+                {tab.kind === 'file' && <File size={12} className="shrink-0" />}
+                {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
+                {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
+                {tab.kind === 'browser' && <Globe size={12} className="shrink-0" />}
+                {tab.kind === 'connecting' &&
+                  (tab.failed ? (
+                    <AlertTriangle size={12} className="shrink-0 text-destructive" />
+                  ) : (
+                    <Loader2 size={12} className="shrink-0 animate-spin" />
+                  ))}
+                <span className="truncate" title={tab.tooltip ?? tab.title}>
+                  {tab.title}
+                </span>
+              </button>
+              <button
+                className="opacity-60 hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClose(tab.sessionId)
+                }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )
+        })}
       </div>
       <button
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:opacity-40"
@@ -288,6 +299,12 @@ export function TabBar({
       >
         <Plus size={14} />
       </button>
+      {drag?.target && (
+        <div
+          className="pointer-events-none fixed z-50 w-0.5 rounded-full bg-primary"
+          style={{ left: drag.target.indicator.left, top: drag.target.indicator.top, height: drag.target.indicator.height }}
+        />
+      )}
       {menu && (
         <>
           {/* メニューの外のクリック（右クリックも）で閉じる。 */}
@@ -347,17 +364,6 @@ export function TabBar({
             >
               {t('tabBar.splitRight')}
             </MenuItem>
-            {menu.tab.splitGroupId !== undefined && (
-              <MenuItem
-                icon={<SquareSplitHorizontal size={14} />}
-                onClick={() => {
-                  onUnsplit(menu.tab.sessionId)
-                  setMenu(null)
-                }}
-              >
-                {t('tabBar.unsplit')}
-              </MenuItem>
-            )}
           </div>
         </>
       )}

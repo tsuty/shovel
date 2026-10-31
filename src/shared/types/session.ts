@@ -113,13 +113,13 @@ export type ReadOnlyRecordKind = Exclude<LocalRecordKind, 'current'>
  *   - `browser`: ブラウザのタブ（開いていたページの URL とタイトル）
  *   - `record`: セッション・履歴・Read Only のタブ。`fileName` はローカル記録のファイル名
  *   - `agentOnly`: `session/list` にだけあった（ローカル記録の無い）履歴のタブ
- * `split` は分割ビューのグループ（同じ `group` 番号のタブが1つのグループ）と、そのペインの幅の比率。
+ * `pane` は分割ビューのペイン（同じ `index` のタブが1つのペイン）と、その幅の比率・前面のタブか。
  * `attachedFile` はチャットの右に添えていたファイル（以前の形式。読み込むだけで、もう書き込まない）。
  */
 export type SavedTab =
-  | { kind: 'file'; relPath: string; split?: SavedSplit }
-  | { kind: 'browser'; url: string; title: string; split?: SavedSplit }
-  | { kind: 'record'; fileName: string; attachedFile?: string; split?: SavedSplit }
+  | { kind: 'file'; relPath: string; pane?: SavedPane }
+  | { kind: 'browser'; url: string; title: string; pane?: SavedPane }
+  | { kind: 'record'; fileName: string; attachedFile?: string; pane?: SavedPane }
   | {
       kind: 'agentOnly'
       key: string
@@ -127,12 +127,16 @@ export type SavedTab =
       title: string
       savedAt: number
       attachedFile?: string
-      split?: SavedSplit
+      pane?: SavedPane
     }
 
-export interface SavedSplit {
-  group: number
+export interface SavedPane {
+  index: number
   weight: number
+  /** そのペインの前面のタブ。 */
+  active?: boolean
+  /** 前面のペインの前面のタブ。 */
+  focused?: boolean
 }
 
 /**
@@ -140,8 +144,8 @@ export interface SavedSplit {
  * セッションのタブも接続はせず、履歴のタブとして開き直す。
  */
 export type RestoredTab =
-  | { kind: 'file'; relPath: string; split?: SavedSplit }
-  | { kind: 'browser'; url: string; title: string; split?: SavedSplit }
+  | { kind: 'file'; relPath: string; pane?: SavedPane }
+  | { kind: 'browser'; url: string; title: string; pane?: SavedPane }
   | {
       kind: 'history'
       snapshot: SessionSnapshot
@@ -150,7 +154,7 @@ export type RestoredTab =
       agentOnly?: boolean
       /** 以前の形式で、チャットの右に添えていたファイル。 */
       attachedFile?: string
-      split?: SavedSplit
+      pane?: SavedPane
     }
 
 /**
