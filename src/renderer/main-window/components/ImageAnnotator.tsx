@@ -526,7 +526,7 @@ export function ImageAnnotator({
   return (
     <Dialog open onOpenChange={(open) => !open && requestClose()}>
       <DialogContent
-        className="flex h-[90vh] w-[94vw] max-w-none flex-col gap-0 overflow-hidden p-0"
+        className="flex h-[90vh] w-[94vw] max-w-none flex-col gap-0 overflow-hidden p-0 outline-none"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={onEscape}
         onKeyDown={onKeyDown}
