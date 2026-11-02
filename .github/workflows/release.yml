@@ -71,17 +71,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+
+      # checkout は注釈付きタグを軽量タグとして取得することがあるので、タグを取り直す
+      - name: Fetch annotated tag
+        run: git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
 
+      # リリースノートの本文は注釈付きタグのメッセージを使う
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
         run: |
           gh release create "${GITHUB_REF_NAME}" artifacts/* \
             --title "${GITHUB_REF_NAME}" \
-            --generate-notes \
+            --notes-from-tag \
             --verify-tag

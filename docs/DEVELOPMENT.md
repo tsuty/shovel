@@ -151,10 +151,15 @@ sbx diagnose
   **リリース**: `package.json` の `version` と同じ `v<version>` タグ（例: `v0.0.1`）を
   push すると、`.github/workflows/release.yml` が macOS / Windows / Linux の各ランナーで
   typecheck・lint・test の後にパッケージを作り、GitHub Release に添付する。タグと
-  `version` が一致しなければ失敗する。
+  `version` が一致しなければ失敗する。Release の本文には注釈付きタグのメッセージが
+  そのまま入るので、タグは `-a` で作り、メッセージに変更点を箇条書きで書く。
+  `#` で始まる行は git がコメントとして消すため、見出しは使わない。
 
   ```bash
-  git tag v0.0.1
+  git tag -a v0.0.1 -F - <<'EOF'
+  - 〇〇を追加
+  - △△の不具合を修正
+  EOF
   git push origin v0.0.1
   ```
 
