@@ -1,4 +1,4 @@
-import { columnLabel, parseCsvRecords, toCsvTable } from '@renderer/main-window/csvTable'
+import { columnLabel, parseCsvRecords, toCsvTable, toTsv } from '@renderer/main-window/csvTable'
 
 function parseCsvTable(text: string, delimiter: ',' | '\t', firstRowIsHeader: boolean): ReturnType<typeof toCsvTable> {
   return toCsvTable(parseCsvRecords(text, delimiter), firstRowIsHeader)
@@ -59,6 +59,12 @@ describe('parseCsvRecords + toCsvTable', () => {
   })
 
   it('空のファイルは列も行も無い', () => {
-    expect(parseCsvTable('', ',', true)).toEqual({ headers: [], rows: [] })
+    expect(parseCsvTable('', ',', true)).toEqual({ headers: [], headerRow: null, rows: [] })
+  })
+})
+
+describe('toTsv', () => {
+  it('タブ・改行・引用符を含む値だけを引用符で囲む', () => {
+    expect(toTsv([['a', 'b\tc'], ['d\ne', 'say "hi"']])).toBe('a\t"b\tc"\n"d\ne"\t"say ""hi"""')
   })
 })

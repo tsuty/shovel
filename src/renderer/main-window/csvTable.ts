@@ -4,6 +4,8 @@ import Papa from 'papaparse'
 export interface CsvTableData {
   /** 列の見出し。1行目を見出しにしないとき、または見出しが空の列は A, B, C…。 */
   headers: string[]
+  /** 1行目を見出しにしたときの、その行の値（列の数に揃えてある）。見出しにしないときは null。 */
+  headerRow: string[] | null
   rows: CsvRow[]
 }
 
@@ -42,13 +44,19 @@ export function toCsvTable(records: string[][], firstRowIsHeader: boolean): CsvT
   const headers = Array.from({ length: columnCount }, (_, i) => headerRecord?.[i] || columnLabel(i))
   const body = firstRowIsHeader ? records.slice(1) : records
   const offset = firstRowIsHeader ? 2 : 1
+  const pad = (record: string[]): string[] =>
+    record.length === columnCount ? record : [...record, ...Array<string>(columnCount - record.length).fill('')]
   return {
     headers,
-    rows: body.map((record, i) => ({
-      rowNumber: i + offset,
-      cells: record.length === columnCount ? record : [...record, ...Array<string>(columnCount - record.length).fill('')]
-    }))
+    headerRow: firstRowIsHeader && records[0] ? pad(records[0]) : null,
+    rows: body.map((record, i) => ({ rowNumber: i + offset, cells: pad(record) }))
   }
+}
+
+/** レコードを TSV にする。タブ・改行・`"` を含む値は `"` で囲み、中の `"` は `""` にする（Excel と同じ）。 */
+export function toTsv(records: readonly (readonly string[])[]): string {
+  const quote = (value: string): string => (/[\t\r\n"]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value)
+  return records.map((record) => record.map(quote).join('\t')).join('\n')
 }
 
 const HEADER_STORAGE_PREFIX = 'shovel.csvFirstRowIsHeader:'

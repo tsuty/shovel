@@ -61,8 +61,8 @@ bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports
 open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in
 `src/shared/fileKinds.ts`): Markdown, Mermaid and HTML get split/source/preview (Mermaid's preview is the diagram, debounced, with zoom/fit/drag-pan via `MermaidViewer` (on `ZoomableView`) — also used by the ```` ```mermaid ```` popup, which can be maximized; print view keeps the static `MermaidDiagram`, decisions.md N-3-2b「大きい図の表示」; HTML renders in a script-less `sandbox="allow-popups"` srcdoc iframe — `HtmlPreview.tsx`, links go out via `<base target="_blank">` → `setWindowOpenHandler`),
 JSON/YAML (and plain `.txt`, uncoloured) get a highlighted "表示" view by default plus an "編集" toggle (`usesViewEditModes`);
-CSV/TSV use the same toggle with "表示" as a read-only virtualized table (`CsvTable.tsx`: PapaParse + TanStack Table/Virtual, sort,
-column resize, a per-file "1行目を見出しにする" checkbox in `localStorage`; files over 10MB only offer "open with default app";
+CSV/TSV use the same toggle with "表示" as a read-only virtualized table (`CsvTable.tsx`: PapaParse + TanStack Table/Virtual, sort via the header's ▲▼ icon,
+column resize, spreadsheet-style cell selection (click/drag/Shift/Cmd/arrows, row number/header for whole rows/columns; multi-range copy follows Excel's same-rows-or-same-columns rule — `cellSelection.ts`, unit-tested) copied as TSV by Cmd/Ctrl+C or right-click; the table is `user-select: none`, a per-file "1行目を見出しにする" checkbox in `localStorage`; files over 10MB only offer "open with default app";
 row-number cells must not be `position: sticky` — that crashed the renderer on ~200k rows; decisions.md N-3-12). The editing
 surface is CodeMirror 6, driven directly via `EditorView` (no React wrapper; `src/renderer/main-window/codeEditor.ts`,
 decisions.md N-3-1 改訂 2026-10-17): syntax colours come from shiki (`shikiHighlight.ts` turns `codeToTokens` into
