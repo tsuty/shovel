@@ -514,19 +514,8 @@ export function App(): React.JSX.Element {
     setBookmarkDraft(null)
   }
 
-  /**
-   * ファイラーの「コンテキストに追加」やブラウザの右クリックの宛先。前面のペインの前面のタブがセッションならそれ、
-   * そうでなければ表示中の（各ペインの前面の）セッションのうち最も左のもの。
-   */
-  const contextTargetId = [activeSessionId, ...layout.panes.map((pane) => pane.activeTabId)].find((id) =>
-    tabs.some((tab) => tab.sessionId === id && tab.kind === 'session')
-  )
-
-  function addToContext(relPath: string): void {
-    if (contextTargetId) addAttachmentToSession(contextTargetId, relPath)
-  }
-
-  // ブラウザの右クリックの「チャットへ渡す項目」のサブメニューに出す、接続済みのチャットの一覧。
+  // ファイラーの「コンテキストに追加」とブラウザの右クリックの「チャットへ渡す項目」のサブメニューに出す、
+  // 接続済みのチャットの一覧。
   // 並びはペインの左から、ペインの中はタブの並び順。
   const chatTargets: ChatTarget[] = layout.panes.flatMap((pane) =>
     pane.tabIds.flatMap((id) => {
@@ -539,19 +528,26 @@ export function App(): React.JSX.Element {
     void window.shovel.browser.setChatTargets(JSON.parse(chatTargetsKey) as ChatTarget[]).catch(() => {})
   }, [chatTargetsKey])
 
+  /** 選ばれたチャットをそのペインの前面に出してファイルを添付し、入力欄にフォーカスを移す。 */
+  function attachToChat(relPath: string, targetId: string): void {
+    activate(targetId)
+    addAttachmentToSession(targetId, relPath)
+    focusSessionInput(targetId)
+  }
+
   // 選ばれたチャットをそのペインの前面に出してから、入力欄へ文字を足す／添付する。
   const activateRef = useRef(activate)
   activateRef.current = activate
+  const attachToChatRef = useRef(attachToChat)
+  attachToChatRef.current = attachToChat
   useEffect(() => {
     const offInsert = window.shovel.browser.onInsertToChat((targetId, insertion) => {
       activateRef.current(targetId)
       insertTextToSession(targetId, insertion)
     })
-    const offAttach = window.shovel.browser.onAttachToChat((targetId, relPath) => {
-      activateRef.current(targetId)
-      addAttachmentToSession(targetId, relPath)
-      focusSessionInput(targetId)
-    })
+    const offAttach = window.shovel.browser.onAttachToChat((targetId, relPath) =>
+      attachToChatRef.current(relPath, targetId)
+    )
     return () => {
       offInsert()
       offAttach()
@@ -876,7 +872,8 @@ export function App(): React.JSX.Element {
           onRenameTab={renameTab}
           onCloseTab={(id) => void closeTab(id)}
           onRecordsDeleted={closeRecordTabs}
-          onAddToContext={addToContext}
+          chatTargets={chatTargets}
+          onAddToContext={attachToChat}
           bookmarks={bookmarks}
           onNewBrowserTab={() => openBrowserTab()}
           onOpenBookmark={(bookmark) => openBrowserTab(bookmark.url)}

@@ -126,6 +126,8 @@
   "filer": {
     "copyPath": "Copy path",
     "addToContext": "Add to context",
+    "visibleChat": "{{title}} (visible)",
+    "noChats": "No open chats",
     "noPreview": "This file can't be previewed in the app.",
     "openWithDefaultApp": "Open with default app",
     "viewerError": "Couldn't display this file.",

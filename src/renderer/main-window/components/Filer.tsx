@@ -26,6 +26,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import type { FsEntry } from '@shared/types/filer'
 import type { NewFileKind } from '@shared/fileKinds'
+import type { ChatTarget } from '@shared/chatDraft'
 import { cn } from '../../shared/lib/utils'
 import { MERMAID_BRAND_COLOR, MermaidIcon } from '../../shared/components/icons/MermaidIcon'
 import { MenuItem, SubMenu } from './MenuItem'
@@ -110,12 +111,16 @@ function targetDirFor(node: FsNode | null): string {
 export function Filer({
   projectId,
   onOpenFile,
+  chatTargets,
   onAddToContext
 }: {
   projectId: string
   /** `at` があれば、開いた後にその位置（コンテンツ検索の一致箇所）へ移る。 */
   onOpenFile: (relPath: string, at?: Omit<FileReveal, 'nonce'>) => void
-  onAddToContext: (relPath: string) => void
+  /** 「コンテキストに追加 ▸」のサブメニューに出す、渡す先に選べるチャット。 */
+  chatTargets: ChatTarget[]
+  /** `relPath` のファイルを `targetId` のチャットに添付する。 */
+  onAddToContext: (relPath: string, targetId: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [data, setDataState] = useState<FsNode[]>([])
@@ -457,15 +462,25 @@ export function Filer({
             </MenuItem>
           )}
           {menu.node && !menu.node.isDir && (
-            <MenuItem
-              icon={<FilePlus size={14} />}
-              onClick={() => {
-                onAddToContext(menu.node!.relPath)
-                setMenu(null)
-              }}
-            >
-              {t('filer.addToContext')}
-            </MenuItem>
+            <SubMenu icon={<FilePlus size={14} />} label={t('filer.addToContext')}>
+              {chatTargets.length === 0 ? (
+                <MenuItem disabled onClick={() => {}}>
+                  {t('filer.noChats')}
+                </MenuItem>
+              ) : (
+                chatTargets.map((target) => (
+                  <MenuItem
+                    key={target.id}
+                    onClick={() => {
+                      onAddToContext(menu.node!.relPath, target.id)
+                      setMenu(null)
+                    }}
+                  >
+                    {target.visible ? t('filer.visibleChat', { title: target.title }) : target.title}
+                  </MenuItem>
+                ))
+              )}
+            </SubMenu>
           )}
           {(!menu.node || menu.node.isDir) && (
             <MenuItem icon={<FolderOpen size={14} />} onClick={() => void handleOpenInOS(menu.node)}>

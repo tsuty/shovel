@@ -125,6 +125,8 @@
   "filer": {
     "copyPath": "パスをコピー",
     "addToContext": "コンテキストに追加",
+    "visibleChat": "{{title}}（表示中）",
+    "noChats": "開いているチャットはありません",
     "noPreview": "このファイルはアプリ内でプレビューできません。",
     "openWithDefaultApp": "既定のアプリで開く",
     "viewerError": "このファイルを表示できませんでした。",

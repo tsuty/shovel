@@ -68,7 +68,7 @@ export function SessionView({
     })
   }, [sessionId])
 
-  // ファイラーの「コンテキストに追加」を、このセッションの添付チップへ反映する。
+  // ファイラーの「コンテキストに追加」やブラウザのスクリーンショットを、このセッションの添付チップへ反映する。
   useEffect(() => {
     return registerAttachHandler(sessionId, (relPath) => {
       setAttachments((prev) => (prev.some((c) => c.path === relPath) ? prev : [...prev, chipFromRelPath(relPath)]))

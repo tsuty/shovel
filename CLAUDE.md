@@ -94,8 +94,7 @@ width to its neighbor. Filer/history/bookmarks open into the focused pane, and a
 to front. Cmd/Ctrl+digits and ←/→ count only the focused pane's tabs. Pane layout, widths and active tabs are saved
 per tab (`SavedTab.pane`). Pure logic lives in `src/renderer/main-window/paneLayout.ts` (unit-tested); the tab area is
 a CSS grid (row 1 tab bars, row 2 contents) and tab contents stay in mount order and are only placed by grid column,
-so moving a tab across panes never moves its DOM (no iframe/webview reload); Cmd/Ctrl+F and "add to context"
-target the focused pane; the editor toolbar collapses to icons below 640px. **Browser tabs** (decisions.md G-1-20,
+so moving a tab across panes never moves its DOM (no iframe/webview reload); Cmd/Ctrl+F targets the focused pane; the editor toolbar collapses to icons below 640px. **Browser tabs** (decisions.md G-1-20,
 `BrowserView.tsx`): an Electron `<webview>` created imperatively (not by React) with back/forward/reload, an address bar
 (`addressToUrl` in `src/shared/browserUrl.ts`: scheme added for domain-like input, else Google search), ☆ bookmark toggle,
 open-externally and an in-tab find bar (`findInPage`); not counted toward the tab limit, restored by URL. Main
@@ -108,7 +107,7 @@ automatically — or save a visible-area `capturePage()` PNG to `.shovel/screens
 submenu listing every connected chat (left pane first, "（表示中）" on visible ones, a disabled "no open chats" row when
 none), and picking a hidden chat brings it to front and focuses its composer. The renderer pushes that list to main via
 `browser:setChatTargets` (decisions.md G-1-20「チャットへ渡す項目」, `src/shared/chatDraft.ts`). The Filer's "add to
-context" still uses the G-1-19 target rule (to be aligned later). Bookmarks are
+context ▸" uses the same chat list submenu and the same bring-to-front + focus behavior. Bookmarks are
 per project (`electron-store` `bookmarks`, `bookmarkService.ts`), managed from a "browser" sidebar panel
 (`BrowserPanel.tsx`/`BookmarkDialog.tsx`). The browser runs on the host, outside the sandbox, and the agent can't drive
 it. Playwright's synthetic mouse/keys don't reach a `<webview>` guest — use real X input (`xdotool` + a window manager

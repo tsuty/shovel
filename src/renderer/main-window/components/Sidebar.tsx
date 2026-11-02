@@ -9,6 +9,7 @@ import { Filer } from './Filer'
 import type { FileReveal } from '../revealMatch'
 import { ChatHistoryPanel } from './ChatHistoryPanel'
 import { ResizablePanel } from './ResizablePanel'
+import type { ChatTarget } from '@shared/chatDraft'
 import { BrowserPanel } from './BrowserPanel'
 
 export type SidebarPanel = 'tabs' | 'filer' | 'browser'
@@ -35,6 +36,7 @@ export function Sidebar({
   onRenameTab,
   onCloseTab,
   onRecordsDeleted,
+  chatTargets,
   onAddToContext,
   bookmarks,
   onNewBrowserTab,
@@ -57,7 +59,8 @@ export function Sidebar({
   onRenameTab: (sessionId: string, title: string) => void
   onCloseTab: (sessionId: string) => void
   onRecordsDeleted: (fileNames: string[]) => void
-  onAddToContext: (relPath: string) => void
+  chatTargets: ChatTarget[]
+  onAddToContext: (relPath: string, targetId: string) => void
   bookmarks: Bookmark[]
   onNewBrowserTab: () => void
   onOpenBookmark: (bookmark: Bookmark) => void
@@ -129,6 +132,7 @@ export function Sidebar({
             <Filer
               projectId={projectId}
               onOpenFile={onOpenFile}
+              chatTargets={chatTargets}
               onAddToContext={onAddToContext}
             />
           )}
