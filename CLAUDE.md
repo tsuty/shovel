@@ -57,7 +57,11 @@ rejected because `shell.openPath` can execute agent-written scripts on the host)
 read-only syntax-highlighted viewer (every file view — including binaries and too-large CSVs — has a bottom status bar whose left end is the
 project-relative path, click to copy; the autosave time sits on the right; file tabs' tooltips are the path too —
 `FileStatusBar.tsx`, decisions.md N-3-13) (images previewed in-app — zoom/fit/drag-pan via the same `ZoomableView` as Mermaid, starting at fit-to-view — with a size + width×height status
-bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those. Editable text files all
+bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those. Non-SVG images get an "注釈を付ける" button (top-left) that opens `ImageAnnotator.tsx`, a dialog for drawing
+rectangles/ellipses/arrows/text (select-move, recolor, undo/redo, text via an overlaid `textarea` for IME) as SVG over the
+image, then re-drawn on a Canvas and saved as a *new* `<name>-annotated.png` next to the original via `fs:saveAnnotatedImage`
+(never overwrites; annotations are burned in and not re-editable; geometry/history in `annotation.ts`, unit-tested;
+decisions.md N-3-15). Editable text files all
 open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in
 `src/shared/fileKinds.ts`): Markdown, Mermaid and HTML get split/source/preview (Mermaid's preview is the diagram, debounced, with zoom/fit/drag-pan via `MermaidViewer` (on `ZoomableView`) — also used by the ```` ```mermaid ```` popup, which can be maximized; print view keeps the static `MermaidDiagram`, decisions.md N-3-2b「大きい図の表示」; HTML renders in a script-less `sandbox="allow-popups"` srcdoc iframe — `HtmlPreview.tsx`, links go out via `<base target="_blank">` → `setWindowOpenHandler`),
 JSON/YAML (and plain `.txt`, uncoloured) get a highlighted "表示" view by default plus an "編集" toggle (`usesViewEditModes`);
@@ -103,7 +107,7 @@ open-externally and an in-tab find bar (`findInPage`); not counted toward the ta
 permission requests, turns popups into new browser tabs, and forwards the guest's Cmd/Ctrl+F, focus and mouse-down to the
 host (`browser:findRequested` / `browser:focused`) since guest input never reaches the host window. The page's right-click
 also hands things to a chat (quote the selection / paste the link or page URL into the composer — never sent
-automatically — or save a visible-area `capturePage()` PNG to `.shovel/screenshots/` and attach it); each item has a
+automatically — or save a visible-area `capturePage()` PNG to `.shovel/screenshots/` and attach it — directly, or after annotating it in `ImageAnnotator` ("保存して添付" attaches the `-annotated.png`; the raw capture stays saved)); each item has a
 submenu listing every connected chat (left pane first, "（表示中）" on visible ones, a disabled "no open chats" row when
 none), and picking a hidden chat brings it to front and focuses its composer. The renderer pushes that list to main via
 `browser:setChatTargets` (decisions.md G-1-20「チャットへ渡す項目」, `src/shared/chatDraft.ts`). The Filer's "add to

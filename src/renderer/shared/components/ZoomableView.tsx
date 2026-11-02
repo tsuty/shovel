@@ -28,16 +28,20 @@ interface DragStart {
  * - `natural`: 中身の本来の寸法。null の間は箱を隠して `placeholder` を出す（読み込み中・エラー）。
  *   null になっても拡大率とモードは保つので、描き直し・読み直しをまたいで表示が保たれる。
  * - `initialMode`: 最初の拡大率の決め方。ダブルクリックで等倍から戻るときもこのモードにする。
+ * - `pointerNavigation`: false なら、ドラッグでの移動とダブルクリックでの拡大率の切り替えをしない
+ *   （中身がポインタの操作を使うとき。拡大・縮小はボタンと Cmd/Ctrl＋ホイール、移動はスクロールで行う）。
  */
 export function ZoomableView({
   natural,
   initialMode,
+  pointerNavigation = true,
   placeholder,
   className,
   children
 }: {
   natural: Size | null
   initialMode: 'fitWidth' | 'fitAll'
+  pointerNavigation?: boolean
   placeholder?: React.ReactNode
   className?: string
   children: React.ReactNode
@@ -160,7 +164,7 @@ export function ZoomableView({
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
     const scroller = scrollRef.current
-    if (e.button !== 0 || !scroller || !canPan) return
+    if (!pointerNavigation || e.button !== 0 || !scroller || !canPan) return
     // 文字の選択・画像のドラッグが始まらないようにする。
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -183,7 +187,7 @@ export function ZoomableView({
 
   /** ダブルクリックで「合わせる ⇔ 等倍」を切り替える。等倍にするときはポインタの位置を中心にする。 */
   function onDoubleClick(e: React.MouseEvent<HTMLDivElement>): void {
-    if (!naturalRef.current) return
+    if (!pointerNavigation || !naturalRef.current) return
     if (modeRef.current === 'manual') fitTo(initialMode)
     else zoomTo(1, { x: e.clientX, y: e.clientY })
   }
@@ -199,7 +203,7 @@ export function ZoomableView({
             'flex min-h-full w-max min-w-full justify-center',
             initialMode === 'fitAll' ? 'items-center' : 'items-start',
             !ready && 'hidden',
-            canPan && (dragging ? 'cursor-grabbing' : 'cursor-grab')
+            pointerNavigation && canPan && (dragging ? 'cursor-grabbing' : 'cursor-grab')
           )}
           style={{ padding: PADDING }}
           onPointerDown={onPointerDown}

@@ -91,6 +91,7 @@ export const IpcChannel = {
   FsReadClipboardFiles: 'fs:readClipboardFiles',
   FsCopyExternal: 'fs:copyExternal',
   FsSearch: 'fs:search',
+  FsSaveAnnotatedImage: 'fs:saveAnnotatedImage',
 
   CommandRun: 'command:run',
   CommandRunTty: 'command:runTty',
@@ -124,7 +125,8 @@ export const IpcChannel = {
   BrowserFindRequested: 'browser:findRequested',
   BrowserFocused: 'browser:focused',
   BrowserInsertToChat: 'browser:insertToChat',
-  BrowserAttachToChat: 'browser:attachToChat'
+  BrowserAttachToChat: 'browser:attachToChat',
+  BrowserAnnotateScreenshot: 'browser:annotateScreenshot'
 } as const
 
 export interface CreateNewDirRequest {
@@ -338,6 +340,8 @@ export interface RendererApi {
     pathForFile(file: File): string
     /** ファイル名とコンテンツの検索（`scopeRelPath` が空ならプロジェクト全体）。新しい検索に追い越されたときは null。 */
     search(projectId: string, scopeRelPath: string, query: string): Promise<FileSearchResults | null>
+    /** 注釈を付けた画像（PNG）を元の画像の隣に別のファイルとして保存し、その相対パスを返す。 */
+    saveAnnotatedImage(projectId: string, sourceRelPath: string, png: Uint8Array): Promise<string>
   }
   command: {
     run(projectId: string, command: string): Promise<{ runId: string }>
@@ -377,6 +381,8 @@ export interface RendererApi {
     onInsertToChat(cb: (targetId: string, insertion: DraftInsertion) => void): () => void
     /** ページの右クリックから、プロジェクトに保存したファイル（スクリーンショット）を `targetId` のチャットに添付するよう求められた。 */
     onAttachToChat(cb: (targetId: string, relPath: string) => void): () => void
+    /** ページの右クリックから、保存したスクリーンショットに注釈を付けて `targetId` のチャットに添付するよう求められた。 */
+    onAnnotateScreenshot(cb: (targetId: string, relPath: string) => void): () => void
   }
   bookmarks: {
     list(projectId: string): Promise<Bookmark[]>

@@ -61,6 +61,7 @@ import {
   readClipboardFilePaths,
   readFileForViewer,
   renameEntry,
+  saveAnnotatedImage,
   searchFiles,
   writeTextFile
 } from '../domain/filerService'
@@ -235,6 +236,11 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IpcChannel.FsSearch, (event, projectId: string, scopeRelPath: string, query: string) =>
     searchFiles(event.sender.id, projectId, scopeRelPath, query)
+  )
+  ipcMain.handle(
+    IpcChannel.FsSaveAnnotatedImage,
+    (_event, projectId: string, sourceRelPath: string, png: Uint8Array) =>
+      saveAnnotatedImage(projectId, sourceRelPath, png)
   )
   ipcMain.handle(IpcChannel.FsReadFile, (_event, projectId: string, relPath: string) =>
     readFileForViewer(projectId, relPath)

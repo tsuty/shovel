@@ -124,7 +124,9 @@ const api: RendererApi = {
     copyExternal: (projectId, absPaths, destDirRelPath) =>
       ipcRenderer.invoke(IpcChannel.FsCopyExternal, projectId, absPaths, destDirRelPath),
     pathForFile: (file) => webUtils.getPathForFile(file),
-    search: (projectId, scopeRelPath, query) => ipcRenderer.invoke(IpcChannel.FsSearch, projectId, scopeRelPath, query)
+    search: (projectId, scopeRelPath, query) => ipcRenderer.invoke(IpcChannel.FsSearch, projectId, scopeRelPath, query),
+    saveAnnotatedImage: (projectId, sourceRelPath, png) =>
+      ipcRenderer.invoke(IpcChannel.FsSaveAnnotatedImage, projectId, sourceRelPath, png)
   },
   command: {
     run: (projectId, command) => ipcRenderer.invoke(IpcChannel.CommandRun, projectId, command),
@@ -185,6 +187,11 @@ const api: RendererApi = {
       const listener = (_event: unknown, targetId: string, relPath: string): void => cb(targetId, relPath)
       ipcRenderer.on(IpcChannel.BrowserAttachToChat, listener)
       return () => ipcRenderer.removeListener(IpcChannel.BrowserAttachToChat, listener)
+    },
+    onAnnotateScreenshot: (cb) => {
+      const listener = (_event: unknown, targetId: string, relPath: string): void => cb(targetId, relPath)
+      ipcRenderer.on(IpcChannel.BrowserAnnotateScreenshot, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserAnnotateScreenshot, listener)
     }
   },
   bookmarks: {

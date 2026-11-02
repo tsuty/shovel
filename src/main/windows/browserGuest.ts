@@ -24,6 +24,7 @@ const labels = {
     linkToChat: 'Paste link into chat',
     pageUrlToChat: 'Paste page URL into chat',
     screenshotToChat: 'Attach screenshot to chat',
+    annotatedScreenshotToChat: 'Annotate screenshot and attach to chat',
     visibleChat: (title: string) => `${title} (visible)`,
     noChats: 'No open chats'
   },
@@ -39,6 +40,7 @@ const labels = {
     linkToChat: 'リンクをチャットに貼る',
     pageUrlToChat: 'ページの URL をチャットに貼る',
     screenshotToChat: 'スクリーンショットをチャットに添付',
+    annotatedScreenshotToChat: 'スクリーンショットに注釈を付けてチャットに添付',
     visibleChat: (title: string) => `${title}（表示中）`,
     noChats: '開いているチャットはありません'
   }
@@ -197,19 +199,32 @@ function chatMenuItems(
   if (projectId) {
     items.push({
       label: t.screenshotToChat,
-      submenu: targetMenu((id) => void attachScreenshot(contents, projectId, id))
+      submenu: targetMenu((id) => void attachScreenshot(contents, projectId, id, false))
+    })
+    items.push({
+      label: t.annotatedScreenshotToChat,
+      submenu: targetMenu((id) => void attachScreenshot(contents, projectId, id, true))
     })
   }
   return items
 }
 
-/** ページの見えている範囲を撮ってプロジェクトに保存し、`targetId` のチャットに添付するよう renderer へ伝える。 */
-async function attachScreenshot(contents: WebContents, projectId: string, targetId: string): Promise<void> {
+/**
+ * ページの見えている範囲を撮ってプロジェクトに保存し、`targetId` のチャットに添付するよう renderer へ伝える。
+ * `annotate` なら、添付する前に注釈を付ける画面を開くよう伝える（撮った元の画像は保存したまま残る）。
+ */
+async function attachScreenshot(
+  contents: WebContents,
+  projectId: string,
+  targetId: string,
+  annotate: boolean
+): Promise<void> {
   try {
     const image = await contents.capturePage()
     if (image.isEmpty()) throw new Error('captured image is empty')
     const relPath = await saveScreenshot(projectId, image.toPNG())
-    contents.hostWebContents?.send(IpcChannel.BrowserAttachToChat, targetId, relPath)
+    const channel = annotate ? IpcChannel.BrowserAnnotateScreenshot : IpcChannel.BrowserAttachToChat
+    contents.hostWebContents?.send(channel, targetId, relPath)
   } catch (err) {
     console.warn('[browser] screenshot failed:', err)
   }

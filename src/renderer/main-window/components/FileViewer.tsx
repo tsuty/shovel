@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, PenLine } from 'lucide-react'
 import type { FileReadResult } from '@shared/types/filer'
 import { highlightToHtml, langFromFilename } from '../../shared/lib/shiki'
 import { Button } from '../../shared/components/ui/button'
@@ -64,15 +64,18 @@ type ViewState =
  * アプリ内で編集できない（`TextFileEditor` で開かない）ファイルのビューア。テキストは shiki で
  * ハイライトし行番号を付けて表示する。画像はアプリ内でプレビューし、それ以外のバイナリは
  * OS の関連付けアプリで開くボタンを出す。`reveal` が来たら、その行へ移って一致箇所を塗る。
+ * `onAnnotate` を渡すと、SVG 以外の画像に「注釈を付ける」ボタンを出す。
  */
 export function FileViewer({
   projectId,
   relPath,
-  reveal
+  reveal,
+  onAnnotate
 }: {
   projectId: string
   relPath: string
   reveal?: FileReveal
+  onAnnotate?: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
@@ -175,7 +178,16 @@ export function FileViewer({
       )
     case 'image':
       return (
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="relative flex flex-1 flex-col overflow-hidden">
+          {onAnnotate && svgSizeHints(view.dataUrl) === null && (
+            <button
+              className="absolute left-2 top-2 z-10 flex h-7 items-center gap-1 rounded-md border border-border bg-background/90 px-2 text-xs text-muted-foreground shadow-xs hover:bg-accent hover:text-foreground"
+              onClick={onAnnotate}
+            >
+              <PenLine size={14} />
+              {t('annotate.open')}
+            </button>
+          )}
           <ZoomableView natural={imageNatural} initialMode="fitAll" className="flex-1">
             <img
               src={view.dataUrl}

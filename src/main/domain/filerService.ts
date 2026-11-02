@@ -208,6 +208,28 @@ export async function saveScreenshot(projectId: string, png: Buffer, now = new D
   return `${SCREENSHOT_DIR}/${name}`
 }
 
+/** PNG ファイルの先頭 8 バイト。 */
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+/**
+ * 注釈を付けた画像（PNG）を、元の画像と同じフォルダに `<元の名前>-annotated.png` として保存し、その相対パスを返す。
+ * 元の画像は変えない。同名があれば番号を付ける。
+ */
+export async function saveAnnotatedImage(projectId: string, sourceRelPath: string, png: Uint8Array): Promise<string> {
+  const data = Buffer.from(png)
+  if (data.length < PNG_SIGNATURE.length || !data.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+    throw new Error('not a PNG image')
+  }
+  const project = requireProject(projectId)
+  const sourceAbs = resolveAbsolute(project, sourceRelPath)
+  const dirAbs = path.dirname(sourceAbs)
+  const stem = path.basename(sourceAbs, path.extname(sourceAbs))
+  const name = await findAvailableName(dirAbs, `${stem}-annotated`, '.png')
+  await writeFile(path.join(dirAbs, name), data, { flag: 'wx' })
+  const dirRel = path.posix.dirname(sourceRelPath)
+  return dirRel === '.' ? name : `${dirRel}/${name}`
+}
+
 export async function renameEntry(projectId: string, relPath: string, newName: string): Promise<void> {
   const project = requireProject(projectId)
   const absPath = resolveAbsolute(project, relPath)

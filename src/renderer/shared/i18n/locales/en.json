@@ -176,6 +176,40 @@
     "fitWidth": "Fit to width",
     "fitAll": "Fit to view"
   },
+  "annotate": {
+    "title": "Annotate image",
+    "hint": "The original image is kept as is; the annotated image is saved as a separate file (…-annotated.png).",
+    "save": "Save as new file",
+    "saveAndAttach": "Save and attach",
+    "saveFailed": "Could not save: {{message}}",
+    "cannotOpen": "This image cannot be annotated.",
+    "confirmDiscard": "Discard the annotations and close?",
+    "undo": "Undo",
+    "redo": "Redo",
+    "delete": "Delete selected annotation",
+    "tool": {
+      "select": "Select / move",
+      "rect": "Rectangle",
+      "ellipse": "Ellipse",
+      "arrow": "Arrow",
+      "text": "Text"
+    },
+    "color": {
+      "ef4444": "Red",
+      "f97316": "Orange",
+      "eab308": "Yellow",
+      "22c55e": "Green",
+      "3b82f6": "Blue",
+      "111827": "Black",
+      "ffffff": "White"
+    },
+    "size": {
+      "0": "Thin / small",
+      "1": "Medium",
+      "2": "Thick / large"
+    },
+    "open": "Annotate"
+  },
   "editor": {
     "mode": {
       "split": "Split",

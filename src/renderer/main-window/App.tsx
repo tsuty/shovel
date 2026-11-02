@@ -39,6 +39,7 @@ import type { Bookmark } from '@shared/types/browser'
 import type { ChatTarget } from '@shared/chatDraft'
 import { BrowserView } from './components/BrowserView'
 import { BookmarkDialog } from './components/BookmarkDialog'
+import { ImageAnnotator } from './components/ImageAnnotator'
 import {
   activateTab,
   canSplitRight,
@@ -219,6 +220,8 @@ export function App(): React.JSX.Element {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   /** ブックマークの追加・編集ダイアログ。`id` があれば編集。 */
   const [bookmarkDraft, setBookmarkDraft] = useState<{ id?: string; title: string; url: string } | null>(null)
+  /** 注釈を付けている画像。`attachTo` があれば、保存した画像をそのチャットに添付する（無ければ開く）。 */
+  const [annotating, setAnnotating] = useState<{ relPath: string; attachTo?: string } | null>(null)
   const [commandsHeight, setCommandsHeight] = useState(COMMANDS_DEFAULT_HEIGHT)
   const [tabStatuses, setTabStatuses] = useState<
     Record<string, { sending: boolean; hasPendingPermission: boolean }>
@@ -548,9 +551,13 @@ export function App(): React.JSX.Element {
     const offAttach = window.shovel.browser.onAttachToChat((targetId, relPath) =>
       attachToChatRef.current(relPath, targetId)
     )
+    const offAnnotate = window.shovel.browser.onAnnotateScreenshot((targetId, relPath) =>
+      setAnnotating({ relPath, attachTo: targetId })
+    )
     return () => {
       offInsert()
       offAttach()
+      offAnnotate()
     }
   }, [])
 
@@ -995,7 +1002,12 @@ export function App(): React.JSX.Element {
                       reveal={revealFor(tab.relPath)}
                     />
                   ) : (
-                    <FileViewer projectId={projectId} relPath={tab.relPath} reveal={revealFor(tab.relPath)} />
+                    <FileViewer
+                      projectId={projectId}
+                      relPath={tab.relPath}
+                      reveal={revealFor(tab.relPath)}
+                      onAnnotate={() => setAnnotating({ relPath: tab.relPath })}
+                    />
                   )}
                 </div>
               )
@@ -1049,6 +1061,21 @@ export function App(): React.JSX.Element {
         onSave={commitBookmark}
         onCancel={() => setBookmarkDraft(null)}
       />
+      {annotating && projectId && (
+        <ImageAnnotator
+          key={annotating.relPath}
+          projectId={projectId}
+          relPath={annotating.relPath}
+          attaching={annotating.attachTo !== undefined}
+          onCancel={() => setAnnotating(null)}
+          onSaved={(savedRelPath) => {
+            const { attachTo } = annotating
+            setAnnotating(null)
+            if (attachTo) attachToChat(savedRelPath, attachTo)
+            else openFile(savedRelPath)
+          }}
+        />
+      )}
       <AuthDialog
         open={authOpen}
         onOpenChange={setAuthOpen}
