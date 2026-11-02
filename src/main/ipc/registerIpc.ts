@@ -80,6 +80,7 @@ import { searchLocalRecords } from '../domain/localSearch'
 import { restoreOpenTabs, saveOpenTabs } from '../domain/openTabsService'
 import { listBookmarks, saveBookmarks } from '../domain/bookmarkService'
 import { openExternalIfSafe } from '../windows/createSecureWindow'
+import { setChatTargets } from '../windows/browserGuest'
 import { isWebUrl } from '@shared/browserUrl'
 import type { Bookmark } from '@shared/types/browser'
 import { getAcpUpdateOffer, resolveAcpUpdate, rollbackAcpVersion } from '../domain/acpVersionService'
@@ -104,6 +105,7 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.BrowserOpenExternal, (_event, url: string) => {
     if (typeof url === 'string' && isWebUrl(url)) openExternalIfSafe(url)
   })
+  ipcMain.handle(IpcChannel.BrowserSetChatTargets, (event, targets: unknown) => setChatTargets(event.sender, targets))
   ipcMain.handle(IpcChannel.BookmarksList, (_event, projectId: string) => listBookmarks(projectId))
   ipcMain.handle(IpcChannel.BookmarksSave, (_event, projectId: string, bookmarks: Bookmark[]) =>
     saveBookmarks(projectId, bookmarks)

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SessionCommand, SessionMeta, SessionUsage } from '@shared/types/session'
 import type { AttachmentChip } from '@shared/types/transcript'
+import { appendToDraft, type DraftInsertion } from '@shared/chatDraft'
 import { Button } from '../../shared/components/ui/button'
 import { Textarea } from '../../shared/components/ui/input'
 import { cn } from '../../shared/lib/utils'
@@ -27,6 +28,8 @@ export function Composer({
   meta,
   sending,
   attachments,
+  insertRequest,
+  focusRequest = 0,
   onRemoveAttachment,
   onSend,
   onStop,
@@ -39,6 +42,10 @@ export function Composer({
   meta: SessionMeta
   sending: boolean
   attachments: AttachmentChip[]
+  /** 入力欄の今の内容の後ろに足す文字。`nonce` が変わるたびに足す。 */
+  insertRequest?: { insertion: DraftInsertion; nonce: number } | null
+  /** 入力欄にフォーカスを移す要求。値が変わるたびに、末尾にキャレットを置いてフォーカスする。 */
+  focusRequest?: number
   onRemoveAttachment: (key: string) => void
   onSend: (text: string) => void
   onStop: () => void
@@ -68,6 +75,27 @@ export function Composer({
     setDismissed(false)
     setCommandIndex(0)
   }, [text])
+
+  /** 次の描画の後に、入力欄の末尾へキャレットを置いてフォーカスする。 */
+  function focusAtEnd(): void {
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      textarea.focus()
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+      textarea.scrollTop = textarea.scrollHeight
+    })
+  }
+
+  useEffect(() => {
+    if (!insertRequest) return
+    setText((prev) => appendToDraft(prev, insertRequest.insertion))
+    focusAtEnd()
+  }, [insertRequest])
+
+  useEffect(() => {
+    if (focusRequest > 0) focusAtEnd()
+  }, [focusRequest])
 
   function applyCommand(cmd: SessionCommand): void {
     setText(`/${cmd.name} `)

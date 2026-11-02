@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next'
 import type { SessionMeta } from '@shared/types/session'
 import type { DiffLayout } from '@shared/types/settings'
 import type { AttachmentChip } from '@shared/types/transcript'
+import type { DraftInsertion } from '@shared/chatDraft'
 import { initialTranscriptState, transcriptReducer } from '../transcriptState'
 import { flushAllEditors } from '../editorRegistry'
 import { notifyTurnEnd } from '../turnEnd'
-import { registerAttachHandler } from '../attachmentRegistry'
+import { registerAttachHandler, registerFocusHandler, registerInsertHandler } from '../attachmentRegistry'
 import { subscribeSessionEvents } from '../sessionEvents'
 import { LiveThoughtArea, Transcript } from './Transcript'
 import { Composer } from './Composer'
@@ -74,6 +75,18 @@ export function SessionView({
     })
   }, [sessionId])
 
+  /** ブラウザの右クリックから入力欄へ足す文字。`nonce` で同じ文字の繰り返しも区別する。 */
+  const [insertRequest, setInsertRequest] = useState<{ insertion: DraftInsertion; nonce: number } | null>(null)
+  useEffect(() => {
+    return registerInsertHandler(sessionId, (insertion) =>
+      setInsertRequest((prev) => ({ insertion, nonce: (prev?.nonce ?? 0) + 1 }))
+    )
+  }, [sessionId])
+
+  /** 入力欄にフォーカスを移す要求。値が変わるたびに移す。 */
+  const [focusRequest, setFocusRequest] = useState(0)
+  useEffect(() => registerFocusHandler(sessionId, () => setFocusRequest((n) => n + 1)), [sessionId])
+
   const hasPendingPermission = Object.values(state.permissions).some((p) => p.status === 'pending')
   // sending / hasPendingPermission の変化を親（TabBar）へ伝える。
   useEffect(() => {
@@ -139,6 +152,8 @@ export function SessionView({
         meta={meta}
         sending={sending}
         attachments={attachments}
+        insertRequest={insertRequest}
+        focusRequest={focusRequest}
         onRemoveAttachment={(key) => setAttachments((prev) => prev.filter((c) => c.key !== key))}
         onSend={(text) => void send(text)}
         onStop={() => void stop()}

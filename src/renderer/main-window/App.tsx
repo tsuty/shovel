@@ -27,7 +27,7 @@ import { ProjectDetailDialog } from '../shared/components/ProjectDetailDialog'
 import { preloadMermaid } from '../shared/lib/mermaid'
 import { isAuthRequiredMessage } from '@shared/authMarker'
 import { useTabSwitchShortcuts } from './useTabShortcuts'
-import { addAttachmentToSession } from './attachmentRegistry'
+import { addAttachmentToSession, focusSessionInput, insertTextToSession } from './attachmentRegistry'
 import { discardSessionEvents } from './sessionEvents'
 import { ResizablePanel } from './components/ResizablePanel'
 import { friendlyErrorMessage, needsSbxLogin } from '../shared/friendlyError'
@@ -36,6 +36,7 @@ import { ConnectingView, type ConnectingStepRecord } from './components/Connecti
 import { FindBar } from './components/FindBar'
 import type { FileReveal } from './revealMatch'
 import type { Bookmark } from '@shared/types/browser'
+import type { ChatTarget } from '@shared/chatDraft'
 import { BrowserView } from './components/BrowserView'
 import { BookmarkDialog } from './components/BookmarkDialog'
 import {
@@ -514,14 +515,48 @@ export function App(): React.JSX.Element {
   }
 
   /**
-   * ファイラーの「コンテキストに追加」。前面のペインの前面のタブがセッションならそこへ、そうでなければ
-   * 表示中の（各ペインの前面の）セッションのうち最も左のものへ渡す。
+   * ファイラーの「コンテキストに追加」やブラウザの右クリックの宛先。前面のペインの前面のタブがセッションならそれ、
+   * そうでなければ表示中の（各ペインの前面の）セッションのうち最も左のもの。
    */
+  const contextTargetId = [activeSessionId, ...layout.panes.map((pane) => pane.activeTabId)].find((id) =>
+    tabs.some((tab) => tab.sessionId === id && tab.kind === 'session')
+  )
+
   function addToContext(relPath: string): void {
-    const candidates = [activeSessionId, ...layout.panes.map((pane) => pane.activeTabId)]
-    const target = candidates.find((id) => tabs.some((tab) => tab.sessionId === id && tab.kind === 'session'))
-    if (target) addAttachmentToSession(target, relPath)
+    if (contextTargetId) addAttachmentToSession(contextTargetId, relPath)
   }
+
+  // ブラウザの右クリックの「チャットへ渡す項目」のサブメニューに出す、接続済みのチャットの一覧。
+  // 並びはペインの左から、ペインの中はタブの並び順。
+  const chatTargets: ChatTarget[] = layout.panes.flatMap((pane) =>
+    pane.tabIds.flatMap((id) => {
+      const tab = tabs.find((candidate) => candidate.sessionId === id)
+      return tab?.kind === 'session' ? [{ id, title: tab.title, visible: pane.activeTabId === id }] : []
+    })
+  )
+  const chatTargetsKey = JSON.stringify(chatTargets)
+  useEffect(() => {
+    void window.shovel.browser.setChatTargets(JSON.parse(chatTargetsKey) as ChatTarget[]).catch(() => {})
+  }, [chatTargetsKey])
+
+  // 選ばれたチャットをそのペインの前面に出してから、入力欄へ文字を足す／添付する。
+  const activateRef = useRef(activate)
+  activateRef.current = activate
+  useEffect(() => {
+    const offInsert = window.shovel.browser.onInsertToChat((targetId, insertion) => {
+      activateRef.current(targetId)
+      insertTextToSession(targetId, insertion)
+    })
+    const offAttach = window.shovel.browser.onAttachToChat((targetId, relPath) => {
+      activateRef.current(targetId)
+      addAttachmentToSession(targetId, relPath)
+      focusSessionInput(targetId)
+    })
+    return () => {
+      offInsert()
+      offAttach()
+    }
+  }, [])
 
   function openHistory(snapshot: SessionSnapshot, agentOnly = false): void {
     const id = `history:${snapshot.sessionId}`

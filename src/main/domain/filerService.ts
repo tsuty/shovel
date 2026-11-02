@@ -191,6 +191,23 @@ export async function createNewFile(projectId: string, parentRelPath: string, ki
   return parentRelPath ? `${parentRelPath}/${name}` : name
 }
 
+/** スクリーンショットを保存するフォルダ（プロジェクトのルートからの相対パス）。 */
+const SCREENSHOT_DIR = '.shovel/screenshots'
+
+/** PNG を `.shovel/screenshots/screenshot-YYYYMMDD-HHMMSS.png` に保存し、その相対パスを返す。同名があれば番号を付ける。 */
+export async function saveScreenshot(projectId: string, png: Buffer, now = new Date()): Promise<string> {
+  const project = requireProject(projectId)
+  const dirAbs = resolveAbsolute(project, SCREENSHOT_DIR)
+  await mkdir(dirAbs, { recursive: true })
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const stamp =
+    `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-` +
+    `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  const name = await findAvailableName(dirAbs, `screenshot-${stamp}`, '.png')
+  await writeFile(path.join(dirAbs, name), png, { flag: 'wx' })
+  return `${SCREENSHOT_DIR}/${name}`
+}
+
 export async function renameEntry(projectId: string, relPath: string, newName: string): Promise<void> {
   const project = requireProject(projectId)
   const absPath = resolveAbsolute(project, relPath)

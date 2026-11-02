@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IpcChannel, type ProjectProgress, type RendererApi, type SessionEnvelope, type SessionOpenProgress } from '@shared/ipc'
 import type { CommandExit, CommandOutputChunk, CommandTtyOutput } from '@shared/types/command'
 import type { AppSettings } from '@shared/types/settings'
+import type { DraftInsertion } from '@shared/chatDraft'
 
 /** `contextBridge` で型付き API を renderer に公開する。 */
 const api: RendererApi = {
@@ -173,6 +174,17 @@ const api: RendererApi = {
       const listener = (_event: unknown, webContentsId: number): void => cb(webContentsId)
       ipcRenderer.on(IpcChannel.BrowserFocused, listener)
       return () => ipcRenderer.removeListener(IpcChannel.BrowserFocused, listener)
+    },
+    setChatTargets: (targets) => ipcRenderer.invoke(IpcChannel.BrowserSetChatTargets, targets),
+    onInsertToChat: (cb) => {
+      const listener = (_event: unknown, targetId: string, insertion: DraftInsertion): void => cb(targetId, insertion)
+      ipcRenderer.on(IpcChannel.BrowserInsertToChat, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserInsertToChat, listener)
+    },
+    onAttachToChat: (cb) => {
+      const listener = (_event: unknown, targetId: string, relPath: string): void => cb(targetId, relPath)
+      ipcRenderer.on(IpcChannel.BrowserAttachToChat, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserAttachToChat, listener)
     }
   },
   bookmarks: {

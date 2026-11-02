@@ -22,6 +22,7 @@ import type { SbxLsEntry } from './types/sbx'
 import type { NetworkBlocks } from './types/network'
 import type { NewFileKind } from './fileKinds'
 import type { Bookmark } from './types/browser'
+import type { ChatTarget, DraftInsertion } from './chatDraft'
 
 export const IpcChannel = {
   // renderer -> main (invoke/handle)
@@ -106,6 +107,7 @@ export const IpcChannel = {
   PrintRunHtml: 'print:runHtml',
 
   BrowserOpenExternal: 'browser:openExternal',
+  BrowserSetChatTargets: 'browser:setChatTargets',
   BookmarksList: 'bookmarks:list',
   BookmarksSave: 'bookmarks:save',
 
@@ -120,7 +122,9 @@ export const IpcChannel = {
   SessionOpenProgress: 'session:openProgress',
   BrowserOpenUrl: 'browser:openUrl',
   BrowserFindRequested: 'browser:findRequested',
-  BrowserFocused: 'browser:focused'
+  BrowserFocused: 'browser:focused',
+  BrowserInsertToChat: 'browser:insertToChat',
+  BrowserAttachToChat: 'browser:attachToChat'
 } as const
 
 export interface CreateNewDirRequest {
@@ -367,6 +371,12 @@ export interface RendererApi {
     onFindRequested(cb: (webContentsId: number) => void): () => void
     /** ブラウザのタブのページにフォーカスが移った。ページを押してもホストのウィンドウにはイベントが来ないため。 */
     onFocused(cb: (webContentsId: number) => void): () => void
+    /** ページの右クリックの「チャットへ渡す項目」のサブメニューに出すチャットの一覧を main に伝える。 */
+    setChatTargets(targets: ChatTarget[]): Promise<void>
+    /** ページの右クリックから、`targetId` のチャットの入力欄へ文字を足すよう求められた。 */
+    onInsertToChat(cb: (targetId: string, insertion: DraftInsertion) => void): () => void
+    /** ページの右クリックから、プロジェクトに保存したファイル（スクリーンショット）を `targetId` のチャットに添付するよう求められた。 */
+    onAttachToChat(cb: (targetId: string, relPath: string) => void): () => void
   }
   bookmarks: {
     list(projectId: string): Promise<Bookmark[]>

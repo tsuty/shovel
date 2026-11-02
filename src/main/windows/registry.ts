@@ -21,6 +21,14 @@ export function getProjectWindow(projectId: string): BrowserWindow | null {
   return null
 }
 
+/** そのウィンドウが開いているプロジェクトの id。プロジェクトのウィンドウでなければ `undefined`。 */
+export function projectIdOfWindow(win: BrowserWindow): string | undefined {
+  for (const [projectId, candidate] of windowsByProjectId) {
+    if (candidate === win) return projectId
+  }
+  return undefined
+}
+
 export function registerProjectWindow(projectId: string, win: BrowserWindow): void {
   windowsByProjectId.set(projectId, win)
   win.once('closed', () => {

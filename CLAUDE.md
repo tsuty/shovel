@@ -102,7 +102,13 @@ open-externally and an in-tab find bar (`findInPage`); not counted toward the ta
 (`src/main/windows/browserGuest.ts`) forces every guest to no preload / no Node / sandbox / the app-wide
 `persist:shovel-browser` partition (cookies shared by all projects, kept across restarts), allows only http(s), denies all
 permission requests, turns popups into new browser tabs, and forwards the guest's Cmd/Ctrl+F, focus and mouse-down to the
-host (`browser:findRequested` / `browser:focused`) since guest input never reaches the host window. Bookmarks are
+host (`browser:findRequested` / `browser:focused`) since guest input never reaches the host window. The page's right-click
+also hands things to a chat (quote the selection / paste the link or page URL into the composer — never sent
+automatically — or save a visible-area `capturePage()` PNG to `.shovel/screenshots/` and attach it); each item has a
+submenu listing every connected chat (left pane first, "（表示中）" on visible ones, a disabled "no open chats" row when
+none), and picking a hidden chat brings it to front and focuses its composer. The renderer pushes that list to main via
+`browser:setChatTargets` (decisions.md G-1-20「チャットへ渡す項目」, `src/shared/chatDraft.ts`). The Filer's "add to
+context" still uses the G-1-19 target rule (to be aligned later). Bookmarks are
 per project (`electron-store` `bookmarks`, `bookmarkService.ts`), managed from a "browser" sidebar panel
 (`BrowserPanel.tsx`/`BookmarkDialog.tsx`). The browser runs on the host, outside the sandbox, and the agent can't drive
 it. Playwright's synthetic mouse/keys don't reach a `<webview>` guest — use real X input (`xdotool` + a window manager
