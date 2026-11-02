@@ -58,8 +58,9 @@ read-only syntax-highlighted viewer (every file view — including binaries and 
 project-relative path, click to copy; the autosave time sits on the right; file tabs' tooltips are the path too —
 `FileStatusBar.tsx`, decisions.md N-3-13) (images previewed in-app — zoom/fit/drag-pan via the same `ZoomableView` as Mermaid, starting at fit-to-view — with a size + width×height status
 bar — `—` for SVGs without absolute `width`/`height`, since Chromium reports 300×150 for those. Non-SVG images get an "注釈を付ける" button (top-left) that opens `ImageAnnotator.tsx`, a dialog for drawing
-rectangles/ellipses/arrows/text (select-move, recolor, undo/redo, text via an overlaid `textarea` for IME) as SVG over the
-image, then re-drawn on a Canvas and saved as a *new* `<name>-annotated.png` next to the original via `fs:saveAnnotatedImage`
+rectangles (rounded corners)/ellipses/arrows (solid/dashed/dotted lines)/text/mosaic regions plus one crop region (select-move, resize via corner/edge handles or arrow end handles, recolor, undo/redo, text via an overlaid
+`textarea` for IME; mosaic = per-block average over the original image, computed once with `pixelate`; crop is only a
+dimmed-outside overlay until save) as SVG over the image, then re-drawn on a Canvas and saved as a *new* `<name>-annotated.png` next to the original via `fs:saveAnnotatedImage`
 (never overwrites; annotations are burned in and not re-editable; geometry/history in `annotation.ts`, unit-tested;
 decisions.md N-3-15). Editable text files all
 open in one `TextFileEditor` (formerly `MarkdownEditor`; decisions.md N-3-1 再改訂, extension check in

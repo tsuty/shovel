@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Circle, MousePointer2, MoveUpRight, Redo2, Square, Trash2, Type, Undo2 } from 'lucide-react'
+import { Circle, Crop, Grid3x3, MousePointer2, MoveUpRight, Redo2, Square, Trash2, Type, Undo2, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../shared/components/ui/dialog'
 import { Button } from '../../shared/components/ui/button'
 import { ZoomableView } from '../../shared/components/ZoomableView'
@@ -9,20 +9,37 @@ import { cn } from '../../shared/lib/utils'
 import {
   ANNOTATION_COLORS,
   ANNOTATION_FONT_FAMILY,
+  DEFAULT_MOSAIC_LEVEL,
   EMPTY_HISTORY,
   FONT_SIZES,
   LINE_HEIGHT,
+  LINE_STYLES,
+  MOSAIC_BLOCKS,
   STROKE_WIDTHS,
   annotationFont,
   annotationUnit,
   arrowGeometry,
   baselineY,
   boxFromPoints,
+  clampOffset,
   commit,
   constrainPoint,
+  cornerRadius,
+  dashPattern,
+  drawOrder,
+  findCrop,
+  handleAt,
+  handleCursor,
+  handlePoints,
   isDrawable,
+  isInsideBox,
+  mosaicBlockSize,
   outlineColor,
+  pixelate,
+  pixelBox,
   redo,
+  replaceCrop,
+  resizeShape,
   shapeBounds,
   textLines,
   textOutlineWidth,
@@ -32,8 +49,12 @@ import {
   type Annotation,
   type AnnotationHistory,
   type AnnotationTool,
+  type DragShape,
+  type Handle,
+  type LineStyle,
   type MeasureText,
   type Point,
+  type CropShape,
   type StrokeShape,
   type TextShape
 } from '../annotation'
@@ -41,14 +62,25 @@ import {
 /** 選択・当たり判定で許す、線からの距離（画面上の px）。 */
 const HIT_TOLERANCE_PX = 6
 
+/** 大きさを変えるつまみの一辺（画面上の px）。 */
+const HANDLE_SIZE_PX = 9
+
 /** 道具とそのキー。 */
 const TOOLS: { tool: AnnotationTool; key: string; icon: React.ReactNode }[] = [
   { tool: 'select', key: 'v', icon: <MousePointer2 size={15} /> },
   { tool: 'rect', key: 'r', icon: <Square size={15} /> },
   { tool: 'ellipse', key: 'e', icon: <Circle size={15} /> },
   { tool: 'arrow', key: 'a', icon: <MoveUpRight size={15} /> },
-  { tool: 'text', key: 't', icon: <Type size={15} /> }
+  { tool: 'text', key: 't', icon: <Type size={15} /> },
+  { tool: 'mosaic', key: 'm', icon: <Grid3x3 size={15} /> },
+  { tool: 'crop', key: 'c', icon: <Crop size={15} /> }
 ]
+
+/** 画像全体をある細かさでモザイクにしたもの。保存には `pixels` を、画面には `url` を使う。 */
+interface MosaicSource {
+  pixels: ImageData
+  url: string
+}
 
 /** 入力中の文字。`id` は既存の文字を直しているときはその id。 */
 interface EditingText {
@@ -60,17 +92,19 @@ interface EditingText {
   fontSize: number
 }
 
-/** 選択した図形を動かしているときの、始めた点と動かす前の並び。 */
+/** 図形を動かす・大きさを変えているときの、始めた点と動かす前の並び。`handle` があれば大きさを変えている。 */
 interface MoveDrag {
   id: string
   start: Point
   base: Annotation[]
+  handle?: Handle
 }
 
 type Source = { kind: 'loading' } | { kind: 'ready'; dataUrl: string } | { kind: 'error' }
 
 /**
- * 画像に矩形・楕円・矢印・文字の注釈を付け、元の画像とは別の PNG として保存するダイアログ。
+ * 画像に矩形・楕円・矢印・文字・モザイクの注釈を付け、必要なら切り抜いて、元の画像とは別の PNG として保存する
+ * ダイアログ。
  * `attaching` なら保存のボタンを「保存して添付」にする（添付は呼び出し側が `onSaved` で行う）。
  */
 export function ImageAnnotator({
@@ -94,9 +128,12 @@ export function ImageAnnotator({
   const [sizeIndex, setSizeIndex] = useState(1)
   const [history, setHistory] = useState<AnnotationHistory>(EMPTY_HISTORY)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<StrokeShape | null>(null)
+  const [draft, setDraft] = useState<DragShape | null>(null)
+  const [mosaicLevel, setMosaicLevel] = useState(DEFAULT_MOSAIC_LEVEL)
+  const [lineStyle, setLineStyle] = useState<LineStyle>(LINE_STYLES[0]!)
   const [moving, setMoving] = useState<Annotation[] | null>(null)
-  const [hovering, setHovering] = useState(false)
+  /** ポインタの下にあるものに合わせたポインタの形（図形・つまみの上でなければ null）。 */
+  const [hoverCursor, setHoverCursor] = useState<string | null>(null)
   const [editing, setEditing] = useState<EditingText | null>(null)
   const [scale, setScale] = useState(1)
   const [saving, setSaving] = useState(false)
@@ -107,6 +144,10 @@ export function ImageAnnotator({
   const surfaceRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const moveRef = useRef<MoveDrag | null>(null)
+  /** 元の画像の画素。モザイクを作る元。 */
+  const basePixelsRef = useRef<ImageData | null>(null)
+  /** 作ったモザイク（1 マスの大きさごと）。 */
+  const mosaicCacheRef = useRef(new Map<number, MosaicSource>())
   const editingRef = useRef(editing)
   editingRef.current = editing
 
@@ -155,6 +196,29 @@ export function ImageAnnotator({
   const fontSize = Math.round(FONT_SIZES[sizeIndex]! * unit)
   const shapes = moving ?? history.present
   const selected = shapes.find((shape) => shape.id === selectedId) ?? null
+  /** 太さのボタンをモザイクの細かさに使うか。 */
+  const mosaicContext = tool === 'mosaic' || selected?.kind === 'mosaic'
+  /** 線の種類が効くか（矩形・楕円・矢印を描く道具か、それらを選んでいるとき）。 */
+  const lineStyleContext =
+    tool === 'rect' ||
+    tool === 'ellipse' ||
+    tool === 'arrow' ||
+    selected?.kind === 'rect' ||
+    selected?.kind === 'ellipse' ||
+    selected?.kind === 'arrow'
+
+  /** 細かさ `level` で画像全体をモザイクにしたもの（初めて使うときに作って取っておく）。 */
+  function mosaicFor(level: number): MosaicSource | null {
+    const base = basePixelsRef.current
+    if (!base) return null
+    const block = mosaicBlockSize(base.width, base.height, level)
+    let source = mosaicCacheRef.current.get(block)
+    if (!source) {
+      source = createMosaicSource(base, block)
+      mosaicCacheRef.current.set(block, source)
+    }
+    return source
+  }
 
   /** クライアント座標を画像のピクセル座標にする（画像の外は端に寄せる）。 */
   function toImagePoint(e: { clientX: number; clientY: number }): Point {
@@ -163,6 +227,25 @@ export function ImageAnnotator({
     const x = ((e.clientX - rect.left) / rect.width) * size.width
     const y = ((e.clientY - rect.top) / rect.height) * size.height
     return { x: Math.min(size.width, Math.max(0, x)), y: Math.min(size.height, Math.max(0, y)) }
+  }
+
+  /** 点が今の切り抜きの範囲の中にあれば、その切り抜き。 */
+  function cropAt(p: Point): CropShape | null {
+    const crop = findCrop(history.present)
+    return crop && isInsideBox(p, boxFromPoints(crop.from, crop.to)) ? crop : null
+  }
+
+  /** 大きさを変えられる図形（選んでいる図形、切り抜きの道具なら切り抜き）のつまみのうち、点の近くにあるもの。 */
+  function handleHitAt(p: Point): { shape: Annotation; handle: Handle } | null {
+    const target =
+      tool === 'select'
+        ? history.present.find((shape) => shape.id === selectedId)
+        : tool === 'crop'
+          ? findCrop(history.present)
+          : null
+    if (!target) return null
+    const handle = handleAt(target, p, (HANDLE_SIZE_PX / 2 + 3) / scale)
+    return handle ? { shape: target, handle } : null
   }
 
   function hitAt(p: Point): Annotation | null {
@@ -191,11 +274,26 @@ export function ImageAnnotator({
       return
     }
     const p = toImagePoint(e)
+    const grabbed = handleHitAt(p)
+    if (grabbed) {
+      moveRef.current = { id: grabbed.shape.id, start: p, base: history.present, handle: grabbed.handle }
+      e.currentTarget.setPointerCapture(e.pointerId)
+      return
+    }
     if (tool === 'select') {
       const hit = hitAt(p)
       setSelectedId(hit?.id ?? null)
       if (!hit) return
-      setColor(hit.color)
+      if ('color' in hit) setColor(hit.color)
+      if (hit.kind === 'mosaic') setMosaicLevel(hit.level)
+      if ('dash' in hit) setLineStyle(hit.dash)
+      const sizeIndexOfHit =
+        hit.kind === 'text'
+          ? FONT_SIZES.findIndex((size) => Math.round(size * unit) === hit.fontSize)
+          : 'width' in hit
+            ? STROKE_WIDTHS.findIndex((width) => Math.round(width * unit * 10) / 10 === hit.width)
+            : -1
+      if (sizeIndexOfHit !== -1) setSizeIndex(sizeIndexOfHit)
       moveRef.current = { id: hit.id, start: p, base: history.present }
       e.currentTarget.setPointerCapture(e.pointerId)
       return
@@ -217,7 +315,11 @@ export function ImageAnnotator({
       return
     }
     setSelectedId(null)
-    setDraft({ id: crypto.randomUUID(), kind: tool, from: p, to: p, color, width: strokeWidth })
+    const crop = tool === 'crop' ? cropAt(p) : null
+    if (crop) moveRef.current = { id: crop.id, start: p, base: history.present }
+    else if (tool === 'crop') setDraft({ id: crypto.randomUUID(), kind: 'crop', from: p, to: p })
+    else if (tool === 'mosaic') setDraft({ id: crypto.randomUUID(), kind: 'mosaic', from: p, to: p, level: mosaicLevel })
+    else setDraft({ id: crypto.randomUUID(), kind: tool, from: p, to: p, color, width: strokeWidth, dash: lineStyle })
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
@@ -230,21 +332,41 @@ export function ImageAnnotator({
     }
     const drag = moveRef.current
     if (drag) {
-      const dx = p.x - drag.start.x
-      const dy = p.y - drag.start.y
-      setMoving(drag.base.map((shape) => (shape.id === drag.id ? translateShape(shape, dx, dy) : shape)))
+      setMoving(
+        drag.base.map((shape) => {
+          if (shape.id !== drag.id) return shape
+          if (drag.handle) return resizeShape(shape, drag.handle, p, e.shiftKey)
+          const dx = p.x - drag.start.x
+          const dy = p.y - drag.start.y
+          if (shape.kind !== 'crop') return translateShape(shape, dx, dy)
+          const offset = clampOffset(boxFromPoints(shape.from, shape.to), dx, dy, natural.width, natural.height)
+          return translateShape(shape, offset.x, offset.y)
+        })
+      )
       return
     }
-    if (tool === 'select') setHovering(hitAt(p) !== null)
+    const grabbed = handleHitAt(p)
+    if (grabbed) setHoverCursor(handleCursor(grabbed.handle))
+    else if (tool === 'select') setHoverCursor(hitAt(p) ? 'move' : null)
+    else if (tool === 'crop') setHoverCursor(cropAt(p) ? 'move' : null)
+    else setHoverCursor(null)
   }
 
   function onPointerUp(): void {
     if (draft) {
-      if (isDrawable(draft.from, draft.to)) setHistory((current) => commit(current, [...current.present, draft]))
+      if (isDrawable(draft.from, draft.to)) {
+        setHistory((current) =>
+          commit(current, draft.kind === 'crop' ? replaceCrop(current.present, draft) : [...current.present, draft])
+        )
+      }
       setDraft(null)
     }
-    if (moveRef.current) {
-      if (moving) setHistory((current) => commit(current, moving))
+    const drag = moveRef.current
+    if (drag) {
+      // 大きさを変えて潰れた（ほぼ点になった）ときは、変える前に戻す。
+      const resized = drag.handle ? moving?.find((shape) => shape.id === drag.id) : undefined
+      const collapsed = resized !== undefined && 'from' in resized && !isDrawable(resized.from, resized.to)
+      if (moving && !collapsed) setHistory((current) => commit(current, moving))
       moveRef.current = null
       setMoving(null)
     }
@@ -271,7 +393,7 @@ export function ImageAnnotator({
   function changeColor(next: string): void {
     setColor(next)
     if (editing) setEditing({ ...editing, color: next })
-    restyleSelected((shape) => ({ ...shape, color: next }))
+    restyleSelected((shape) => ('color' in shape ? { ...shape, color: next } : shape))
   }
 
   function changeSize(index: number): void {
@@ -279,13 +401,29 @@ export function ImageAnnotator({
     const nextFont = Math.round(FONT_SIZES[index]! * unit)
     const nextStroke = Math.round(STROKE_WIDTHS[index]! * unit * 10) / 10
     if (editing) setEditing({ ...editing, fontSize: nextFont })
-    restyleSelected((shape) => (shape.kind === 'text' ? { ...shape, fontSize: nextFont } : { ...shape, width: nextStroke }))
+    restyleSelected((shape) =>
+      shape.kind === 'text' ? { ...shape, fontSize: nextFont } : 'width' in shape ? { ...shape, width: nextStroke } : shape
+    )
+  }
+
+  function changeLineStyle(next: LineStyle): void {
+    setLineStyle(next)
+    restyleSelected((shape) => ('dash' in shape ? { ...shape, dash: next } : shape))
+  }
+
+  function changeMosaicLevel(level: number): void {
+    setMosaicLevel(level)
+    restyleSelected((shape) => (shape.kind === 'mosaic' ? { ...shape, level } : shape))
   }
 
   function deleteSelected(): void {
     if (!selectedId) return
     setHistory((current) => commit(current, current.present.filter((shape) => shape.id !== selectedId)))
     setSelectedId(null)
+  }
+
+  function removeCrop(): void {
+    setHistory((current) => commit(current, replaceCrop(current.present, null)))
   }
 
   function onUndo(): void {
@@ -317,7 +455,11 @@ export function ImageAnnotator({
     setSaving(true)
     setSaveError(null)
     try {
-      const png = await renderPng(image, natural, shapesToSave)
+      const png = await renderPng(image, natural, shapesToSave, (level) => {
+        const source = mosaicFor(level)
+        if (!source) throw new Error('mosaic is not ready')
+        return source.pixels
+      })
       onSaved(await window.shovel.fs.saveAnnotatedImage(projectId, relPath, png))
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))
@@ -364,8 +506,22 @@ export function ImageAnnotator({
   }
 
   const displayed = draft ? [...shapes, draft] : shapes
-  const cursor =
-    tool === 'select' ? (moving ? 'grabbing' : hovering ? 'move' : 'default') : tool === 'text' ? 'text' : 'crosshair'
+  const crop = draft?.kind === 'crop' ? draft : findCrop(shapes)
+  const cropSize = crop && natural ? pixelBox(boxFromPoints(crop.from, crop.to), natural.width, natural.height, 'round') : null
+  const resizing = moveRef.current?.handle
+  const cursor = resizing
+    ? handleCursor(resizing)
+    : moving
+      ? 'grabbing'
+      : (hoverCursor ?? (tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair'))
+  /** つまみを出す図形。 */
+  const resizable = editing
+    ? null
+    : tool === 'select'
+      ? selected
+      : tool === 'crop' && draft?.kind !== 'crop'
+        ? findCrop(shapes)
+        : null
 
   return (
     <Dialog open onOpenChange={(open) => !open && requestClose()}>
@@ -419,14 +575,39 @@ export function ImageAnnotator({
           </div>
           <Separator />
           <div className="flex items-center gap-0.5">
-            {STROKE_WIDTHS.map((width, index) => (
+            {mosaicContext
+              ? MOSAIC_BLOCKS.map((block, index) => (
+                  <IconButton
+                    key={block}
+                    title={t(`annotate.mosaicSize.${index}`)}
+                    active={mosaicLevel === index}
+                    onClick={() => changeMosaicLevel(index)}
+                  >
+                    <MosaicLevelIcon cells={MOSAIC_BLOCKS.length + 2 - index} />
+                  </IconButton>
+                ))
+              : STROKE_WIDTHS.map((width, index) => (
+                  <IconButton
+                    key={width}
+                    title={t(`annotate.size.${index}`)}
+                    active={sizeIndex === index}
+                    onClick={() => changeSize(index)}
+                  >
+                    <span className="block w-3.5 rounded-full bg-current" style={{ height: width }} />
+                  </IconButton>
+                ))}
+          </div>
+          <Separator />
+          <div className="flex items-center gap-0.5">
+            {LINE_STYLES.map((style) => (
               <IconButton
-                key={width}
-                title={t(`annotate.size.${index}`)}
-                active={sizeIndex === index}
-                onClick={() => changeSize(index)}
+                key={style}
+                title={t(`annotate.lineStyle.${style}`)}
+                active={lineStyleContext && lineStyle === style}
+                disabled={!lineStyleContext}
+                onClick={() => changeLineStyle(style)}
               >
-                <span className="block w-3.5 rounded-full bg-current" style={{ height: width }} />
+                <LineStyleIcon style={style} />
               </IconButton>
             ))}
           </div>
@@ -442,6 +623,20 @@ export function ImageAnnotator({
               <Trash2 size={15} />
             </IconButton>
           </div>
+          {cropSize && (
+            <>
+              <Separator />
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Crop size={13} />
+                <span className="tabular-nums">
+                  {cropSize.width} × {cropSize.height}
+                </span>
+                <IconButton title={t('annotate.removeCrop')} onClick={removeCrop}>
+                  <X size={14} />
+                </IconButton>
+              </div>
+            </>
+          )}
         </div>
         <div className="relative flex min-h-0 flex-1 flex-col bg-muted/40">
           {source.kind === 'error' ? (
@@ -463,9 +658,20 @@ export function ImageAnnotator({
                     className="absolute inset-0 block h-full w-full"
                     draggable={false}
                     onLoad={(e) => {
-                      const { naturalWidth: width, naturalHeight: height } = e.currentTarget
-                      if (width > 0 && height > 0) setNatural({ width, height })
-                      else setSource({ kind: 'error' })
+                      const image = e.currentTarget
+                      const { naturalWidth: width, naturalHeight: height } = image
+                      if (width === 0 || height === 0) {
+                        setSource({ kind: 'error' })
+                        return
+                      }
+                      try {
+                        basePixelsRef.current = readPixels(image, width, height)
+                        mosaicCacheRef.current.clear()
+                      } catch {
+                        setSource({ kind: 'error' })
+                        return
+                      }
+                      setNatural({ width, height })
                     }}
                     onError={() => setSource({ kind: 'error' })}
                   />
@@ -479,13 +685,22 @@ export function ImageAnnotator({
                       onPointerMove={onPointerMove}
                       onPointerUp={onPointerUp}
                       onPointerCancel={onPointerUp}
-                      onPointerLeave={() => setHovering(false)}
+                      onPointerLeave={() => setHoverCursor(null)}
                       onDoubleClick={onDoubleClick}
                     >
-                      {displayed.map((shape) =>
-                        shape.id === editing?.id ? null : <ShapeView key={shape.id} shape={shape} />
+                      {drawOrder(displayed).map((shape) =>
+                        shape.id === editing?.id ? null : (
+                          <ShapeView
+                            key={shape.id}
+                            shape={shape}
+                            natural={natural}
+                            mosaicUrl={shape.kind === 'mosaic' ? (mosaicFor(shape.level)?.url ?? null) : null}
+                          />
+                        )
                       )}
+                      {crop && <CropOverlay crop={crop} natural={natural} />}
                       {selected && !editing && <SelectionFrame shape={selected} measure={measure} />}
+                      {resizable && <Handles shape={resizable} scale={scale} />}
                     </svg>
                   )}
                   {editing && (
@@ -552,16 +767,41 @@ function commitText(current: AnnotationHistory, pending: EditingText): Annotatio
   return commit(current, exists ? current.present.map((s) => (s.id === pending.id ? shape : s)) : [...current.present, shape])
 }
 
-function ShapeView({ shape }: { shape: Annotation }): React.JSX.Element {
+function ShapeView({
+  shape,
+  natural,
+  mosaicUrl
+}: {
+  shape: Annotation
+  natural: Size
+  /** モザイクのときの、その細かさで画像全体をモザイクにしたものの URL。作れていなければ null。 */
+  mosaicUrl: string | null
+}): React.JSX.Element | null {
   switch (shape.kind) {
+    case 'crop':
+      return null
+    case 'mosaic': {
+      const box = boxFromPoints(shape.from, shape.to)
+      // 入れ子の svg で範囲の外を切り落とし、画像全体のモザイクのうち範囲の中だけを見せる。
+      return mosaicUrl ? (
+        <svg {...box} viewBox={`${box.x} ${box.y} ${box.width} ${box.height}`} overflow="hidden">
+          <image href={mosaicUrl} width={natural.width} height={natural.height} preserveAspectRatio="none" />
+        </svg>
+      ) : (
+        <rect {...box} fill="#9ca3af" />
+      )
+    }
     case 'rect': {
       const box = boxFromPoints(shape.from, shape.to)
       return (
         <rect
           {...box}
+          rx={cornerRadius(shape.width, box)}
           fill="none"
           stroke={shape.color}
           strokeWidth={shape.width}
+          strokeDasharray={dashPattern(shape.dash, shape.width).join(' ') || undefined}
+          strokeLinecap="round"
           strokeLinejoin="round"
         />
       )
@@ -577,6 +817,8 @@ function ShapeView({ shape }: { shape: Annotation }): React.JSX.Element {
           fill="none"
           stroke={shape.color}
           strokeWidth={shape.width}
+          strokeDasharray={dashPattern(shape.dash, shape.width).join(' ') || undefined}
+          strokeLinecap="round"
         />
       )
     }
@@ -591,6 +833,7 @@ function ShapeView({ shape }: { shape: Annotation }): React.JSX.Element {
             y2={shaftEnd.y}
             stroke={shape.color}
             strokeWidth={shape.width}
+            strokeDasharray={dashPattern(shape.dash, shape.width).join(' ') || undefined}
             strokeLinecap="round"
           />
           <polygon points={head.map((p) => `${p.x},${p.y}`).join(' ')} fill={shape.color} />
@@ -620,6 +863,42 @@ function ShapeView({ shape }: { shape: Annotation }): React.JSX.Element {
   }
 }
 
+/** 切り抜きの範囲の外を暗くし、範囲に枠を付ける。 */
+function CropOverlay({ crop, natural }: { crop: CropShape; natural: Size }): React.JSX.Element {
+  const box = boxFromPoints(crop.from, crop.to)
+  const outside =
+    `M0 0H${natural.width}V${natural.height}H0Z` +
+    `M${box.x} ${box.y}h${box.width}v${box.height}h${-box.width}Z`
+  return (
+    <g pointerEvents="none">
+      <path d={outside} fill="rgba(0, 0, 0, 0.5)" fillRule="evenodd" />
+      <rect {...box} fill="none" stroke="#ffffff" strokeWidth={1.5} strokeDasharray="6 4" vectorEffect="non-scaling-stroke" />
+    </g>
+  )
+}
+
+/** 大きさを変えるつまみ。画面上で一定の大きさにする。 */
+function Handles({ shape, scale }: { shape: Annotation; scale: number }): React.JSX.Element {
+  const size = HANDLE_SIZE_PX / scale
+  return (
+    <g pointerEvents="none">
+      {handlePoints(shape).map(({ handle, point }) => (
+        <rect
+          key={handle}
+          x={point.x - size / 2}
+          y={point.y - size / 2}
+          width={size}
+          height={size}
+          fill="#ffffff"
+          stroke="#0ea5e9"
+          strokeWidth={1.5}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </g>
+  )
+}
+
 function SelectionFrame({ shape, measure }: { shape: Annotation; measure: MeasureText }): React.JSX.Element {
   const box = shapeBounds(shape, measure)
   return (
@@ -635,22 +914,85 @@ function SelectionFrame({ shape, measure }: { shape: Annotation; measure: Measur
   )
 }
 
-/** 画像に注釈を描き込んだ PNG を作る。 */
-async function renderPng(image: HTMLImageElement, size: Size, shapes: Annotation[]): Promise<Uint8Array> {
+/** 画像の画素を読む。 */
+function readPixels(image: HTMLImageElement, width: number, height: number): ImageData {
   const canvas = document.createElement('canvas')
-  canvas.width = size.width
-  canvas.height = size.height
+  canvas.width = width
+  canvas.height = height
   const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas is not available')
+  ctx.drawImage(image, 0, 0, width, height)
+  return ctx.getImageData(0, 0, width, height)
+}
+
+/** 画像全体を 1 マス `block` px でモザイクにしたものを作る。 */
+function createMosaicSource(base: ImageData, block: number): MosaicSource {
+  const canvas = document.createElement('canvas')
+  canvas.width = base.width
+  canvas.height = base.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas is not available')
+  const pixels = ctx.createImageData(base.width, base.height)
+  pixels.data.set(pixelate(base.data, base.width, base.height, block))
+  ctx.putImageData(pixels, 0, 0)
+  return { pixels, url: canvas.toDataURL('image/png') }
+}
+
+/** 画像に注釈を描き込み、切り抜きがあればその範囲だけにした PNG を作る。 */
+async function renderPng(
+  image: HTMLImageElement,
+  size: Size,
+  shapes: Annotation[],
+  mosaicPixels: (level: number) => ImageData
+): Promise<Uint8Array> {
+  const full = document.createElement('canvas')
+  full.width = size.width
+  full.height = size.height
+  const ctx = full.getContext('2d')
   if (!ctx) throw new Error('canvas is not available')
   ctx.drawImage(image, 0, 0, size.width, size.height)
   ctx.lineJoin = 'round'
-  for (const shape of shapes) drawShape(ctx, shape)
+  // モザイクの Canvas は保存のたびに画素から作る（GPU のリセットで中身が消えた Canvas を使わないため）。
+  const mosaicCanvases = new Map<number, HTMLCanvasElement>()
+  const mosaicCanvas = (level: number): HTMLCanvasElement => {
+    let canvas = mosaicCanvases.get(level)
+    if (!canvas) {
+      const pixels = mosaicPixels(level)
+      canvas = document.createElement('canvas')
+      canvas.width = pixels.width
+      canvas.height = pixels.height
+      canvas.getContext('2d')?.putImageData(pixels, 0, 0)
+      mosaicCanvases.set(level, canvas)
+    }
+    return canvas
+  }
+  for (const shape of drawOrder(shapes)) {
+    if (shape.kind === 'crop') continue
+    if (shape.kind !== 'mosaic') {
+      drawShape(ctx, shape)
+      continue
+    }
+    const box = pixelBox(boxFromPoints(shape.from, shape.to), size.width, size.height)
+    if (box.width > 0 && box.height > 0) {
+      ctx.drawImage(mosaicCanvas(shape.level), box.x, box.y, box.width, box.height, box.x, box.y, box.width, box.height)
+    }
+  }
+  const crop = findCrop(shapes)
+  let canvas = full
+  if (crop) {
+    const box = pixelBox(boxFromPoints(crop.from, crop.to), size.width, size.height, 'round')
+    if (box.width === 0 || box.height === 0) throw new Error('crop area is empty')
+    canvas = document.createElement('canvas')
+    canvas.width = box.width
+    canvas.height = box.height
+    canvas.getContext('2d')?.drawImage(full, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height)
+  }
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error('failed to encode PNG')
   return new Uint8Array(await blob.arrayBuffer())
 }
 
-function drawShape(ctx: CanvasRenderingContext2D, shape: Annotation): void {
+function drawShape(ctx: CanvasRenderingContext2D, shape: StrokeShape | TextShape): void {
   ctx.save()
   if (shape.kind === 'text') {
     ctx.font = annotationFont(shape.fontSize)
@@ -670,10 +1012,13 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Annotation): void {
   ctx.strokeStyle = shape.color
   ctx.fillStyle = shape.color
   ctx.lineWidth = shape.width
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.setLineDash(dashPattern(shape.dash, shape.width))
   ctx.beginPath()
   if (shape.kind === 'rect') {
     const box = boxFromPoints(shape.from, shape.to)
-    ctx.rect(box.x, box.y, box.width, box.height)
+    ctx.roundRect(box.x, box.y, box.width, box.height, cornerRadius(shape.width, box))
     ctx.stroke()
   } else if (shape.kind === 'ellipse') {
     const box = boxFromPoints(shape.from, shape.to)
@@ -681,10 +1026,10 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Annotation): void {
     ctx.stroke()
   } else {
     const { shaftEnd, head } = arrowGeometry(shape.from, shape.to, shape.width)
-    ctx.lineCap = 'round'
     ctx.moveTo(shape.from.x, shape.from.y)
     ctx.lineTo(shaftEnd.x, shaftEnd.y)
     ctx.stroke()
+    ctx.setLineDash([])
     ctx.beginPath()
     ctx.moveTo(head[0].x, head[0].y)
     ctx.lineTo(head[1].x, head[1].y)
@@ -693,6 +1038,41 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Annotation): void {
     ctx.fill()
   }
   ctx.restore()
+}
+
+/** 線の種類のボタンの絵。 */
+function LineStyleIcon({ style }: { style: LineStyle }): React.JSX.Element {
+  return (
+    <svg width={16} height={14} viewBox="0 0 16 14" aria-hidden="true">
+      <line
+        x1={2}
+        y1={7}
+        x2={14}
+        y2={7}
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeDasharray={dashPattern(style, 2).join(' ') || undefined}
+      />
+    </svg>
+  )
+}
+
+/** モザイクの細かさのボタンの絵。`cells` × `cells` の市松模様（多いほど細かい）。 */
+function MosaicLevelIcon({ cells }: { cells: number }): React.JSX.Element {
+  const size = 14 / cells
+  return (
+    <svg width={14} height={14} viewBox="0 0 14 14" aria-hidden="true">
+      {Array.from({ length: cells * cells }, (_, i) => {
+        const x = i % cells
+        const y = Math.floor(i / cells)
+        return (x + y) % 2 === 0 ? (
+          <rect key={i} x={x * size} y={y * size} width={size} height={size} fill="currentColor" />
+        ) : null
+      })}
+      <rect x={0.5} y={0.5} width={13} height={13} fill="none" stroke="currentColor" />
+    </svg>
+  )
 }
 
 function Separator(): React.JSX.Element {

@@ -14,6 +14,29 @@ export interface StrokeShape {
   color: string
   /** 線の太さ（px）。 */
   width: number
+  /** 線の種類。 */
+  dash: LineStyle
+}
+
+/** 線の種類（CSS の `border-style` の solid / dashed / dotted に当たる）。 */
+export type LineStyle = 'solid' | 'dashed' | 'dotted'
+
+/** 線の種類の候補。先頭が既定。 */
+export const LINE_STYLES: readonly LineStyle[] = ['solid', 'dashed', 'dotted']
+
+/**
+ * 線の種類の破線パターン（線の長さ・間隔の繰り返し。実線は空）。線端を丸くして描く前提で、丸い端が太さの分だけ
+ * 伸びるのを見込む（点線は長さ 0 の線を丸い端で点にする）。
+ */
+export function dashPattern(style: LineStyle, width: number): number[] {
+  if (style === 'dashed') return [width * 2, width * 3]
+  if (style === 'dotted') return [0, width * 2]
+  return []
+}
+
+/** 矩形の角の丸みの半径。線の太さに比例させ、矩形の短い辺の半分を超えない。 */
+export function cornerRadius(width: number, box: Box): number {
+  return Math.min(width * 2, box.width / 2, box.height / 2)
 }
 
 /** 文字。`at` は 1 行目の左上。 */
@@ -27,11 +50,35 @@ export interface TextShape {
   fontSize: number
 }
 
-export type Annotation = StrokeShape | TextShape
+/** 範囲（対角の 2 点）の元の画像をモザイクにする。 */
+export interface MosaicShape {
+  id: string
+  kind: 'mosaic'
+  from: Point
+  to: Point
+  /** 細かさ（`MOSAIC_BLOCKS` の位置。0 が最も細かい）。 */
+  level: number
+}
 
-export type AnnotationTool = 'select' | StrokeShape['kind'] | 'text'
+/** 保存する範囲（対角の 2 点）。並びに 1 つまで。 */
+export interface CropShape {
+  id: string
+  kind: 'crop'
+  from: Point
+  to: Point
+}
 
-/** 矩形・楕円・文字の外接矩形。 */
+/** 範囲を示す図形。 */
+export type RegionShape = MosaicShape | CropShape
+
+export type Annotation = StrokeShape | TextShape | RegionShape
+
+/** ドラッグで描く図形。 */
+export type DragShape = StrokeShape | RegionShape
+
+export type AnnotationTool = 'select' | DragShape['kind'] | 'text'
+
+/** 矩形・楕円・文字・範囲の外接矩形。 */
 export interface Box {
   x: number
   y: number
@@ -80,9 +127,9 @@ export function boxFromPoints(a: Point, b: Point): Box {
 }
 
 /**
- * Shift を押しながら描くときの終点。矩形・楕円は正方形・正円に、矢印は 45° 刻みの向きにする。
+ * Shift を押しながら描くときの終点。矢印は 45° 刻みの向きに、それ以外は正方形（楕円は正円）にする。
  */
-export function constrainPoint(kind: StrokeShape['kind'], from: Point, to: Point): Point {
+export function constrainPoint(kind: DragShape['kind'], from: Point, to: Point): Point {
   const dx = to.x - from.x
   const dy = to.y - from.y
   if (kind === 'arrow') {
@@ -159,6 +206,16 @@ export function textBox(shape: TextShape, measure: MeasureText): Box {
   return { x: shape.at.x, y: shape.at.y, width, height: shape.fontSize * LINE_HEIGHT * lines.length }
 }
 
+/** 点が矩形の中（`margin` だけ広げた範囲）にあるか。 */
+export function isInsideBox(p: Point, box: Box, margin = 0): boolean {
+  return (
+    p.x >= box.x - margin &&
+    p.x <= box.x + box.width + margin &&
+    p.y >= box.y - margin &&
+    p.y <= box.y + box.height + margin
+  )
+}
+
 /** 点から線分までの距離。 */
 export function distanceToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
@@ -194,18 +251,12 @@ function distanceToRectEdge(p: Point, box: Box): number {
 
 /**
  * 点が図形に当たっているか。矩形・楕円は線の上だけ（中の別の図形を選べるように）、矢印は軸か矢じり、
- * 文字は外接矩形の中。`tolerance` は線からの許容距離。
+ * 文字とモザイクは範囲の中。切り抜きは選ばない。`tolerance` は線からの許容距離。
  */
 export function hitTest(shape: Annotation, p: Point, tolerance: number, measure: MeasureText): boolean {
-  if (shape.kind === 'text') {
-    const box = textBox(shape, measure)
-    return (
-      p.x >= box.x - tolerance &&
-      p.x <= box.x + box.width + tolerance &&
-      p.y >= box.y - tolerance &&
-      p.y <= box.y + box.height + tolerance
-    )
-  }
+  if (shape.kind === 'crop') return false
+  if (shape.kind === 'text') return isInsideBox(p, textBox(shape, measure), tolerance)
+  if (shape.kind === 'mosaic') return isInsideBox(p, boxFromPoints(shape.from, shape.to), tolerance)
   const reach = tolerance + shape.width / 2
   if (shape.kind === 'arrow') return distanceToSegment(p, shape.from, shape.to) <= reach
   const box = boxFromPoints(shape.from, shape.to)
@@ -236,9 +287,86 @@ export function translateShape<T extends Annotation>(shape: T, dx: number, dy: n
   }
 }
 
+/**
+ * 大きさを変えるつまみ。矩形・楕円・モザイク・切り抜きは四隅と各辺の中点（方角で呼ぶ）、矢印は根元（`from`）と
+ * 先端（`to`）。
+ */
+export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'from' | 'to'
+
+/** 図形のつまみとその位置。文字にはつまみが無い（大きさはツールバーで変える）。 */
+export function handlePoints(shape: Annotation): { handle: Handle; point: Point }[] {
+  if (shape.kind === 'text') return []
+  if (shape.kind === 'arrow') {
+    return [
+      { handle: 'from', point: shape.from },
+      { handle: 'to', point: shape.to }
+    ]
+  }
+  const { x, y, width, height } = boxFromPoints(shape.from, shape.to)
+  const cx = x + width / 2
+  const cy = y + height / 2
+  return [
+    { handle: 'nw', point: { x, y } },
+    { handle: 'n', point: { x: cx, y } },
+    { handle: 'ne', point: { x: x + width, y } },
+    { handle: 'e', point: { x: x + width, y: cy } },
+    { handle: 'se', point: { x: x + width, y: y + height } },
+    { handle: 's', point: { x: cx, y: y + height } },
+    { handle: 'sw', point: { x, y: y + height } },
+    { handle: 'w', point: { x, y: cy } }
+  ]
+}
+
+/** 点の近く（`tolerance` 以内）にあるつまみ。重なっていれば後ろのもの（矢印なら先端、矩形なら辺より後ろの隅）。 */
+export function handleAt(shape: Annotation, p: Point, tolerance: number): Handle | null {
+  let found: Handle | null = null
+  for (const { handle, point } of handlePoints(shape)) {
+    if (Math.abs(p.x - point.x) <= tolerance && Math.abs(p.y - point.y) <= tolerance) found = handle
+  }
+  return found
+}
+
+/**
+ * つまみ `handle` を `p` まで動かした図形。矩形などは反対側の隅・辺を動かさず、矢印は反対の端を動かさない。
+ * `constrain`（Shift）なら、隅のつまみは正方形に、矢印は 45° 刻みの向きにする。辺のつまみは幅か高さだけを変える。
+ */
+export function resizeShape<T extends Annotation>(shape: T, handle: Handle, p: Point, constrain: boolean): T {
+  if (shape.kind === 'text') return shape
+  if (shape.kind === 'arrow') {
+    if (handle === 'from') return { ...shape, from: constrain ? constrainPoint('arrow', shape.to, p) : p }
+    if (handle === 'to') return { ...shape, to: constrain ? constrainPoint('arrow', shape.from, p) : p }
+    return shape
+  }
+  if (handle === 'from' || handle === 'to') return shape
+  const box = boxFromPoints(shape.from, shape.to)
+  let left = box.x
+  let top = box.y
+  let right = box.x + box.width
+  let bottom = box.y + box.height
+  if (handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw') {
+    const anchor = { x: handle.includes('w') ? right : left, y: handle.includes('n') ? bottom : top }
+    const corner = constrain ? constrainPoint(shape.kind, anchor, p) : p
+    return { ...shape, from: anchor, to: corner }
+  }
+  if (handle === 'n') top = p.y
+  else if (handle === 's') bottom = p.y
+  else if (handle === 'w') left = p.x
+  else right = p.x
+  return { ...shape, from: { x: left, y: top }, to: { x: right, y: bottom } }
+}
+
+/** つまみの上でのポインタの形。 */
+export function handleCursor(handle: Handle): string {
+  if (handle === 'from' || handle === 'to') return 'crosshair'
+  if (handle === 'n' || handle === 's') return 'ns-resize'
+  if (handle === 'e' || handle === 'w') return 'ew-resize'
+  return handle === 'nw' || handle === 'se' ? 'nwse-resize' : 'nesw-resize'
+}
+
 /** 選択の枠に使う外接矩形（線の太さ・矢じりを含む）。 */
 export function shapeBounds(shape: Annotation, measure: MeasureText): Box {
   if (shape.kind === 'text') return textBox(shape, measure)
+  if (shape.kind === 'mosaic' || shape.kind === 'crop') return boxFromPoints(shape.from, shape.to)
   const box = boxFromPoints(shape.from, shape.to)
   const pad = shape.kind === 'arrow' ? Math.max(shape.width * 4, 12) * 0.55 : shape.width / 2
   return { x: box.x - pad, y: box.y - pad, width: box.width + pad * 2, height: box.height + pad * 2 }
@@ -271,3 +399,82 @@ export function redo(history: AnnotationHistory): AnnotationHistory {
   return { past: [...history.past, history.present], present: next, future: history.future.slice(1) }
 }
 
+/** 並びの中の切り抜き（無ければ null）。 */
+export function findCrop(shapes: readonly Annotation[]): CropShape | null {
+  return shapes.find((shape): shape is CropShape => shape.kind === 'crop') ?? null
+}
+
+/** 切り抜きを `crop` に置き換えた並び（null なら切り抜きを外す）。 */
+export function replaceCrop(shapes: readonly Annotation[], crop: CropShape | null): Annotation[] {
+  const rest = shapes.filter((shape) => shape.kind !== 'crop')
+  return crop ? [...rest, crop] : rest
+}
+
+/** 描く順。モザイクは元の画像にかけるので先に描き、切り抜きは描かない。 */
+export function drawOrder(shapes: readonly Annotation[]): Annotation[] {
+  return [
+    ...shapes.filter((shape) => shape.kind === 'mosaic'),
+    ...shapes.filter((shape) => shape.kind !== 'mosaic' && shape.kind !== 'crop')
+  ]
+}
+
+/**
+ * 矩形を整数のピクセルにし、画像（`width` × `height`）の中に収める。`cover` は端数を外へ広げ（モザイクで元の画素を
+ * 残さない）、`round` は四捨五入する（切り抜きを動かしても大きさが変わらない）。
+ */
+export function pixelBox(box: Box, width: number, height: number, mode: 'cover' | 'round' = 'cover'): Box {
+  const x = Math.max(0, mode === 'cover' ? Math.floor(box.x) : Math.round(box.x))
+  const y = Math.max(0, mode === 'cover' ? Math.floor(box.y) : Math.round(box.y))
+  const right = Math.min(width, mode === 'cover' ? Math.ceil(box.x + box.width) : x + Math.round(box.width))
+  const bottom = Math.min(height, mode === 'cover' ? Math.ceil(box.y + box.height) : y + Math.round(box.height))
+  return { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) }
+}
+
+/** 矩形の大きさを保ったまま、画像（`width` × `height`）の中に収まるようずらす量に直す。 */
+export function clampOffset(box: Box, dx: number, dy: number, width: number, height: number): Point {
+  return {
+    x: Math.min(Math.max(dx, -box.x), width - box.x - box.width),
+    y: Math.min(Math.max(dy, -box.y), height - box.y - box.height)
+  }
+}
+
+/** モザイクの 1 マスの大きさの候補（細かい・普通・粗い）。画像の大きさに応じて `annotationUnit` 倍する。 */
+export const MOSAIC_BLOCKS = [5, 8, 12] as const
+
+/** モザイクの細かさの既定（普通）。 */
+export const DEFAULT_MOSAIC_LEVEL = 1
+
+/** 細かさ `level` のモザイクの 1 マスの大きさ（px）。 */
+export function mosaicBlockSize(width: number, height: number, level: number): number {
+  const base = MOSAIC_BLOCKS[Math.min(MOSAIC_BLOCKS.length - 1, Math.max(0, level))]!
+  return Math.round(base * annotationUnit(width, height))
+}
+
+/**
+ * 画像全体をモザイクにした画素（RGBA）。マスは画像の左上から `block` px ごとに区切り、各マスをその平均の色で
+ * 塗る。どのモザイクの範囲も同じマス目を使うので、重なっても継ぎ目が出ない。
+ */
+export function pixelate(data: Uint8ClampedArray, width: number, height: number, block: number): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(data.length)
+  for (let top = 0; top < height; top += block) {
+    const bottom = Math.min(height, top + block)
+    for (let left = 0; left < width; left += block) {
+      const right = Math.min(width, left + block)
+      const sum = [0, 0, 0, 0]
+      for (let y = top; y < bottom; y++) {
+        for (let x = left; x < right; x++) {
+          const i = (y * width + x) * 4
+          for (let c = 0; c < 4; c++) sum[c]! += data[i + c]!
+        }
+      }
+      const count = (bottom - top) * (right - left)
+      const average = sum.map((value) => Math.round(value / count))
+      for (let y = top; y < bottom; y++) {
+        for (let x = left; x < right; x++) {
+          out.set(average, (y * width + x) * 4)
+        }
+      }
+    }
+  }
+  return out
+}

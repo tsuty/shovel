@@ -187,12 +187,15 @@
     "undo": "Undo",
     "redo": "Redo",
     "delete": "Delete selected annotation",
+    "removeCrop": "Remove crop",
     "tool": {
       "select": "Select / move",
       "rect": "Rectangle",
       "ellipse": "Ellipse",
       "arrow": "Arrow",
-      "text": "Text"
+      "text": "Text",
+      "mosaic": "Mosaic",
+      "crop": "Crop"
     },
     "color": {
       "ef4444": "Red",
@@ -207,6 +210,16 @@
       "0": "Thin / small",
       "1": "Medium",
       "2": "Thick / large"
+    },
+    "mosaicSize": {
+      "0": "Fine",
+      "1": "Medium",
+      "2": "Coarse"
+    },
+    "lineStyle": {
+      "solid": "Solid",
+      "dashed": "Dashed",
+      "dotted": "Dotted"
     },
     "open": "Annotate"
   },
