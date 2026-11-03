@@ -16,7 +16,7 @@ export interface TabInfo {
    */
   snapshotId?: string
   /** 背景タブの通知状態。`undefined` はセッション以外のタブ（ファイル/履歴）。 */
-  status?: { sending: boolean; hasPendingPermission: boolean }
+  status?: { sending: boolean; awaitingUser: boolean }
   /** 接続中タブの接続が失敗した。 */
   failed?: boolean
   /** 「右に分割して移動」を押せる。 */
@@ -234,7 +234,7 @@ export function TabBar({
         {tabs.map((tab) => {
           const isActive = tab.sessionId === activeId
           // 通知は前面にないタブにだけ出す。
-          const showPendingBadge = !isActive && tab.status?.hasPendingPermission
+          const showPendingBadge = !isActive && tab.status?.awaitingUser
           const showPulse = !isActive && tab.status?.sending
           return (
             <div

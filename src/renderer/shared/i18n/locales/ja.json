@@ -359,8 +359,45 @@
     "sendChoices": "送信",
     "jumpToLatest": "最新へ",
     "backToTurnStart": "↑ ターンの先頭へ戻る",
+    "ask": {
+      "selectOne": "1つ選ぶ",
+      "selectMany": "1つ以上選ぶ",
+      "preview": "プレビュー"
+    },
     "notice": {
       "replayAdopted": "エージェント側の記録が更新されたため、以前の内容をバックアップとして保存しました。"
+    }
+  },
+  "elicitation": {
+    "heading": "エージェントからの質問",
+    "submit": "送信",
+    "decline": "回答しない",
+    "declineHint": "答えずにエージェントへ続けてもらいます",
+    "cancel": "中止",
+    "cancelHint": "質問を取り消し、エージェントの作業を中止します",
+    "clear": "選択を外す",
+    "unselected": "（選択しない）",
+    "status": {
+      "accept": "回答しました",
+      "decline": "回答しませんでした",
+      "cancel": "中止しました"
+    },
+    "error": {
+      "required": "入力してください",
+      "minLength": "{{min}} 文字以上で入力してください",
+      "maxLength": "{{max}} 文字以内で入力してください",
+      "pattern": "形式が正しくありません",
+      "email": "メールアドレスの形式で入力してください",
+      "uri": "URL の形式で入力してください",
+      "date": "日付（YYYY-MM-DD）で入力してください",
+      "dateTime": "日時（例: 2026-01-31T09:00:00+09:00）で入力してください",
+      "number": "数値を入力してください",
+      "integer": "整数を入力してください",
+      "minimum": "{{min}} 以上を入力してください",
+      "maximum": "{{max}} 以下を入力してください",
+      "choice": "選択肢から選んでください",
+      "minItems": "{{min}} 個以上選んでください",
+      "maxItems": "{{max}} 個以内で選んでください"
     }
   },
   "composer": {

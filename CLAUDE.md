@@ -38,7 +38,12 @@ collapsible once the block closes), a floating "jump to latest" button + a "back
 link per turn, and an expand/collapse caret on tool-call rows that have non-diff `content` (e.g.
 `search`/`fetch`/`other` kinds) that preserves the clicked row's on-screen position across the
 toggle), permission cards (their diff summary is opened via the same tool-call-row "view diff"
-link, not a duplicate affordance on the card), Mode/Model selectors plus a token-usage readout
+link, not a duplicate affordance on the card), question cards for agent `elicitation/create` requests (form mode only; Send/Don't answer/Abort =
+accept/decline/cancel; a request with any field the card can't draw is refused with `-32602`; answers
+are re-validated in main via `src/shared/elicitationForm.ts`; pending questions *and* permission cards are
+cancelled on turn stop/end, ↻, tab close and disconnect; not kept in snapshots — decisions.md A-1c; the
+`AskUserQuestion` tool-call row instead expands to the formatted questions/options via `ToolCallPayload.ask`,
+extracted in `translate.ts` by input shape and, unlike `rawInput`, kept in snapshots), Mode/Model selectors plus a token-usage readout
 (shown only once `usage_update` has been received), a sign-in dialog, file tree (create
 folder/Markdown file, rename, delete, move via drag & drop, and clipboard copy/paste, all from the
 right-click menu — including on empty space for root-level creation/paste — plus copy-in from the
@@ -292,8 +297,12 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   `src/main/domain/acpVersionService.ts`). Only `stdout` is fed to the JSON-RPC
   parser; `stderr` is captured separately for logs (mixing them breaks parsing because `npx`
   writes progress to stderr). Line splitting must accept both `\n` and `\r\n`.
-- ACP v1 only, and all client capabilities (`fs.readTextFile`, `fs.writeTextFile`, `terminal`) are
-  reported as `false` — the agent always reads/writes files itself inside the sandbox. This is
+- ACP v1 only, and the file/terminal client capabilities (`fs.readTextFile`, `fs.writeTextFile`,
+  `terminal`) are reported as `false` — the agent always reads/writes files itself inside the sandbox.
+  The only capability advertised is `elicitation: { form: {} }` (question cards for
+  `elicitation/create` form mode — how claude-agent-acp delivers Claude Code's `AskUserQuestion`,
+  which it disables entirely without that capability; URL mode is not advertised and gets `-32602`;
+  `src/main/acp/elicitation.ts`, `ElicitationCard.tsx`, decisions.md A-1c). This is
   the load-bearing assumption behind the safety model (§6 of `architecture.md`): shovel never
   intermediates file operations, so there is no enforcement point to bypass.
 - Renderer: React + Tailwind + shadcn/ui, `react-markdown` + `remark-gfm` + `remark-gemoji`

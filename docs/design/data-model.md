@@ -197,8 +197,16 @@ ACP の生イベントを UI が扱える語彙に翻訳した中間表現。
 | `toolCall` | （下記） | ツールコールカードの追加・更新（`id` で upsert） |
 | `permission` | `id`, `toolCallId`, `headline`, `bodyHtml`, `flat`, `options` | インライン承認カード |
 | `permissionResolved` | `id`, `status` | ボタンを無効化し、選択結果を表示 |
+| `elicitation` | `id`, `message`, `title`, `description`, `fields` | 質問カード（`elicitation/create` のフォームモード）。`fields` はスキーマの各項目を入力欄の種類（`text` / `select` / `number` / `boolean` / `multiSelect`）に整理したもの。選択肢は `value` / `label` / `description` / `preview` |
+| `elicitationResolved` | `id`, `action`, `content` | 入力欄を無効化し、送った内容と結果（`accept` / `decline` / `cancel`）を表示 |
 | `turnEnd` | `id`, `targetId` | 「ターンの先頭へ戻る」操作を紐付ける |
 | `toast` | `text` | 下端に一時メッセージを表示 |
+
+`toolCall` のペイロードは `id`, `groupId`, `kind`, `title`, `status`, `locations`, `diffs`, `rawInput`,
+`content`, `ask`。`ask` は `kind` が `other`（または無指定）で、入力が `AskUserQuestion` の形
+（`questions` の各要素が `question` と `label` 付きの `options` を持つ）のときだけ、main が取り出した質問
+（`header` / `question` / `multiSelect` / `options[{label, description, preview}]`）。スナップショットには
+`rawInput` を保存しないが `ask` は保存するので、履歴でも質問を開ける。
 
 `role` は `USER` / `AGENT` / `THOUGHT` / `PLAN` / `SYSTEM` / `COMPLETION` / `ERROR`。
 枠・アイコン・タイトル・地味な見た目はこの `role` が決める。
@@ -207,7 +215,7 @@ ACP の生イベントを UI が扱える語彙に翻訳した中間表現。
 
 `ready` / `openFile{path,line}` / `openDiff{toolCallId,diffIndex}` / `openUrl{url}` /
 `openAttachment{key}` / `copyBlock{id}` / `copyText{text}` /
-`submitChoices{id,markdown}` / `permission{id,optionId}`
+`submitChoices{id,markdown}` / `permission{id,optionId}` / `elicitation{id,reply}`
 
 renderer は生の Markdown を持っているため、`copyBlock` / `copyText` はどちらも
 main を経由せず renderer 内で `navigator.clipboard.writeText()` を直接呼ぶ

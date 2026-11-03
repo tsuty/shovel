@@ -297,6 +297,11 @@ export function dispatchTranscriptAction(action: TranscriptAction): void {
       tab?.opened.resolvePermission(action.id, action.optionId)
       return
     }
+    case 'elicitation': {
+      const tab = tabs.get(action.sessionId)
+      tab?.opened.resolveElicitation(action.id, action.reply)
+      return
+    }
     case 'ready':
       // 何もしない。
       return

@@ -77,12 +77,22 @@ describe('transcriptReducer', () => {
     expect(state.permissions.p).toMatchObject({ status: 'selected', chosenOptionId: 'allow' })
   })
 
-  it('知らない id への stream / blockMarkdown / attachments / permissionResolved は無視する', () => {
+  it('質問は order に並べ、解決で状態と送った内容を記録する', () => {
+    const state = reduce([
+      { type: 'elicitation', id: 'e', message: 'Q?', fields: [] },
+      { type: 'elicitationResolved', id: 'e', action: 'accept', content: { a: 'b' } }
+    ])
+    expect(state.order).toEqual([{ kind: 'elicitation', id: 'e' }])
+    expect(state.elicitations.e).toMatchObject({ message: 'Q?', status: 'accept', content: { a: 'b' } })
+  })
+
+  it('知らない id への stream / blockMarkdown / attachments / permissionResolved / elicitationResolved は無視する', () => {
     const events: TranscriptEvent[] = [
       { type: 'stream', id: 'x', text: 'a' },
       { type: 'blockMarkdown', id: 'x', markdown: 'a' },
       { type: 'attachments', id: 'x', chips: [] },
-      { type: 'permissionResolved', id: 'x', status: 'cancelled' }
+      { type: 'permissionResolved', id: 'x', status: 'cancelled' },
+      { type: 'elicitationResolved', id: 'x', action: 'cancel' }
     ]
     expect(reduce(events)).toEqual(initialTranscriptState)
   })

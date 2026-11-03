@@ -12,6 +12,7 @@ import type {
   ToolKind
 } from '@agentclientprotocol/sdk'
 import type {
+  AskQuestion,
   AttachmentChip,
   PermissionOption,
   ToolCallKind,
@@ -353,22 +354,55 @@ function toolCallPayload(payload: ToolCall | ToolCallUpdate, groupId: string): T
     locations: (payload.locations ?? []).map((l) => ({ path: l.path, line: l.line ?? undefined })),
     diffs,
     rawInput: payload.rawInput,
-    content
+    content,
+    ask: !payload.kind || payload.kind === 'other' ? askQuestions(payload.rawInput) : undefined
   }
+}
+
+/**
+ * `AskUserQuestion` の形の入力（`questions` の各要素が `question` と、`label` を持つ `options` を持つ）
+ * から質問を取り出す。名前やタイトルではなく入力の形で見分ける。文か選択肢の無い質問は飛ばし、
+ * 1つも残らなければ（入力がまだ届ききっていないときも）undefined。
+ */
+export function askQuestions(rawInput: unknown): AskQuestion[] | undefined {
+  if (!rawInput || typeof rawInput !== 'object') return undefined
+  const questions = (rawInput as Record<string, unknown>).questions
+  if (!Array.isArray(questions)) return undefined
+  const result = questions.flatMap((item): AskQuestion[] => {
+    if (!item || typeof item !== 'object') return []
+    const q = item as Record<string, unknown>
+    if (typeof q.question !== 'string' || q.question === '' || !Array.isArray(q.options)) return []
+    const options = q.options.flatMap((option): AskQuestion['options'] => {
+      if (!option || typeof option !== 'object') return []
+      const o = option as Record<string, unknown>
+      if (typeof o.label !== 'string' || o.label === '') return []
+      return [{ label: o.label, description: nonEmpty(o.description), preview: nonEmpty(o.preview) }]
+    })
+    if (options.length === 0) return []
+    return [{ header: nonEmpty(q.header), question: q.question, multiSelect: q.multiSelect === true, options }]
+  })
+  return result.length > 0 ? result : undefined
+}
+
+function nonEmpty(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined
 }
 
 /** `tool_call_update` で送られてきたフィールドだけを前回の値に重ねる。 */
 function mergeToolCallUpdate(previous: ToolCallPayload, payload: ToolCall | ToolCallUpdate): ToolCallPayload {
   const fresh = toolCallPayload(payload, previous.groupId)
+  const kind = payload.kind ? fresh.kind : previous.kind
+  const ask = payload.rawInput !== undefined ? askQuestions(payload.rawInput) : previous.ask
   return {
     ...previous,
-    kind: payload.kind ? fresh.kind : previous.kind,
+    kind,
     title: 'title' in payload && payload.title ? fresh.title : previous.title,
     status: payload.status ? fresh.status : previous.status,
     locations: payload.locations ? fresh.locations : previous.locations,
     diffs: payload.content ? fresh.diffs : previous.diffs,
     content: payload.content ? fresh.content : previous.content,
-    rawInput: payload.rawInput !== undefined ? fresh.rawInput : previous.rawInput
+    rawInput: payload.rawInput !== undefined ? fresh.rawInput : previous.rawInput,
+    ask: kind === 'other' ? ask : undefined
   }
 }
 

@@ -36,7 +36,7 @@ export function SessionView({
   initialAttachments?: string[]
   onOpenFile: (relPath: string) => void
   /** 背景タブの通知状態。TabBar が非アクティブなタブに反映する。 */
-  onStatusChange?: (status: { sending: boolean; hasPendingPermission: boolean }) => void
+  onStatusChange?: (status: { sending: boolean; awaitingUser: boolean }) => void
   /** ↻ の完了。新しい会話の書き込み先スナップショット id を渡す。 */
   onRefreshed?: (snapshotId: string) => void
   /** エージェントがセッションにタイトルを付けた。 */
@@ -87,12 +87,15 @@ export function SessionView({
   const [focusRequest, setFocusRequest] = useState(0)
   useEffect(() => registerFocusHandler(sessionId, () => setFocusRequest((n) => n + 1)), [sessionId])
 
-  const hasPendingPermission = Object.values(state.permissions).some((p) => p.status === 'pending')
-  // sending / hasPendingPermission の変化を親（TabBar）へ伝える。
+  /** 承認カードか質問に答えるのを待っているか。 */
+  const awaitingUser =
+    Object.values(state.permissions).some((p) => p.status === 'pending') ||
+    Object.values(state.elicitations).some((e) => e.status === 'pending')
+  // sending / awaitingUser の変化を親（TabBar）へ伝える。
   useEffect(() => {
-    onStatusChange?.({ sending, hasPendingPermission })
+    onStatusChange?.({ sending, awaitingUser })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sending, hasPendingPermission])
+  }, [sending, awaitingUser])
 
   async function send(text: string): Promise<void> {
     // 未保存の Markdown 編集をディスクへ書き出してから送信する。
@@ -141,6 +144,9 @@ export function SessionView({
         state={state}
         onPermission={(permissionId, optionId) =>
           void window.shovel.session.dispatch({ type: 'permission', sessionId, id: permissionId, optionId })
+        }
+        onElicitation={(elicitationId, reply) =>
+          void window.shovel.session.dispatch({ type: 'elicitation', sessionId, id: elicitationId, reply })
         }
         onOpenFile={onOpenFile}
         onSubmitChoices={(markdown) => void send(markdown)}

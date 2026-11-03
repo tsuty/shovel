@@ -319,6 +319,27 @@ Stop ボタンで `session/cancel`（通知）を送る。`session/prompt` は
 エージェントの Mode（`session/set_mode`）の責任とする。繰り返しの確認を
 避けたい利用者は、エージェントが提供する `allow_always` を選ぶ。
 
+### 5b. エージェントからの質問（decisions.md A-1c）
+
+```
+エージェント → elicitation/create
+  │
+  ├─ mode が form 以外、または描けない項目を含む → -32602（Invalid params）を返して終わり
+  │
+  ├─ トランスクリプトの末尾に質問カードを追加
+  │   背景のタブなら、承認カードと同じバッジ
+  │
+  ├─ 「送信」     → 入力を検証。誤りがあれば項目の下に表示して送らない
+  │                 通れば main でもスキーマに照らして検証し直し { action: accept, content }
+  ├─ 「回答しない」→ { action: decline }
+  ├─ 「中止」     → { action: cancel }
+  ├─ ターンの停止・終了、↻、タブを閉じる、接続断 → { action: cancel }
+  │   （応答待ちの承認カードも同時に cancelled で返す）
+  └─ エージェントの $/cancel_request → その質問だけ { action: cancel }
+  │
+  └─ 応答後は入力欄を無効化し、送った内容と結果をカードに残す
+```
+
 ---
 
 ## 6. セッションの復元

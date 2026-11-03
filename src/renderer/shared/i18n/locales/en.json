@@ -362,8 +362,45 @@
     "sendChoices": "Send",
     "jumpToLatest": "Jump to latest",
     "backToTurnStart": "↑ Back to turn start",
+    "ask": {
+      "selectOne": "Select one",
+      "selectMany": "Select one or more",
+      "preview": "Preview"
+    },
     "notice": {
       "replayAdopted": "The agent's record of this session has changed, so the previous contents were saved as a backup."
+    }
+  },
+  "elicitation": {
+    "heading": "Question from the agent",
+    "submit": "Send",
+    "decline": "Don't answer",
+    "declineHint": "Let the agent continue without an answer",
+    "cancel": "Abort",
+    "cancelHint": "Withdraw the question and stop the agent's work",
+    "clear": "Clear selection",
+    "unselected": "(none)",
+    "status": {
+      "accept": "Answered",
+      "decline": "Not answered",
+      "cancel": "Aborted"
+    },
+    "error": {
+      "required": "Required",
+      "minLength": "Enter at least {{min}} characters",
+      "maxLength": "Enter at most {{max}} characters",
+      "pattern": "Invalid format",
+      "email": "Enter an email address",
+      "uri": "Enter a URL",
+      "date": "Enter a date (YYYY-MM-DD)",
+      "dateTime": "Enter a date and time (e.g. 2026-01-31T09:00:00+09:00)",
+      "number": "Enter a number",
+      "integer": "Enter a whole number",
+      "minimum": "Enter {{min}} or more",
+      "maximum": "Enter {{max}} or less",
+      "choice": "Choose one of the options",
+      "minItems": "Choose at least {{min}}",
+      "maxItems": "Choose at most {{max}}"
     }
   },
   "composer": {

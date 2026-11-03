@@ -166,9 +166,12 @@ sbx exec -i "<sandbox-name>" npx -y <acp-package>@<version>
 fs.readTextFile  : false
 fs.writeTextFile : false
 terminal         : false
+elicitation      : { form: {} }
 ```
 
-**すべて `false`。完全なサンドボックス内包。**
+**ファイルと端末はすべて `false`。完全なサンドボックス内包。**
+`elicitation` はユーザーに質問するための UI だけで、ファイル操作を仲介しないため
+この前提を崩さない（フォームモードだけ。decisions.md A-1c）。
 
 この結果、**エージェントは shovel を経由せず自分でファイルを読み書きする**。
 shovel はファイル操作を仲介していないため、そこに強制点が存在しない。
@@ -244,14 +247,15 @@ Windows は **MSYS / Git Bash 形式**（WSL の `/mnt/c/...` ではない）。
 **main → renderer（`TranscriptEvent`）**
 
 `reset` / `theme` / `agent` / `block` / `stream` / `blockHtml` / `attachments` /
-`group` / `toolCall` / `permission` / `permissionResolved` / `turnEnd` / `toast`
+`group` / `toolCall` / `permission` / `permissionResolved` / `elicitation` /
+`elicitationResolved` / `turnEnd` / `toast`
 
 **renderer → main（`TranscriptAction`）**
 
 `ready` / `openFile` / `openDiff` / `openUrl` / `openAttachment` / `copyBlock` /
-`copyText` / `submitChoices` / `permission`
+`copyText` / `submitChoices` / `permission` / `elicitation`
 
-**型としては全て「renderer → main」だが、実際に main まで届くのは `permission` だけ。**
+**型としては全て「renderer → main」だが、実際に main まで届くのは `permission` と `elicitation` だけ。**
 Transcript は main-window レンダラ内の通常の React コンポーネント（`App.tsx` の子孫）
 であり、残りは renderer 内で完結する:
 
@@ -262,10 +266,11 @@ Transcript は main-window レンダラ内の通常の React コンポーネン�
 | `copyBlock` / `copyText` | `navigator.clipboard.writeText()` を renderer 内で直接呼ぶ。N-1 の決定で renderer は既に生の Markdown を持っている |
 | `submitChoices` | 既存の `session.prompt` IPC をそのまま呼ぶ（新しい経路は不要） |
 | `openUrl` | `createSecureWindow.ts` の `will-navigate` / `setWindowOpenHandler` が、Transcript に限らず全リンクを外部ブラウザへ既に転送している |
-| `permission` | 唯一 main の状態（`resolvePermission` の pending Promise）を操作する必要があるため、実際に IPC で届く |
+| `permission` | main の状態（`resolvePermission` の pending Promise）を操作する必要があるため、実際に IPC で届く |
+| `elicitation` | 同じく main の状態（`resolveElicitation` の pending Promise）を操作するため、実際に IPC で届く |
 
 `TranscriptAction` 型と `dispatchTranscriptAction`（`sessionManager.ts`）の網羅的な
-`switch` は全アクションを列挙しているが、`permission` 以外の分岐は到達しない。
+`switch` は全アクションを列挙しているが、`permission` と `elicitation` 以外の分岐は到達しない。
 
 ### ルーティング
 

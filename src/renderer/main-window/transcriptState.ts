@@ -1,6 +1,9 @@
 import type {
   AttachmentChip,
   BlockRole,
+  ElicitationAction,
+  ElicitationField,
+  ElicitationValue,
   PermissionOption,
   ToolCallPayload,
   TranscriptEvent
@@ -38,7 +41,21 @@ export interface RenderPermission {
   chosenOptionId?: string
 }
 
-export type OrderEntry = { kind: 'block'; id: string } | { kind: 'group'; id: string }
+export interface RenderElicitation {
+  id: string
+  message: string
+  title?: string
+  description?: string
+  fields: ElicitationField[]
+  status: 'pending' | ElicitationAction
+  /** `accept` で送った内容。 */
+  content?: Record<string, ElicitationValue>
+}
+
+export type OrderEntry =
+  | { kind: 'block'; id: string }
+  | { kind: 'group'; id: string }
+  | { kind: 'elicitation'; id: string }
 
 /** ストリーミング中の思考。確定（`blockMarkdown`）したら `order` へ折り畳みブロックとして移す。 */
 export interface LiveThought {
@@ -52,6 +69,7 @@ export interface TranscriptState {
   groups: Record<string, RenderGroup>
   toolCallsByGroup: Record<string, ToolCallPayload[]>
   permissions: Record<string, RenderPermission>
+  elicitations: Record<string, RenderElicitation>
   toast: string | null
   liveThought: LiveThought | null
 }
@@ -62,6 +80,7 @@ export const initialTranscriptState: TranscriptState = {
   groups: {},
   toolCallsByGroup: {},
   permissions: {},
+  elicitations: {},
   toast: null,
   liveThought: null
 }
@@ -163,6 +182,33 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
         permissions: {
           ...state.permissions,
           [event.id]: { ...existing, status: event.status, chosenOptionId: event.optionId }
+        }
+      }
+    }
+    case 'elicitation':
+      return {
+        ...state,
+        order: [...state.order, { kind: 'elicitation', id: event.id }],
+        elicitations: {
+          ...state.elicitations,
+          [event.id]: {
+            id: event.id,
+            message: event.message,
+            title: event.title,
+            description: event.description,
+            fields: event.fields,
+            status: 'pending'
+          }
+        }
+      }
+    case 'elicitationResolved': {
+      const existing = state.elicitations[event.id]
+      if (!existing) return state
+      return {
+        ...state,
+        elicitations: {
+          ...state.elicitations,
+          [event.id]: { ...existing, status: event.action, content: event.content }
         }
       }
     }

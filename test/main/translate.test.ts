@@ -1,5 +1,5 @@
 import type { RequestPermissionRequest, SessionUpdate } from '@agentclientprotocol/sdk'
-import { permissionRequestToEvent, SessionTranslator } from '@main/acp/translate'
+import { askQuestions, permissionRequestToEvent, SessionTranslator } from '@main/acp/translate'
 import type { TranscriptEvent } from '@shared/types/transcript'
 
 const SANDBOX = '/workspace/project'
@@ -270,6 +270,54 @@ describe('SessionTranslator: その他', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(t.handleSessionUpdate({ sessionUpdate: 'something_new' } as unknown as SessionUpdate)).toEqual([])
     warn.mockRestore()
+  })
+})
+
+describe('askQuestions / ツールコールの ask', () => {
+  const input = {
+    questions: [
+      {
+        header: 'DB',
+        question: 'どれを使う？',
+        multiSelect: false,
+        options: [{ label: 'PostgreSQL', description: '実績', preview: 'CREATE TABLE t ();' }, { label: '' }, 'x']
+      },
+      { question: '機能は？', multiSelect: true, options: [{ label: '認証' }] },
+      { question: '選択肢なし', options: [] },
+      { options: [{ label: 'no question' }] }
+    ]
+  }
+
+  it('AskUserQuestion の形の入力から質問を取り出し、壊れた質問・選択肢は飛ばす', () => {
+    expect(askQuestions(input)).toEqual([
+      {
+        header: 'DB',
+        question: 'どれを使う？',
+        multiSelect: false,
+        options: [{ label: 'PostgreSQL', description: '実績', preview: 'CREATE TABLE t ();' }]
+      },
+      { header: undefined, question: '機能は？', multiSelect: true, options: [{ label: '認証', description: undefined, preview: undefined }] }
+    ])
+    expect(askQuestions({ questions: [] })).toBeUndefined()
+    expect(askQuestions({ command: 'ls' })).toBeUndefined()
+    expect(askQuestions(undefined)).toBeUndefined()
+  })
+
+  function lastToolCall(events: TranscriptEvent[]) {
+    return events.filter((e): e is Extract<TranscriptEvent, { type: 'toolCall' }> => e.type === 'toolCall').pop()!.toolCall
+  }
+
+  it('kind が other のツールコールにだけ ask を付け、後から届いた入力でも付ける', () => {
+    const translator = new SessionTranslator(SANDBOX)
+    let events = translator.handleSessionUpdate(toolCall({ toolCallId: 'a', title: 'Ask', kind: 'other', status: 'pending' }))
+    expect(lastToolCall(events).ask).toBeUndefined()
+    events = translator.handleSessionUpdate(toolCallUpdate({ toolCallId: 'a', rawInput: input }))
+    expect(lastToolCall(events).ask).toHaveLength(2)
+    events = translator.handleSessionUpdate(toolCallUpdate({ toolCallId: 'a', status: 'completed' }))
+    expect(lastToolCall(events).ask).toHaveLength(2)
+
+    events = translator.handleSessionUpdate(toolCall({ toolCallId: 'b', title: 'Run', kind: 'execute', rawInput: input }))
+    expect(lastToolCall(events).ask).toBeUndefined()
   })
 })
 

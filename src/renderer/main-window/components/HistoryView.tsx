@@ -122,7 +122,14 @@ export function HistoryView({
           {t(agentOnly ? 'history.agentOnlyEmpty' : 'history.empty')}
         </p>
       ) : (
-        <Transcript state={state} onPermission={() => {}} onOpenFile={onOpenFile} onSubmitChoices={() => {}} diffLayout={diffLayout} />
+        <Transcript
+          state={state}
+          onPermission={() => {}}
+          onElicitation={() => {}}
+          onOpenFile={onOpenFile}
+          onSubmitChoices={() => {}}
+          diffLayout={diffLayout}
+        />
       )}
     </div>
   )

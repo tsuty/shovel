@@ -20,13 +20,14 @@ import {
   User,
   type LucideIcon
 } from 'lucide-react'
-import type { ToolCallPayload } from '@shared/types/transcript'
+import type { AskQuestion, ElicitationReply, ToolCallPayload } from '@shared/types/transcript'
 import type { DiffLayout } from '@shared/types/settings'
 import type { RenderBlock, RenderChoice, RenderPermission, TranscriptState } from '../transcriptState'
 import { cn } from '../../shared/lib/utils'
 import { Markdown } from '../../shared/components/Markdown'
 import { TextDiffView } from '../../shared/components/DiffView'
 import { Button } from '../../shared/components/ui/button'
+import { ElicitationCard } from './ElicitationCard'
 
 function blockDomId(id: string): string {
   return `transcript-block-${id}`
@@ -58,12 +59,14 @@ function splitIntoTurns(order: TranscriptState['order'], blocks: TranscriptState
 export function Transcript({
   state,
   onPermission,
+  onElicitation,
   onOpenFile,
   onSubmitChoices,
   diffLayout = 'split'
 }: {
   state: TranscriptState
   onPermission: (permissionId: string, optionId: string) => void
+  onElicitation: (elicitationId: string, reply: ElicitationReply) => void
   onOpenFile: (relPath: string) => void
   onSubmitChoices: (markdown: string) => void
   /** Diff ビューを開いたときの表示（設定の既定値）。 */
@@ -139,6 +142,8 @@ export function Transcript({
                       onSubmitChoices={onSubmitChoices}
                     />
                   </div>
+                ) : entry.kind === 'elicitation' ? (
+                  <ElicitationCard key={entry.id} elicitation={state.elicitations[entry.id]!} onReply={onElicitation} />
                 ) : (
                   <GroupView
                     key={entry.id}
@@ -382,7 +387,7 @@ function toolCallLine(tc: ToolCallPayload): string {
 }
 
 // read/delete/move は1行で展開しない。switch_mode は plan 本文を常時展開する。
-// それ以外は content があれば末尾のキャレットで展開できる。
+// それ以外は content か質問（ask）があれば末尾のキャレットで展開できる。
 const NON_EXPANDABLE_KINDS = new Set<ToolCallPayload['kind']>(['read', 'delete', 'move', 'switch_mode'])
 
 function GroupView({
@@ -454,7 +459,7 @@ function GroupView({
       <ul className={cn('mt-1 flex flex-col gap-1 pl-4', !groupOpen && 'hidden')}>
         {toolCalls.map((tc) => {
           const permission = pendingByToolCall.get(tc.id)
-          const canExpand = !NON_EXPANDABLE_KINDS.has(tc.kind) && !!tc.content
+          const canExpand = !NON_EXPANDABLE_KINDS.has(tc.kind) && (!!tc.content || !!tc.ask)
           const isExpanded = expanded.has(tc.id)
           const KindIcon = KIND_ICONS[tc.kind] ?? Info
           return (
@@ -512,7 +517,8 @@ function GroupView({
                   )}
                 </div>
               )}
-              {canExpand && isExpanded && (
+              {canExpand && isExpanded && tc.ask && <AskQuestionsView questions={tc.ask} />}
+              {canExpand && isExpanded && !tc.ask && (
                 <div className="ml-[calc(1.25rem+1.15em)] mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-muted/40 px-2 py-1 text-transcript-xs text-muted-foreground">
                   {tc.content}
                 </div>
@@ -523,6 +529,74 @@ function GroupView({
         })}
       </ul>
     </div>
+  )
+}
+
+/**
+ * ユーザーへの質問ツールの行を開いたときの中身。尋ねた質問と選択肢をそのまま並べる
+ * （何と答えたかはツールコールには含まれない）。選択肢の `preview` は「プレビュー」で開閉する。
+ * 文言はすべてプレーンテキスト。
+ */
+function AskQuestionsView({ questions }: { questions: AskQuestion[] }): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div className="ml-[calc(1.25rem+1.15em)] mt-1 flex flex-col gap-2 rounded bg-muted/40 px-2 py-1.5 text-transcript-xs">
+      {questions.map((question, i) => (
+        <div key={i} className={cn('flex flex-col gap-1', i > 0 && 'border-t border-dotted border-border pt-2')}>
+          {question.header && <div className="font-medium text-muted-foreground">{question.header}</div>}
+          <div className="whitespace-pre-wrap">{question.question}</div>
+          <div className="text-muted-foreground">
+            {t(question.multiSelect ? 'transcript.ask.selectMany' : 'transcript.ask.selectOne')}
+          </div>
+          <ul className="flex flex-col gap-1">
+            {question.options.map((option, j) => (
+              <AskOptionRow key={j} option={option} multiSelect={question.multiSelect} />
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AskOptionRow({
+  option,
+  multiSelect
+}: {
+  option: AskQuestion['options'][number]
+  multiSelect: boolean
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const [showPreview, setShowPreview] = useState(false)
+  return (
+    <li className="flex items-start gap-1.5">
+      {/* 記号は1行目の高さの中で上下中央に置く（文字の記号はフォントで位置がずれるので枠線で描く）。 */}
+      <span className="flex h-[1lh] shrink-0 items-center" aria-hidden>
+        <span
+          className={cn('h-[0.8em] w-[0.8em] border border-muted-foreground', multiSelect ? 'rounded-[2px]' : 'rounded-full')}
+        />
+      </span>
+      <div className="flex min-w-0 flex-col">
+        <span>{option.label}</span>
+        {option.description && <span className="whitespace-pre-wrap text-muted-foreground">{option.description}</span>}
+        {option.preview && (
+          <>
+            <button
+              className="self-start text-primary hover:underline"
+              aria-expanded={showPreview}
+              onClick={() => setShowPreview((v) => !v)}
+            >
+              {t('transcript.ask.preview')}
+            </button>
+            {showPreview && (
+              <pre className="mt-0.5 max-h-48 overflow-auto rounded border border-border bg-background px-2 py-1 font-mono">
+                {option.preview}
+              </pre>
+            )}
+          </>
+        )}
+      </div>
+    </li>
   )
 }
 

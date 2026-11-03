@@ -224,7 +224,7 @@ export function App(): React.JSX.Element {
   const [annotating, setAnnotating] = useState<{ relPath: string; attachTo?: string } | null>(null)
   const [commandsHeight, setCommandsHeight] = useState(COMMANDS_DEFAULT_HEIGHT)
   const [tabStatuses, setTabStatuses] = useState<
-    Record<string, { sending: boolean; hasPendingPermission: boolean }>
+    Record<string, { sending: boolean; awaitingUser: boolean }>
   >({})
   const { settings, update: updateSettings } = useSettings()
 
@@ -736,11 +736,11 @@ export function App(): React.JSX.Element {
   /** 背景タブの通知状態。変化がなければ同一参照を返す。 */
   function updateTabStatus(
     sessionId: string,
-    status: { sending: boolean; hasPendingPermission: boolean }
+    status: { sending: boolean; awaitingUser: boolean }
   ): void {
     setTabStatuses((prev) => {
       const current = prev[sessionId]
-      if (current && current.sending === status.sending && current.hasPendingPermission === status.hasPendingPermission) {
+      if (current && current.sending === status.sending && current.awaitingUser === status.awaitingUser) {
         return prev
       }
       return { ...prev, [sessionId]: status }

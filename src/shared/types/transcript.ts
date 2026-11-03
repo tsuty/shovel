@@ -45,6 +45,19 @@ export interface ToolCallPayload {
   diffs: ToolCallDiff[]
   rawInput?: unknown
   content?: string
+  /**
+   * ユーザーに質問するツール（claude-agent-acp の `AskUserQuestion` の形の入力）なら、その質問。
+   * 行を開くと、生の入力の代わりにこれを整形して出す。`rawInput` と違いスナップショットにも残す。
+   */
+  ask?: AskQuestion[]
+}
+
+/** ユーザーへの質問1つ（`AskUserQuestion` の入力の `questions` の1要素）。 */
+export interface AskQuestion {
+  header?: string
+  question: string
+  multiSelect: boolean
+  options: { label: string; description?: string; preview?: string }[]
 }
 
 export interface PermissionOption {
@@ -54,6 +67,63 @@ export interface PermissionOption {
 }
 
 export type PermissionResolution = 'selected' | 'cancelled'
+
+/** エージェントからの質問（`elicitation/create` のフォーム）の選択肢。 */
+export interface ElicitationOption {
+  value: string
+  label: string
+  description?: string
+  /**
+   * 選んだときに下へ出す補足（コード片や画面の下書きなど、プレーンテキスト）。claude-agent-acp が
+   * `AskUserQuestion` の選択肢の `_meta["_claude/askUserQuestionOption"].preview` で送ってくる。
+   */
+  preview?: string
+}
+
+interface ElicitationFieldBase {
+  /** `requestedSchema.properties` のキー。回答の `content` のキーになる。 */
+  key: string
+  title?: string
+  description?: string
+  required: boolean
+}
+
+/** `requestedSchema` の1項目を、描くコントロールの種類ごとに整理したもの。 */
+export type ElicitationField =
+  | (ElicitationFieldBase & {
+      kind: 'text'
+      default?: string
+      format?: 'email' | 'uri' | 'date' | 'date-time'
+      minLength?: number
+      maxLength?: number
+      pattern?: string
+    })
+  | (ElicitationFieldBase & { kind: 'select'; default?: string; options: ElicitationOption[] })
+  | (ElicitationFieldBase & {
+      kind: 'number'
+      integer: boolean
+      default?: number
+      minimum?: number
+      maximum?: number
+    })
+  | (ElicitationFieldBase & { kind: 'boolean'; default?: boolean })
+  | (ElicitationFieldBase & {
+      kind: 'multiSelect'
+      default?: string[]
+      options: ElicitationOption[]
+      minItems?: number
+      maxItems?: number
+    })
+
+export type ElicitationValue = string | number | boolean | string[]
+
+export type ElicitationAction = 'accept' | 'decline' | 'cancel'
+
+/** renderer から main へ返す、質問への応答。 */
+export type ElicitationReply =
+  | { action: 'accept'; content: Record<string, ElicitationValue> }
+  | { action: 'decline' }
+  | { action: 'cancel' }
 
 /** main → renderer */
 export type TranscriptEvent =
@@ -90,6 +160,22 @@ export type TranscriptEvent =
       options: PermissionOption[]
     }
   | { type: 'permissionResolved'; id: string; status: PermissionResolution; optionId?: string }
+  /** エージェントからの質問（`elicitation/create` のフォームモード）。 */
+  | {
+      type: 'elicitation'
+      id: string
+      message: string
+      title?: string
+      description?: string
+      fields: ElicitationField[]
+    }
+  /** 質問への応答が決まった（`accept` のときは送った内容も運ぶ）。 */
+  | {
+      type: 'elicitationResolved'
+      id: string
+      action: ElicitationAction
+      content?: Record<string, ElicitationValue>
+    }
   | { type: 'turnEnd'; id: string; targetId: string }
   | { type: 'toast'; text: string }
   /**
@@ -125,3 +211,4 @@ export type TranscriptAction =
   | { type: 'copyText'; text: string }
   | { type: 'submitChoices'; sessionId: string; id: string; markdown: string }
   | { type: 'permission'; sessionId: string; id: string; optionId: string }
+  | { type: 'elicitation'; sessionId: string; id: string; reply: ElicitationReply }

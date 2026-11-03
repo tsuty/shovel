@@ -5,6 +5,7 @@ import type {
   ActiveSessionMessage,
   ClientContext,
   ContentBlock,
+  CreateElicitationResponse,
   InitializeResponse,
   ListSessionsResponse,
   LoadSessionResponse,
@@ -27,7 +28,8 @@ import type {
   SessionUsage,
   SnapshotEntry
 } from '@shared/types/session'
-import type { TranscriptEvent } from '@shared/types/transcript'
+import type { ElicitationField, ElicitationReply, TranscriptEvent } from '@shared/types/transcript'
+import { checkElicitationContent } from '@shared/elicitationForm'
 import type { SessionOpenStep } from '@shared/ipc'
 import { snapshotEntriesToEvents } from '@shared/snapshotEvents'
 import { sbxSpawnInteractive } from '../sbx/cli'
@@ -35,6 +37,13 @@ import { SessionLogger } from '../log'
 import { buildAcpStream } from './stream'
 import { loadAcpSdk } from './sdk'
 import { permissionRequestToEvent, SessionTranslator } from './translate'
+import {
+  ELICITATION_CAPABILITIES,
+  elicitationToEvent,
+  parseElicitationRequest,
+  replyToResponse,
+  UnsupportedElicitationError
+} from './elicitation'
 import { backupSnapshot, saveSnapshot } from '../persistence/snapshot'
 import { mergeConfigOptions } from './configOptions'
 import { compareByMessageId, describeMessageIdComparison, SnapshotAccumulator } from './snapshotRecord'
@@ -95,6 +104,7 @@ export interface OpenedSession {
   setMode(modeId: string): Promise<void>
   setConfigOption(configId: string, value: string | boolean): Promise<void>
   resolvePermission(permissionId: string, optionId: string): void
+  resolveElicitation(elicitationId: string, reply: ElicitationReply): void
   /**
    * `sbx exec` プロセスと `initialize` 済みの接続を再利用し、`session/new` で
    * ACP セッションだけを張り直す。
@@ -162,6 +172,19 @@ export async function openAcpSession(
   const translator = new SessionTranslator(project.sandboxPath)
   const snapshotAcc = new SnapshotAccumulator()
   const pendingPermissions = new Map<string, (optionId: string | null) => void>()
+  /** 応答待ちの質問（`elicitation/create`）。null は取り消し（cancel）。 */
+  const pendingElicitations = new Map<string, PendingElicitation>()
+
+  /**
+   * 応答待ちの承認カードと質問を、すべて取り消し（cancelled / cancel）で返す。
+   * ターンの停止・終了、↻、タブを閉じたとき、接続が切れたときに呼ぶ。
+   */
+  function cancelPendingRequests(): void {
+    for (const resolve of pendingPermissions.values()) resolve(null)
+    pendingPermissions.clear()
+    for (const pending of pendingElicitations.values()) pending.resolve(null)
+    pendingElicitations.clear()
+  }
   /** 復元した `ManualSession` を ACP セッション id で引くための表。 */
   const manualSessions = new Map<string, ManualSession>()
   /**
@@ -240,8 +263,19 @@ export async function openAcpSession(
     .onRequest(acp.CLIENT_METHODS.terminal_kill, () => {
       throw acp.RequestError.methodNotFound(acp.CLIENT_METHODS.terminal_kill)
     })
-    .onRequest(acp.CLIENT_METHODS.elicitation_create, () => {
-      throw acp.RequestError.methodNotFound(acp.CLIENT_METHODS.elicitation_create)
+    .onRequest(acp.CLIENT_METHODS.elicitation_create, async ({ params, signal }) => {
+      let fields: ElicitationField[]
+      try {
+        fields = parseElicitationRequest(params)
+      } catch (err) {
+        // 広告していないモードや描けない項目を含む要求は Invalid params で断る。
+        if (!(err instanceof UnsupportedElicitationError)) throw err
+        logger.logDebug(`refusing elicitation/create: ${err.message}`)
+        throw acp.RequestError.invalidParams(undefined, err.message)
+      }
+      const elicitationId = randomUUID()
+      callbacks.onEvent(elicitationToEvent(elicitationId, params, fields))
+      return awaitElicitationReply(elicitationId, fields, callbacks, pendingElicitations, signal)
     })
     // 復元したセッション宛ての `session/update` を `ManualSession` のキューへ流す。
     // 表に無い sessionId は SDK の `ActiveSession` 側で処理されるので捨てる。
@@ -424,7 +458,8 @@ export async function openAcpSession(
               protocolVersion: 1,
               clientCapabilities: {
                 fs: { readTextFile: false, writeTextFile: false },
-                terminal: false
+                terminal: false,
+                elicitation: ELICITATION_CAPABILITIES
               },
               clientInfo: { name: 'shovel', version: app.getVersion() }
             }),
@@ -481,8 +516,7 @@ export async function openAcpSession(
         await closeSignal
       })
       connectionPromise.catch((err: unknown) => {
-        for (const resolve of pendingPermissions.values()) resolve(null)
-        pendingPermissions.clear()
+        cancelPendingRequests()
         callbacks.onFatalError(errorMessage(err))
       })
     }
@@ -542,10 +576,15 @@ export async function openAcpSession(
         name: relPath.split('/').pop() ?? relPath
       }))
       promptBlocks.push({ type: 'text', text })
-      await currentSession.prompt(promptBlocks)
+      try {
+        await currentSession.prompt(promptBlocks)
+      } finally {
+        cancelPendingRequests()
+      }
     },
     async cancel() {
       if (!ready) return
+      cancelPendingRequests()
       await ready.ctx.notify(acp.AGENT_METHODS.session_cancel, { sessionId: currentSession.sessionId })
     },
     async setMode(modeId: string) {
@@ -588,9 +627,25 @@ export async function openAcpSession(
         resolve(optionId)
       }
     },
+    resolveElicitation(elicitationId: string, reply: ElicitationReply) {
+      const pending = pendingElicitations.get(elicitationId)
+      if (!pending) return
+      if (reply.action === 'accept') {
+        // renderer でも検証しているが、送る前に要求のスキーマに照らしてもう一度確かめる。
+        const content = checkElicitationContent(pending.fields, reply.content)
+        if (!content) {
+          logger.logDebug(`ignoring an elicitation answer that does not fit its schema: ${elicitationId}`)
+          return
+        }
+        reply = { action: 'accept', content }
+      }
+      pendingElicitations.delete(elicitationId)
+      pending.resolve(reply)
+    },
     async refresh() {
       if (!ready) return snapshotId
       restoreEpoch++
+      cancelPendingRequests()
       // 前の会話の記録を閉じ、新しい会話は新しい `{snapshotId}.json` に書く。
       await persistSnapshot()
       restoredTitle = undefined
@@ -643,6 +698,7 @@ export async function openAcpSession(
     },
     close() {
       restoreEpoch++
+      cancelPendingRequests()
       void persistSnapshot()
       child.kill()
       releaseConnection()
@@ -886,6 +942,37 @@ async function handlePermissionRequest(
   }
   callbacks.onEvent({ type: 'permissionResolved', id: permissionId, status: 'selected', optionId })
   return { outcome: { outcome: 'selected', optionId } }
+}
+
+interface PendingElicitation {
+  fields: ElicitationField[]
+  resolve: (reply: ElicitationReply | null) => void
+}
+
+/** 質問への応答を待つ。エージェントが要求を取り消したとき（`$/cancel_request`）は cancel で返す。 */
+async function awaitElicitationReply(
+  elicitationId: string,
+  fields: ElicitationField[],
+  callbacks: SessionRuntimeCallbacks,
+  pending: Map<string, PendingElicitation>,
+  signal: AbortSignal
+): Promise<CreateElicitationResponse> {
+  const reply = await new Promise<ElicitationReply | null>((resolve) => {
+    pending.set(elicitationId, { fields, resolve })
+    signal.addEventListener('abort', () => {
+      pending.delete(elicitationId)
+      resolve(null)
+    })
+  })
+
+  const response = replyToResponse(reply ?? { action: 'cancel' })
+  callbacks.onEvent({
+    type: 'elicitationResolved',
+    id: elicitationId,
+    action: response.action,
+    content: response.action === 'accept' ? response.content : undefined
+  })
+  return response
 }
 
 function initialMetaState(
