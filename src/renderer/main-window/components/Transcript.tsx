@@ -27,7 +27,7 @@ import { cn } from '../../shared/lib/utils'
 import { Markdown } from '../../shared/components/Markdown'
 import { TextDiffView } from '../../shared/components/DiffView'
 import { Button } from '../../shared/components/ui/button'
-import { ElicitationCard } from './ElicitationCard'
+import { ElicitationCard, QuestionMarkdown } from './ElicitationCard'
 
 function blockDomId(id: string): string {
   return `transcript-block-${id}`
@@ -535,16 +535,16 @@ function GroupView({
 /**
  * ユーザーへの質問ツールの行を開いたときの中身。尋ねた質問と選択肢をそのまま並べる
  * （何と答えたかはツールコールには含まれない）。選択肢の `preview` は「プレビュー」で開閉する。
- * 文言はすべてプレーンテキスト。
+ * 見出しと選択肢の名前はプレーンテキスト、それ以外は質問カードと同じく `QuestionMarkdown` で描く。
  */
 function AskQuestionsView({ questions }: { questions: AskQuestion[] }): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <div className="ml-[calc(1.25rem+1.15em)] mt-1 flex flex-col gap-2 rounded bg-muted/40 px-2 py-1.5 text-transcript-xs">
+    <div className="ml-[calc(1.25rem+1.15em)] mt-1 flex flex-col gap-2 rounded border border-border px-2 py-1.5 text-transcript-xs">
       {questions.map((question, i) => (
         <div key={i} className={cn('flex flex-col gap-1', i > 0 && 'border-t border-dotted border-border pt-2')}>
           {question.header && <div className="font-medium text-muted-foreground">{question.header}</div>}
-          <div className="whitespace-pre-wrap">{question.question}</div>
+          <QuestionMarkdown className="text-transcript-xs" text={question.question} />
           <div className="text-muted-foreground">
             {t(question.multiSelect ? 'transcript.ask.selectMany' : 'transcript.ask.selectOne')}
           </div>
@@ -578,7 +578,7 @@ function AskOptionRow({
       </span>
       <div className="flex min-w-0 flex-col">
         <span>{option.label}</span>
-        {option.description && <span className="whitespace-pre-wrap text-muted-foreground">{option.description}</span>}
+        {option.description && <QuestionMarkdown className="text-transcript-xs text-muted-foreground" text={option.description} />}
         {option.preview && (
           <>
             <button
@@ -589,9 +589,9 @@ function AskOptionRow({
               {t('transcript.ask.preview')}
             </button>
             {showPreview && (
-              <pre className="mt-0.5 max-h-48 overflow-auto rounded border border-border bg-background px-2 py-1 font-mono">
-                {option.preview}
-              </pre>
+              <div className="mt-0.5 max-h-48 overflow-auto rounded border border-border bg-background px-2 py-1">
+                <QuestionMarkdown preformatted className="font-mono text-transcript-xs" text={option.preview} />
+              </div>
             )}
           </>
         )}
@@ -608,7 +608,7 @@ function PermissionCard({
   onPermission: (permissionId: string, optionId: string) => void
 }): React.JSX.Element {
   return (
-    <div className="mt-2 rounded-md border border-primary/40 bg-primary/5 p-2">
+    <div className="mt-2 rounded-md border border-l-4 border-border border-l-primary p-2">
       <div className="mb-1 text-transcript font-medium">{permission.headline}</div>
       {permission.bodyMarkdown && <Markdown className="text-transcript" text={permission.bodyMarkdown} />}
       <div className="mt-2 flex flex-wrap gap-2">

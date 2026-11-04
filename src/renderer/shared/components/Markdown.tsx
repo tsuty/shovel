@@ -237,14 +237,17 @@ function CodeBlock({
 function MarkdownLink({
   href,
   children,
-  onOpenFileLink
+  onOpenFileLink,
+  inert = false
 }: {
   href?: string
   children?: React.ReactNode
   onOpenFileLink?: (relPath: string) => void
+  /** どのリンクも開けない文字として描く。 */
+  inert?: boolean
 }): React.JSX.Element {
   const target = href ?? ''
-  if (EXTERNAL_LINK.test(target)) {
+  if (!inert && EXTERNAL_LINK.test(target)) {
     return (
       <a
         href={target}
@@ -259,7 +262,7 @@ function MarkdownLink({
       </a>
     )
   }
-  const relPath = onOpenFileLink ? asProjectRelativePath(target) : null
+  const relPath = !inert && onOpenFileLink ? asProjectRelativePath(target) : null
   if (relPath && onOpenFileLink) {
     // href を持たせない。
     return (
@@ -292,7 +295,8 @@ export function Markdown({
   collapseCodeBlocks = false,
   forPrint = false,
   allowDetails = false,
-  headingLines = false
+  headingLines = false,
+  inertLinks = false
 }: {
   text: string
   className?: string
@@ -306,6 +310,8 @@ export function Markdown({
   allowDetails?: boolean
   /** 見出しに、ソースの行番号（1 始まり）を `data-source-line` として付ける（アウトラインから移るため）。 */
   headingLines?: boolean
+  /** リンクをクリックできない文字として描き、画像は読み込まずに代替テキストだけを出す。 */
+  inertLinks?: boolean
 }): React.JSX.Element {
   // 描画のたびに作り直すと、コードブロックが毎回作り直されて図やハイライトを描き直す
   // （印刷用表示では描画完了の通知で親が描き直されるので、終わらなくなる）。
@@ -315,14 +321,21 @@ export function Markdown({
         <CodeBlock node={node} collapsible={collapseCodeBlocks} forPrint={forPrint} {...props} />
       ),
       a: ({ href, children }) => (
-        <MarkdownLink href={href} onOpenFileLink={onOpenFileLink}>
+        <MarkdownLink href={href} onOpenFileLink={onOpenFileLink} inert={inertLinks}>
           {children}
         </MarkdownLink>
       ),
+      ...(inertLinks && {
+        img: ({ alt, src }) => (
+          <span className="markdown-dead-link" title={typeof src === 'string' && src ? src : undefined}>
+            {alt || src}
+          </span>
+        )
+      }),
       ...(forPrint && { details: ({ node: _node, ...props }) => <details {...props} open /> }),
       ...(headingLines && HEADING_WITH_LINE)
     }),
-    [collapseCodeBlocks, forPrint, onOpenFileLink, headingLines]
+    [collapseCodeBlocks, forPrint, onOpenFileLink, headingLines, inertLinks]
   )
   return (
     <div className={`markdown ${className}`}>

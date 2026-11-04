@@ -11,6 +11,7 @@ import {
   type ElicitationFormValue,
   type ElicitationFormValues
 } from '@shared/elicitationForm'
+import { Markdown } from '../../shared/components/Markdown'
 import { cn } from '../../shared/lib/utils'
 
 /** 単一選択の選択肢がこの数を超えたら、ラジオの列ではなくドロップダウンで描く。 */
@@ -20,8 +21,34 @@ const INPUT_CLASS =
   'w-full rounded-md border border-input bg-background px-2 py-1 text-transcript-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60'
 
 /**
- * エージェントからの質問（`elicitation/create` のフォームモード）。文言はすべてプレーンテキストで描き、
- * リンクにはしない。
+ * 質問の文言（メッセージ・説明・選択肢の説明・preview）。Markdown として描くが、リンクはクリックできない
+ * 文字のまま、画像は代替テキストだけにする。前後の段落の余白は詰める。
+ */
+export function QuestionMarkdown({
+  text,
+  className,
+  preformatted = false
+}: {
+  text: string
+  className?: string
+  /** 段落の改行と空白をそのまま残す（preview の下書きや図のため）。 */
+  preformatted?: boolean
+}): React.JSX.Element {
+  return (
+    <Markdown
+      text={text}
+      inertLinks
+      // cn（tailwind-merge）は text-transcript-* を色のクラスとみなして落とすので、文字列のまま繋ぐ。
+      className={['[&>:first-child]:mt-0 [&>:last-child]:mb-0', preformatted && '[&_p]:whitespace-pre-wrap', className]
+        .filter(Boolean)
+        .join(' ')}
+    />
+  )
+}
+
+/**
+ * エージェントからの質問（`elicitation/create` のフォームモード）。選択肢・項目の名前は
+ * プレーンテキスト、それ以外の文言は `QuestionMarkdown` で描く。
  */
 export function ElicitationCard({
   elicitation,
@@ -50,15 +77,15 @@ export function ElicitationCard({
   }
 
   return (
-    <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-transcript">
+    <div className="rounded-md border border-l-4 border-border border-l-primary px-3 py-2 text-transcript">
       <div className="mb-1 flex items-center gap-1 text-transcript-sm font-medium text-muted-foreground">
         <MessageCircleQuestion size={12} />
         {t('elicitation.heading')}
       </div>
-      <div className="whitespace-pre-wrap font-medium">{elicitation.message}</div>
-      {elicitation.title && <div className="mt-1 whitespace-pre-wrap">{elicitation.title}</div>}
+      <QuestionMarkdown className="text-transcript font-medium" text={elicitation.message} />
+      {elicitation.title && <QuestionMarkdown className="mt-1 text-transcript" text={elicitation.title} />}
       {elicitation.description && (
-        <div className="mt-1 whitespace-pre-wrap text-transcript-sm text-muted-foreground">{elicitation.description}</div>
+        <QuestionMarkdown className="mt-1 text-transcript-sm text-muted-foreground" text={elicitation.description} />
       )}
       <form
         className="mt-2 flex flex-col"
@@ -271,7 +298,7 @@ function FieldView({
         </div>
       )}
       {field.description && (
-        <div className="whitespace-pre-wrap text-transcript-sm text-muted-foreground">{field.description}</div>
+        <QuestionMarkdown className="text-transcript-sm text-muted-foreground" text={field.description} />
       )}
       {control}
       {error && <div className="text-transcript-xs text-destructive">{t(`elicitation.error.${error.code}`, error.params)}</div>}
@@ -298,7 +325,7 @@ function OptionRow({
     <label
       className={cn(
         'flex items-start gap-2 rounded-md border px-2 py-1',
-        checked ? 'border-primary bg-primary/10' : 'border-border',
+        checked ? 'border-primary ring-1 ring-primary' : 'border-border',
         !disabled && 'cursor-pointer hover:bg-accent/50'
       )}
     >
@@ -306,22 +333,22 @@ function OptionRow({
       <span className="flex h-[1lh] shrink-0 items-center">
         <input className="m-0" type={type} name={name} checked={checked} disabled={disabled} onChange={onChange} />
       </span>
-      <span className="flex flex-col">
+      <span className="flex min-w-0 flex-col">
         <span>{option.label}</span>
         {option.description && (
-          <span className="whitespace-pre-wrap text-transcript-sm text-muted-foreground">{option.description}</span>
+          <QuestionMarkdown className="text-transcript-sm text-muted-foreground" text={option.description} />
         )}
       </span>
     </label>
   )
 }
 
-/** 選んでいる選択肢の `preview`（コード片や画面の下書き）。プレーンテキストのまま等幅で出す。 */
+/** 選んでいる選択肢の `preview`（コード片や画面の下書き）。等幅の枠の中に Markdown として描く。 */
 function OptionPreview({ option }: { option: ElicitationOption | undefined }): React.JSX.Element | null {
   if (!option?.preview) return null
   return (
-    <pre className="max-h-64 overflow-auto rounded-md border border-border bg-muted/40 px-2 py-1 font-mono text-transcript-xs">
-      {option.preview}
-    </pre>
+    <div className="max-h-64 overflow-auto rounded-md border border-border px-2 py-1">
+      <QuestionMarkdown preformatted className="font-mono text-transcript-xs" text={option.preview} />
+    </div>
   )
 }

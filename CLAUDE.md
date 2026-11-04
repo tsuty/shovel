@@ -39,7 +39,7 @@ link per turn, and an expand/collapse caret on tool-call rows that have non-diff
 `search`/`fetch`/`other` kinds) that preserves the clicked row's on-screen position across the
 toggle), permission cards (their diff summary is opened via the same tool-call-row "view diff"
 link, not a duplicate affordance on the card), question cards for agent `elicitation/create` requests (form mode only; Send/Don't answer/Abort =
-accept/decline/cancel; a request with any field the card can't draw is refused with `-32602`; answers
+accept/decline/cancel; messages/descriptions/previews render as Markdown via `QuestionMarkdown` with links and images made inert (`Markdown`'s `inertLinks`); a request with any field the card can't draw is refused with `-32602`; answers
 are re-validated in main via `src/shared/elicitationForm.ts`; pending questions *and* permission cards are
 cancelled on turn stop/end, ↻, tab close and disconnect; not kept in snapshots — decisions.md A-1c; the
 `AskUserQuestion` tool-call row instead expands to the formatted questions/options via `ToolCallPayload.ask`,
