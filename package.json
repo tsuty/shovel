@@ -1,6 +1,6 @@
 {
   "name": "shovel",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "description": "AIエージェントチャット on Docker Sandboxes",
   "license": "Apache-2.0",
