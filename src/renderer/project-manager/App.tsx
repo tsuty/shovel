@@ -109,7 +109,7 @@ export function App(): React.JSX.Element {
             >
               <StatusDot status={project.status} />
               <button
-                className="flex-1 text-left"
+                className="min-w-0 flex-1 text-left"
                 onDoubleClick={() => void open(project.id)}
                 onClick={() => void open(project.id)}
               >
@@ -130,13 +130,19 @@ export function App(): React.JSX.Element {
                   />
                 ) : (
                   <>
-                    <div className="text-sm font-medium">{project.displayName}</div>
-                    <div className="truncate text-xs text-muted-foreground">{project.hostPath}</div>
+                    <div className="truncate text-sm font-medium">{project.displayName}</div>
+                    {/* rtl にすると、はみ出したときに先頭側が「…」になる。中身は bdi で左から右のまま並べる。 */}
+                    <div
+                      className="truncate text-left text-xs text-muted-foreground [direction:rtl]"
+                      title={project.hostPath}
+                    >
+                      <bdi>{project.hostPath}</bdi>
+                    </div>
                   </>
                 )}
               </button>
               <StatusBadge status={project.status} />
-              <div className="hidden gap-1 group-hover:flex">
+              <div className="hidden shrink-0 gap-1 group-hover:flex">
                 <Button
                   size="sm"
                   variant="ghost"
@@ -208,9 +214,9 @@ function StatusDot({ status }: { status: SandboxStatus }): React.JSX.Element {
 function StatusBadge({ status }: { status: SandboxStatus }): React.JSX.Element | null {
   const { t } = useTranslation()
   if (status === 'running' || status === 'stopped' || status === 'unknown') {
-    return <Badge variant="secondary">{t(`projectManager.status.${status}`)}</Badge>
+    return <Badge variant="secondary" className="shrink-0 whitespace-nowrap">{t(`projectManager.status.${status}`)}</Badge>
   }
-  return <Badge variant="destructive">{t(`projectManager.status.${status}`)}</Badge>
+  return <Badge variant="destructive" className="shrink-0 whitespace-nowrap">{t(`projectManager.status.${status}`)}</Badge>
 }
 
 /** `sbx` 自体の問題で状態を確かめられないときの案内（未サインインならサインインへ誘導する）。 */

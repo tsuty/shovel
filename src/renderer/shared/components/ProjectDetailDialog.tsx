@@ -97,11 +97,15 @@ export function ProjectDetailDialog({
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : (
           <div className="flex flex-col gap-3 text-sm">
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
               <dt className="text-muted-foreground">{t('detail.hostPath')}</dt>
-              <dd className="truncate">{diagnostics.project.hostPath}</dd>
+              <dd className="truncate" title={diagnostics.project.hostPath}>
+                {diagnostics.project.hostPath}
+              </dd>
               <dt className="text-muted-foreground">{t('detail.sandboxName')}</dt>
-              <dd className="truncate">{diagnostics.project.sandboxName}</dd>
+              <dd className="truncate" title={diagnostics.project.sandboxName}>
+                {diagnostics.project.sandboxName}
+              </dd>
               <dt className="text-muted-foreground">{t('detail.agent')}</dt>
               <dd className="flex min-w-0 items-center gap-2">
                 <span className="truncate">{agentLabel(diagnostics)}</span>
