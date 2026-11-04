@@ -7,6 +7,8 @@ export interface FsEntry {
   isDir: boolean
   /** `.gitignore` に一致する（node_modules 等）。 */
   ignored: boolean
+  /** シンボリックリンクのとき、リンク先（readlink の値）とリンク切れかどうか。 */
+  symlink?: { target: string; broken: boolean }
 }
 
 /** テキストファイルの文字コード（判定できたもの）。`unknown` は UTF-8 として無理に読んだもの。 */

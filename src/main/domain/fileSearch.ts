@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readdir, readFile, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { sentenceAround } from '@shared/plainText'
 import {
@@ -66,6 +66,8 @@ export async function searchDirectory(
   if (!needle) return { names, contents }
 
   const queue = [scopeRelPath]
+  // シンボリックリンク経由で同じフォルダを二重に辿らない（循環防止）ための実パス集合。
+  const visited = new Set<string>()
   while (queue.length > 0) {
     const dirRel = queue.shift()!
     let entries
@@ -79,11 +81,24 @@ export async function searchDirectory(
     entries.sort((a, b) => a.name.localeCompare(b.name))
     for (const entry of entries) {
       const relPath = dirRel ? `${dirRel}/${entry.name}` : entry.name
-      if (entry.isDirectory()) {
+      let isDir = entry.isDirectory()
+      let isFile = entry.isFile()
+      if (entry.isSymbolicLink()) {
+        // リンク先の種別で判定する。リンク切れは飛ばす。
+        const info = await stat(path.join(rootAbs, relPath)).catch(() => null)
+        isDir = info?.isDirectory() ?? false
+        isFile = info?.isFile() ?? false
+        if (isDir) {
+          const real = await realpath(path.join(rootAbs, relPath)).catch(() => null)
+          if (!real || visited.has(real)) continue
+          visited.add(real)
+        }
+      }
+      if (isDir) {
         if (!isSkippedDir(entry.name)) queue.push(relPath)
         continue
       }
-      if (!entry.isFile()) continue
+      if (!isFile) continue
       if (names.length < FILE_SEARCH_MAX_RESULTS) {
         const nameMatch = findNameMatch(entry.name, needle)
         if (nameMatch) names.push({ relPath, ...nameMatch })

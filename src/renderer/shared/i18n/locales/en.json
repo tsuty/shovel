@@ -143,6 +143,8 @@
     "copy": "Copy",
     "paste": "Paste",
     "unreadable": "This folder's contents can't be shown",
+    "symlink": "{{target}}",
+    "brokenSymlink": "Broken link → {{target}}",
     "refresh": "Refresh",
     "openInFinder": "Open in Finder",
     "openInExplorer": "Open in Explorer",

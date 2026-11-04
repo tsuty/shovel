@@ -18,6 +18,7 @@ import {
   FolderPlus,
   FolderSearch,
   Link,
+  Link2,
   RefreshCw,
   Search,
   SquarePen,
@@ -580,6 +581,7 @@ function FilerRow({
   onOpen: () => void
   onCommitRename: (name: string) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const entry = node.data
   const composingRef = useRef(false)
   return (
@@ -631,6 +633,14 @@ function FilerRow({
         />
       ) : (
         <span className="truncate">{entry.name}</span>
+      )}
+      {!isRenaming && entry.symlink && (
+        <span
+          className={cn('shrink-0', entry.symlink.broken ? 'text-amber-500' : 'text-muted-foreground')}
+          title={t(entry.symlink.broken ? 'filer.brokenSymlink' : 'filer.symlink', { target: entry.symlink.target })}
+        >
+          <Link2 size={12} />
+        </span>
       )}
     </div>
   )

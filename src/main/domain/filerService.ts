@@ -1,4 +1,4 @@
-import { readdir, readFile, rename as fsRename, stat, mkdir, cp, writeFile } from 'node:fs/promises'
+import { readdir, readlink, readFile, rename as fsRename, stat, mkdir, cp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { clipboard, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
@@ -80,12 +80,21 @@ export async function listDir(projectId: string, relPath: string): Promise<FsEnt
   for (const entry of entries) {
     if (relPath === '' && entry.name === '.git') continue
     const entryRelPath = relPath ? `${relPath}/${entry.name}` : entry.name
-    const isDir = entry.isDirectory()
+    let isDir = entry.isDirectory()
+    let symlink: FsEntry['symlink']
+    if (entry.isSymbolicLink()) {
+      // シンボリックリンクはリンク先の種別で判定する。リンク切れはファイル扱い。
+      const info = await stat(path.join(dirAbs, entry.name)).catch(() => null)
+      isDir = info?.isDirectory() ?? false
+      const target = await readlink(path.join(dirAbs, entry.name)).catch(() => '')
+      symlink = { target, broken: info === null }
+    }
     result.push({
       relPath: entryRelPath,
       name: entry.name,
       isDir,
-      ignored: ig.ignores(isDir ? `${entryRelPath}/` : entryRelPath)
+      ignored: ig.ignores(isDir ? `${entryRelPath}/` : entryRelPath),
+      ...(symlink && { symlink })
     })
   }
   result.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1))

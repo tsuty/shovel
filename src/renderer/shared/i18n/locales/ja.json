@@ -142,6 +142,8 @@
     "copy": "コピー",
     "paste": "貼り付け",
     "unreadable": "このフォルダの内容は表示できません",
+    "symlink": "{{target}}",
+    "brokenSymlink": "リンク切れ → {{target}}",
     "refresh": "更新",
     "openInFinder": "Finder で開く",
     "openInExplorer": "エクスプローラーで開く",
