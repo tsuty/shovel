@@ -112,7 +112,7 @@ describe('copyPlan', () => {
 })
 
 describe('planToTsv', () => {
-  const table = toCsvTable(parseCsvRecords('名前,年齢,市\n佐藤,30,東京\n鈴木,25,大阪\n高橋,41,福岡\n', ','), true)
+  const table = toCsvTable(parseCsvRecords('名前,年齢,市\n佐藤,30,東京\n鈴木,25,大阪\n高橋,41,福岡\n', ','), 1)
 
   it('表示の順で行を取り出す', () => {
     expect(planToTsv(table, [2, 1, 0], { rows: [0, 1], columns: [0, 2], withHeader: false })).toBe(
@@ -126,8 +126,15 @@ describe('planToTsv', () => {
     )
   })
 
-  it('1行目を見出しにしないときは、列名（A, B…）を付けない', () => {
-    const plain = toCsvTable(parseCsvRecords('x,y\n1,2\n', ','), false)
+  it('複数行の見出しは全部を先頭に置く', () => {
+    const multi = toCsvTable(parseCsvRecords('表題,\n名前,年齢\n佐藤,30\n', ','), 2)
+    expect(planToTsv(multi, [0], { rows: [0], columns: [0, 1], withHeader: true })).toBe(
+      '表題\t\n名前\t年齢\n佐藤\t30'
+    )
+  })
+
+  it('見出しの行が無いときは、列名（A, B…）を付けない', () => {
+    const plain = toCsvTable(parseCsvRecords('x,y\n1,2\n', ','), 0)
     expect(planToTsv(plain, [0, 1], { rows: [0, 1], columns: [1], withHeader: true })).toBe('y\n2')
   })
 })

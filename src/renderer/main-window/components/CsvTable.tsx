@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowDown, ArrowUp, ArrowUpDown, Copy } from 'lucide-react'
 import {
@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { cn } from '../../shared/lib/utils'
-import type { CsvRow, CsvTableData } from '../csvTable'
+import { estimateRowLines, type CsvRow, type CsvTableData } from '../csvTable'
 import {
   boundsContain,
   boundsCoverColumn,
@@ -57,6 +57,9 @@ const AUTO_SCROLL_MAX = 24
 /** 「コピーできません」などの知らせを出しておく時間（ms）。 */
 const NOTICE_MS = 2500
 
+/** セルの左右の余白と罫線の幅（px）。折り返しの見積もりで列の幅から引く。 */
+const CELL_INLINE_EXTRA = 17
+
 const ARROW_KEYS = new Set<string>(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 
 /** 押した場所（セル・行番号・見出し）の種類と位置。`data-kind` / `data-row` / `data-col` から読む。 */
@@ -73,8 +76,9 @@ function targetAt(element: Element | null): { kind: CellRange['kind']; pos: Part
  * 見出しの右端をドラッグすると列の幅を変えられる。行は見えている分だけ描く。
  * セルの選び方は表計算ソフトと同じ（押す・ドラッグ・Shift・Cmd/Ctrl・矢印キー、行番号・見出しで行・列全体）で、
  * Cmd/Ctrl+C か右クリックの「コピー」で TSV としてクリップボードへ書く。
+ * `wrap` のときはセルを折り返して全文を出し、行の高さは描いた行を測って決める。
  */
-export function CsvTable({ data }: { data: CsvTableData }): React.JSX.Element {
+export function CsvTable({ data, wrap }: { data: CsvTableData; wrap: boolean }): React.JSX.Element {
   const { t } = useTranslation()
   const columns = useMemo<Array<ColumnDef<typeof features, CsvRow>>>(
     () =>
@@ -129,47 +133,106 @@ export function CsvTable({ data }: { data: CsvTableData }): React.JSX.Element {
     return () => clearTimeout(timer)
   }, [notice])
 
-  // 行はどれも1行で高さが同じなので、見出しの行の高さを測って全行に使う（行ごとには測らない）。
+  // 1行ぶんの高さと文字の幅は、見えない見本を測って求める（文字サイズの設定を変えたときも測り直す）。
   const headerRef = useRef<HTMLDivElement>(null)
-  const [rowHeight, setRowHeight] = useState(28)
+  const probeRef = useRef<HTMLDivElement>(null)
+  const [metrics, setMetrics] = useState({ rowHeight: 28, lineHeight: 19, charWidth: 7 })
+  const { rowHeight } = metrics
   useLayoutEffect(() => {
-    const header = headerRef.current
-    if (!header) return
-    // 文字サイズの設定を変えたときも測り直す。
-    const update = (): void => setRowHeight(header.offsetHeight || 28)
+    const probe = probeRef.current
+    const sample = probe?.firstElementChild
+    if (!probe || !sample) return
+    const update = (): void => {
+      const { height, width } = sample.getBoundingClientRect()
+      if (probe.offsetHeight === 0 || width === 0) return
+      setMetrics((prev) => {
+        const next = { rowHeight: probe.offsetHeight, lineHeight: height, charWidth: width }
+        return prev.rowHeight === next.rowHeight && prev.lineHeight === next.lineHeight && prev.charWidth === next.charWidth
+          ? prev
+          : next
+      })
+    }
     update()
     const observer = new ResizeObserver(update)
-    observer.observe(header)
+    observer.observe(probe)
     return () => observer.disconnect()
   }, [])
 
+  // 折り返すときの、まだ描いていない行の高さの見積もり（`data.rows` の位置ごとの行数）。
+  const columnWidthsKey = headerGroup?.headers.map((header) => header.getSize()).join(',') ?? ''
+  const estimatedLines = useMemo(() => {
+    if (!wrap) return null
+    const charWidth = metrics.charWidth
+    const widths = columnWidthsKey
+      .split(',')
+      .map((width) => Math.max(1, Math.floor((Number(width) - CELL_INLINE_EXTRA) / charWidth)))
+    return estimateRowLines(data.rows, widths)
+  }, [wrap, data.rows, columnWidthsKey, metrics.charWidth])
+  const estimateRowHeight = (index: number): number => {
+    const lines = estimatedLines?.[rows[index]?.index ?? -1]
+    return lines === undefined ? rowHeight : rowHeight + (lines - 1) * metrics.lineHeight
+  }
+
   const scrollRef = useRef<HTMLDivElement>(null)
+  const getItemKey = useCallback((index: number) => rows[index]?.id ?? index, [rows])
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowHeight,
-    getItemKey: (index) => rows[index]?.id ?? index,
+    estimateSize: estimateRowHeight,
+    // 隠れているタブでは高さが 0 になるので、そのときは見積もりのままにする。
+    measureElement: (element) => (element as HTMLElement).offsetHeight || estimateRowHeight(Number((element as HTMLElement).dataset.index)),
+    getItemKey,
     overscan: 10
   })
-  useEffect(() => virtualizer.measure(), [virtualizer, rowHeight])
+
+  // 高さを測り直すと上の行の高さが変わるので、一番上に見えていた行の位置へスクロールし直す。
+  // 新しい行が描かれて測られるとスクロール位置が動くので、一番上の行は描画の前に読んでおく。
+  const measureKey = `${rowHeight}:${metrics.lineHeight}:${wrap}:${columnWidthsKey}`
+  const measuredKey = useRef(measureKey)
+  const topRowBeforeMeasure = useRef<number | null>(null)
+  if (measuredKey.current !== measureKey) {
+    measuredKey.current = measureKey
+    const scroller = scrollRef.current
+    topRowBeforeMeasure.current = scroller ? (virtualizer.getVirtualItemForOffset(scroller.scrollTop)?.index ?? null) : null
+  }
+  // 全体の高さが描画に反映されてからスクロールするため、この effect を測り直しの effect より前に置き、測り直した次の描画で動かす。
+  const topRowToRestore = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const row = topRowToRestore.current
+    const scroller = scrollRef.current
+    if (row === null || !scroller) return
+    topRowToRestore.current = null
+    scroller.scrollTop = virtualizer.measurementsCache[row]?.start ?? 0
+  })
+  useLayoutEffect(() => {
+    topRowToRestore.current = topRowBeforeMeasure.current
+    virtualizer.measure()
+  }, [virtualizer, measureKey])
 
   /** キー操作で動かしたセルが見えるように、表をスクロールする（見出しの行と重ならない位置まで）。 */
   function scrollToCell(pos: CellPos): void {
     const scroller = scrollRef.current
     const header = headerRef.current
-    if (!scroller || !header) return
+    const item = virtualizer.measurementsCache[pos.row]
+    if (!scroller || !header || !item) return
     const headerHeight = header.offsetHeight
-    const top = headerHeight + pos.row * rowHeight
-    if (top - headerHeight < scroller.scrollTop) scroller.scrollTop = top - headerHeight
-    else if (top + rowHeight > scroller.scrollTop + scroller.clientHeight) {
-      scroller.scrollTop = top + rowHeight - scroller.clientHeight
+    if (item.start < scroller.scrollTop) scroller.scrollTop = item.start
+    else if (headerHeight + item.end > scroller.scrollTop + scroller.clientHeight) {
+      // 表より高い行は、行の先頭が見える位置で止める。
+      scroller.scrollTop = Math.min(item.start, headerHeight + item.end - scroller.clientHeight)
     }
-    const rowNumberPx = (header.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0
+    const rowNumberPx = (header.firstElementChild?.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0
     const sizes = headerGroup?.headers.map((h) => h.getSize()) ?? []
     const left = rowNumberPx + sizes.slice(0, pos.col).reduce((sum, w) => sum + w, 0)
     const right = left + (sizes[pos.col] ?? 0)
     if (left - rowNumberPx < scroller.scrollLeft) scroller.scrollLeft = left - rowNumberPx
     else if (right > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = right - scroller.clientWidth
+  }
+
+  /** 折り返すときは、移った先の行を描いて測ると高さが変わるので、測った後にもう一度合わせる。 */
+  function revealCell(pos: CellPos): void {
+    scrollToCell(pos)
+    if (wrap) requestAnimationFrame(() => requestAnimationFrame(() => scrollToCell(pos)))
   }
 
   /** ポインタの位置にあるセル・行番号・見出しの位置。表の外なら、表の端に寄せた位置で探す。 */
@@ -298,7 +361,7 @@ export function CsvTable({ data }: { data: CsvTableData }): React.JSX.Element {
       )
       updateSelection(() => next)
       const last = next.at(-1)
-      if (last) scrollToCell(e.shiftKey ? last.focus : last.anchor)
+      if (last) revealCell(e.shiftKey ? last.focus : last.anchor)
     } else if (e.key === 'Escape' && selection.length > 0) {
       updateSelection(() => [])
     }
@@ -333,68 +396,116 @@ export function CsvTable({ data }: { data: CsvTableData }): React.JSX.Element {
   }, [menu])
 
   // 行番号の列は、いちばん大きい行番号の桁数に合わせる。
-  const lastRowNumber = data.rows.at(-1)?.rowNumber ?? 1
+  const lastRowNumber = data.rows.at(-1)?.rowNumber ?? data.headerRows.at(-1)?.rowNumber ?? 1
   const rowNumberWidth = `${String(lastRowNumber).length + 3}ch`
   const totalWidth = `calc(${rowNumberWidth} + ${table.getTotalSize()}px)`
+  const wrapTextClass = 'whitespace-pre-wrap [overflow-wrap:anywhere]'
+  const upperHeaderRows = data.headerRows.slice(0, -1)
+  // 見出しの行が1行だけのときは、行番号の欄を空けておく。
+  const lastHeaderNumber = data.headerRows.length > 1 ? data.headerRows.at(-1)?.rowNumber : undefined
+  const headerNumberCell = (rowNumber: number | undefined): React.JSX.Element => (
+    // 幅は ch で決めるので、本文の行番号と同じ字体（太さ）にしておく（違うと列の線がずれる）。
+    <div
+      className="shrink-0 border-r border-border bg-muted px-2 py-1 text-right font-normal tabular-nums text-muted-foreground"
+      style={{ width: rowNumberWidth }}
+    >
+      {rowNumber}
+    </div>
+  )
+  const resizeHandle = (header: NonNullable<typeof headerGroup>['headers'][number]): React.JSX.Element => (
+    <div
+      data-no-select
+      className={cn(
+        'absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40',
+        header.column.getIsResizing() && 'bg-primary/60'
+      )}
+      onMouseDown={header.getResizeHandler()}
+      onTouchStart={header.getResizeHandler()}
+      onDoubleClick={() => header.column.resetSize()}
+    />
+  )
 
   return (
     <div className="relative h-full">
       <div
         ref={scrollRef}
         tabIndex={0}
-        className="h-full select-none overflow-auto text-editor outline-none"
+        className="h-full select-none overflow-auto text-editor outline-none [container-type:size]"
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onContextMenu={handleContextMenu}
       >
         <div style={{ width: totalWidth }} className="relative">
-          <div ref={headerRef} className="sticky top-0 z-20 flex border-b border-border bg-muted font-medium">
-            {/* 幅は ch で決めるので、本文の行番号と同じ字体（太さ）にしておく（違うと列の線がずれる）。 */}
-            <div
-              className="shrink-0 border-r border-border bg-muted font-normal tabular-nums"
-              style={{ width: rowNumberWidth }}
-            />
-            {headerGroup?.headers.map((header, columnIndex) => {
-              const sorted = header.column.getIsSorted()
-              const SortIcon = sorted === 'asc' ? ArrowUp : sorted === 'desc' ? ArrowDown : ArrowUpDown
-              return (
-                <div
-                  key={header.id}
-                  data-kind="columns"
-                  data-col={columnIndex}
-                  className={cn(
-                    'relative flex shrink-0 cursor-pointer items-center border-r border-border hover:bg-accent',
-                    boundsCoverColumn(bounds, columnIndex) && 'bg-primary/20 hover:bg-primary/25'
-                  )}
-                  style={{ width: header.getSize() }}
-                >
-                  <span className="min-w-0 flex-1 truncate px-2 py-1" title={header.column.columnDef.header as string}>
-                    {header.column.columnDef.header as string}
-                  </span>
-                  <button
-                    data-no-select
-                    className={cn(
-                      'mr-1.5 shrink-0 rounded-sm p-0.5 hover:bg-background/60',
-                      sorted ? 'text-foreground' : 'text-muted-foreground/50 hover:text-muted-foreground'
-                    )}
-                    title={t('editor.tableSort')}
-                    onClick={header.column.getToggleSortingHandler()}
-                  >
-                    <SortIcon size={12} />
-                  </button>
+          <div ref={probeRef} aria-hidden className="pointer-events-none invisible absolute left-0 top-0 border-b px-2 py-1">
+            <span className="inline-block">0</span>
+          </div>
+          {/* 見出しが高いときは本文の場所を残すため、高さを抑えて中でスクロールする（スクロールバーは列の線をずらすので出さない）。 */}
+          <div
+            ref={headerRef}
+            className="sticky top-0 z-20 max-h-[40cqh] overflow-y-auto overflow-x-hidden border-b border-border bg-muted font-medium [scrollbar-width:none]"
+          >
+            {upperHeaderRows.map((row) => (
+              <div key={row.rowNumber} className="flex border-b border-border/60">
+                {headerNumberCell(row.rowNumber)}
+                {headerGroup?.headers.map((header, columnIndex) => (
                   <div
-                    data-no-select
+                    key={header.id}
+                    data-kind="columns"
+                    data-col={columnIndex}
                     className={cn(
-                      'absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40',
-                      header.column.getIsResizing() && 'bg-primary/60'
+                      'relative shrink-0 cursor-pointer border-r border-border px-2 py-1 hover:bg-accent',
+                      wrap ? wrapTextClass : 'truncate',
+                      boundsCoverColumn(bounds, columnIndex) && 'bg-primary/20 hover:bg-primary/25'
                     )}
-                    onMouseDown={header.getResizeHandler()}
-                    onTouchStart={header.getResizeHandler()}
-                    onDoubleClick={() => header.column.resetSize()}
-                  />
-                </div>
-              )
-            })}
+                    style={{ width: header.getSize() }}
+                    title={wrap ? undefined : row.cells[columnIndex]}
+                  >
+                    {row.cells[columnIndex]}
+                    {resizeHandle(header)}
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div className="flex">
+              {headerNumberCell(lastHeaderNumber)}
+              {headerGroup?.headers.map((header, columnIndex) => {
+                const sorted = header.column.getIsSorted()
+                const SortIcon = sorted === 'asc' ? ArrowUp : sorted === 'desc' ? ArrowDown : ArrowUpDown
+                return (
+                  <div
+                    key={header.id}
+                    data-kind="columns"
+                    data-col={columnIndex}
+                    className={cn(
+                      'relative flex shrink-0 cursor-pointer border-r border-border hover:bg-accent',
+                      wrap ? 'items-start' : 'items-center',
+                      boundsCoverColumn(bounds, columnIndex) && 'bg-primary/20 hover:bg-primary/25'
+                    )}
+                    style={{ width: header.getSize() }}
+                  >
+                    <span
+                      className={cn('min-w-0 flex-1 px-2 py-1', wrap ? wrapTextClass : 'truncate')}
+                      title={wrap ? undefined : (header.column.columnDef.header as string)}
+                    >
+                      {header.column.columnDef.header as string}
+                    </span>
+                    <button
+                      data-no-select
+                      className={cn(
+                        'mr-1.5 shrink-0 rounded-sm p-0.5 hover:bg-background/60',
+                        wrap && 'mt-1',
+                        sorted ? 'text-foreground' : 'text-muted-foreground/50 hover:text-muted-foreground'
+                      )}
+                      title={t('editor.tableSort')}
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      <SortIcon size={12} />
+                    </button>
+                    {resizeHandle(header)}
+                  </div>
+                )
+              })}
+            </div>
           </div>
           <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
             {virtualizer.getVirtualItems().map((item) => {
@@ -404,8 +515,13 @@ export function CsvTable({ data }: { data: CsvTableData }): React.JSX.Element {
               return (
                 <div
                   key={row.id}
+                  ref={wrap ? virtualizer.measureElement : undefined}
+                  data-index={item.index}
                   className="absolute left-0 flex w-full border-b border-border/60 hover:bg-accent/40"
-                  style={{ height: rowHeight, transform: `translateY(${item.start}px)` }}
+                  style={{
+                    ...(wrap ? { minHeight: rowHeight } : { height: rowHeight }),
+                    transform: `translateY(${item.start}px)`
+                  }}
                 >
                   <div
                     data-kind="rows"
@@ -430,14 +546,15 @@ export function CsvTable({ data }: { data: CsvTableData }): React.JSX.Element {
                         data-row={position}
                         data-col={columnIndex}
                         className={cn(
-                          'shrink-0 cursor-cell truncate whitespace-pre border-r border-border/60 px-2 py-1',
+                          'shrink-0 cursor-cell border-r border-border/60 px-2 py-1',
+                          wrap ? wrapTextClass : 'truncate whitespace-pre',
                           boundsContain(bounds, position, columnIndex) && 'bg-primary/15',
                           isActive && 'outline outline-2 -outline-offset-2 outline-primary'
                         )}
                         style={{ width: cell.column.getSize() }}
-                        title={value.length > TOOLTIP_MIN_LENGTH || value.includes('\n') ? value : undefined}
+                        title={!wrap && (value.length > TOOLTIP_MIN_LENGTH || value.includes('\n')) ? value : undefined}
                       >
-                        {value.replace(/\r?\n/g, ' ⏎ ')}
+                        {wrap ? value.replace(/\r\n/g, '\n') : value.replace(/\r?\n/g, ' ⏎ ')}
                       </div>
                     )
                   })}

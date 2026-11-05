@@ -130,7 +130,7 @@ export function moveBy(
 export interface CopyPlan {
   rows: number[]
   columns: number[]
-  /** 列全体だけを選んでいるとき。見出しの行があれば先頭に付ける。 */
+  /** 列全体だけを選んでいるとき。見出しの行があれば全部を先頭に付ける。 */
   withHeader: boolean
 }
 
@@ -178,9 +178,8 @@ export function planToTsv(data: CsvTableData, order: readonly number[], plan: Co
     const cells = data.rows[order[position] ?? -1]?.cells
     return plan.columns.map((c) => cells?.[c] ?? '')
   })
-  if (plan.withHeader && data.headerRow) {
-    const headerRow = data.headerRow
-    records.unshift(plan.columns.map((c) => headerRow[c] ?? ''))
+  if (plan.withHeader) {
+    records.unshift(...data.headerRows.map((row) => plan.columns.map((c) => row.cells[c] ?? '')))
   }
   return toTsv(records)
 }

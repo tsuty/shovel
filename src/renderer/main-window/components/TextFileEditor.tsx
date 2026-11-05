@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
+  ChevronDown,
+  ChevronUp,
   CircleHelp,
   Columns2,
   ExternalLink,
@@ -32,7 +34,15 @@ import { openSearchPanel } from '@codemirror/search'
 import { supportsFolding } from '../codeFolding'
 import { createCodeEditor, moveToLineTop, replaceDocument, revealCaret, selectAt, type CodeEditor } from '../codeEditor'
 import { closeFindBar, registerEditorSearch } from '../editorSearch'
-import { loadFirstRowIsHeader, parseCsvRecords, saveFirstRowIsHeader, toCsvTable } from '../csvTable'
+import {
+  loadHeaderRowCount,
+  loadWrapCells,
+  MAX_HEADER_ROWS,
+  parseCsvRecords,
+  saveHeaderRowCount,
+  saveWrapCells,
+  toCsvTable
+} from '../csvTable'
 import { CsvTable } from './CsvTable'
 import { extractOutline, type OutlineItem } from '../markdownOutline'
 import { OutlineMenu, OutlinePane } from './MarkdownOutline'
@@ -527,14 +537,19 @@ export function TextFileEditor({
     [syncWithDisk]
   )
 
-  // CSV / TSV の「1行目を見出しにする」。ファイルが替わったら、そのファイルの設定を読み直す。
-  const headerKey = `${projectId}\0${relPath}`
-  const [headerPref, setHeaderPref] = useState<{ key: string; value: boolean } | null>(null)
-  const firstRowIsHeader =
-    headerPref?.key === headerKey ? headerPref.value : loadFirstRowIsHeader(projectId, relPath)
-  function changeFirstRowIsHeader(value: boolean): void {
-    saveFirstRowIsHeader(projectId, relPath, value)
-    setHeaderPref({ key: headerKey, value })
+  // CSV / TSV の見出しの行数と折り返し。ファイルが替わったら、そのファイルの設定を読み直す。
+  const tablePrefKey = `${projectId}\0${relPath}`
+  const [headerPref, setHeaderPref] = useState<{ key: string; value: number } | null>(null)
+  const headerRowCount = headerPref?.key === tablePrefKey ? headerPref.value : loadHeaderRowCount(projectId, relPath)
+  function changeHeaderRowCount(value: number): void {
+    saveHeaderRowCount(projectId, relPath, value)
+    setHeaderPref({ key: tablePrefKey, value })
+  }
+  const [wrapPref, setWrapPref] = useState<{ key: string; value: boolean } | null>(null)
+  const wrapCells = wrapPref?.key === tablePrefKey ? wrapPref.value : loadWrapCells(projectId, relPath)
+  function changeWrapCells(value: boolean): void {
+    saveWrapCells(projectId, relPath, value)
+    setWrapPref({ key: tablePrefKey, value })
   }
   const tableRecords = useMemo(
     () =>
@@ -542,8 +557,8 @@ export function TextFileEditor({
     [language, showPreview, loaded, text]
   )
   const tableData = useMemo(
-    () => (tableRecords ? toCsvTable(tableRecords, firstRowIsHeader) : null),
-    [tableRecords, firstRowIsHeader]
+    () => (tableRecords ? toCsvTable(tableRecords, headerRowCount) : null),
+    [tableRecords, headerRowCount]
   )
 
   async function openInOS(): Promise<void> {
@@ -632,9 +647,13 @@ export function TextFileEditor({
           ))}
         {tableData && (
           <>
-            <label className="ml-2 flex items-center gap-1.5 text-xs">
-              <Checkbox checked={firstRowIsHeader} onChange={(e) => changeFirstRowIsHeader(e.target.checked)} />
-              {t('editor.firstRowIsHeader')}
+            <label className="ml-2 flex items-center gap-1.5 whitespace-nowrap text-xs" title={t('editor.headerRowsHint')}>
+              {t('editor.headerRows')}
+              <HeaderRowsInput value={headerRowCount} onChange={changeHeaderRowCount} />
+            </label>
+            <label className="ml-2 flex items-center gap-1.5 whitespace-nowrap text-xs">
+              <Checkbox checked={wrapCells} onChange={(e) => changeWrapCells(e.target.checked)} />
+              {t('editor.wrapCells')}
             </label>
             <span className="ml-2 flex items-center gap-1 text-xs text-muted-foreground">
               <Table size={12} />
@@ -708,7 +727,7 @@ export function TextFileEditor({
               ) : language === 'html' ? (
                 <HtmlPreview html={renderedSource} title={relPath} />
               ) : tableData ? (
-                <CsvTable data={tableData} />
+                <CsvTable data={tableData} wrap={wrapCells} />
               ) : highlighted !== null ? (
                 <div
                   ref={highlightedRef}
@@ -749,5 +768,54 @@ export function TextFileEditor({
         }
       />
     </div>
+  )
+}
+
+/**
+ * 見出しの行数の入力欄。入力の途中（空欄など）は確定せず、範囲内の整数になったときだけ反映する。
+ * ネイティブの ▲▼ は再描画で固まっている間に押し続けと判定されて値が進み続けるので隠し、1回押すと1だけ動くボタンを置く。
+ */
+function HeaderRowsInput({ value, onChange }: { value: number; onChange: (value: number) => void }): React.JSX.Element {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState<string | null>(null)
+  const stepButton = (delta: 1 | -1): React.JSX.Element => {
+    const next = value + delta
+    const Icon = delta > 0 ? ChevronUp : ChevronDown
+    return (
+      <button
+        type="button"
+        className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+        title={t(delta > 0 ? 'editor.headerRowsIncrease' : 'editor.headerRowsDecrease')}
+        disabled={next < 0 || next > MAX_HEADER_ROWS}
+        onClick={() => {
+          setDraft(null)
+          onChange(next)
+        }}
+      >
+        <Icon size={10} />
+      </button>
+    )
+  }
+  return (
+    <span className="flex h-6 w-12 overflow-hidden rounded-md border border-input focus-within:ring-1 focus-within:ring-ring">
+      <input
+        className="w-0 min-w-0 flex-1 bg-transparent px-1.5 text-xs tabular-nums outline-hidden [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        type="number"
+        min={0}
+        max={MAX_HEADER_ROWS}
+        step={1}
+        value={draft ?? value}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          const next = Number(e.target.value)
+          if (e.target.value !== '' && Number.isInteger(next) && next >= 0 && next <= MAX_HEADER_ROWS) onChange(next)
+        }}
+        onBlur={() => setDraft(null)}
+      />
+      <span className="flex w-4 shrink-0 flex-col border-l border-input">
+        {stepButton(1)}
+        {stepButton(-1)}
+      </span>
+    </span>
   )
 }
