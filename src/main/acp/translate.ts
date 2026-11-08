@@ -133,15 +133,6 @@ export class SessionTranslator {
       case 'usage_update':
         // メタ状態（モード・configOptions・使用量など）はトランスクリプトには流さない。
         return []
-      case 'plan_update':
-      case 'plan_removed':
-        // unstable の機能。clientCapabilities で plan を宣言していないので、仕様上は届かない。
-        return []
-      case 'subagent_update':
-      case 'session_message':
-      case 'session_message_chunk':
-        // clientCapabilities で subagents を宣言していないので、仕様上は届かない。
-        return []
       default:
         // 未知のバリアントはログに残して無視する。
         console.warn('[acp] unknown session/update variant', (update as { sessionUpdate?: string }).sessionUpdate)

@@ -18,7 +18,7 @@
 |---|---|
 | プロトコルバージョン | `1`（`initialize` で送る） |
 | 照合した仕様 | ACP リリース `v1.15.1`（2026-11-02）の `schema/v1/schema.json` と `meta.json` |
-| 使っている SDK | `@agentclientprotocol/sdk` 1.9.0 |
+| 使っている SDK | `@agentclientprotocol/sdk` 2.4.0（既定の入口 = stable の ACP v1。`/unstable`・`/experimental/v2` は使わない） |
 | shovel のバージョン | 1.3.0 |
 | unstable の機能（`schema.unstable.json`） | 方針（§7。stable になってから検討する） |
 | ACP v2（`schema-v2.0.0-alpha.*`） | 方針（decisions.md A-1b。v1 のみ） |
@@ -164,7 +164,8 @@
 `session/archive` / `session/unarchive`、`session/status`、`session/set_title`、`plan_update` / `plan_removed`、
 サブエージェント（`subagent_update`、`session_message` など）、`providers/*`、`auth/status` / `auth/status_update`、
 `mcp/message`、プロキシの `proxy/initialize` / `proxy/successor` などがある。
-SDK の型には一部が含まれているため、`translate.ts` はこれらの `session/update` を受け取っても何も描かない。
+SDK は既定の入口（stable の v1）から import しているため、これらの型を持たない。stable の `SessionUpdate` に無いバリアントの
+`session/update` は SDK のスキーマ検証で弾かれ（`console.error` に出る）、`translate.ts` には届かない。
 unstable の機能は stable になってから検討する。
 
 ---
