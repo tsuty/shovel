@@ -257,6 +257,7 @@ what has since changed, since this note is a snapshot.
 | `docs/design/ui.md` | Window/tab/sidebar/transcript/screen layouts |
 | `docs/design/decisions.md` | **Decision log** — why things are the way they are, including rejected alternatives. Check this before re-litigating a design choice |
 | `docs/design/open-issues.md` | Unresolved/unverified items (labelled V-N for things needing hands-on verification, and lettered items for undiscussed topics) |
+| `docs/ACP_SUPPORT.md` | Which ACP v1 methods / capabilities / `session/update` variants / content types shovel supports, and known deviations from the spec — update it whenever ACP handling or the SDK changes |
 
 `docs/DEVELOPMENT.md` is the environment setup guide and lists the build/lint/typecheck/test
 commands (`pnpm typecheck`, `pnpm lint`, `pnpm test`). Unit tests live under `test/` (Vitest) and

@@ -27,7 +27,7 @@ Docker Sandboxes の中で動く AI エージェントを、ACP（Agent Client P
 ## 採用技術
 
 * Electron + React + TypeScript
-* [ACP 公式 TypeScript SDK](https://github.com/agentclientprotocol)（`@agentclientprotocol/sdk`, v1）
+* [ACP 公式 TypeScript SDK](https://github.com/agentclientprotocol)（`@agentclientprotocol/sdk`, v1）。対応状況は [docs/ACP_SUPPORT.md](./docs/ACP_SUPPORT.md)
 * Tailwind CSS + shadcn/ui
 * pnpm
 
