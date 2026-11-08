@@ -3,14 +3,23 @@
  * ブロックの本文は `markdown`（生テキスト）で運び、renderer 側で描画する。
  */
 
-import type { ConfigOption, SessionCommand, SessionMode, SessionUsage } from './session'
+import type { CompactionState, ConfigOption, SessionCommand, SessionMode, SessionUsage } from './session'
 
-export type BlockRole = 'USER' | 'AGENT' | 'THOUGHT' | 'PLAN' | 'SYSTEM' | 'COMPLETION' | 'ERROR'
+export type BlockRole = 'USER' | 'AGENT' | 'THOUGHT' | 'PLAN' | 'SYSTEM' | 'COMPLETION' | 'ERROR' | 'COMPACTION'
 
 export interface AttachmentChip {
   key: string
   label: string
   path: string
+}
+
+/**
+ * トランスクリプトに出す画像。`data`（base64）があれば描き、無ければ `[image <mimeType>]` の
+ * プレースホルダにする（表示できない形式・大きすぎる・スナップショットから戻した画像）。
+ */
+export interface TranscriptImage {
+  mimeType: string
+  data?: string
 }
 
 export type ToolCallKind =
@@ -45,6 +54,8 @@ export interface ToolCallPayload {
   diffs: ToolCallDiff[]
   rawInput?: unknown
   content?: string
+  /** `content` に含まれていた画像。スナップショットには `data` を除いて残す。 */
+  images?: TranscriptImage[]
   /**
    * ユーザーに質問するツール（claude-agent-acp の `AskUserQuestion` の形の入力）なら、その質問。
    * 行を開くと、生の入力の代わりにこれを整形して出す。`rawInput` と違いスナップショットにも残す。
@@ -148,6 +159,8 @@ export type TranscriptEvent =
       messageId?: string
     }
   | { type: 'attachments'; id: string; chips: AttachmentChip[] }
+  /** AGENT ブロックに含まれていた画像（その時点までの全部を送る。置き換え）。 */
+  | { type: 'images'; id: string; images: TranscriptImage[] }
   | { type: 'group'; id: string; timed: boolean; closed: boolean; elapsedMs?: number }
   | { type: 'toolCall'; toolCall: ToolCallPayload }
   | {
@@ -185,6 +198,21 @@ export type TranscriptEvent =
    *     ローカルをバックアップへ退避して表示をエージェント側の記録に置き換えた。
    */
   | { type: 'notice'; id: string; key: 'replayAdopted' }
+  /**
+   * エージェントからの知らせ（ACP `notice`）。トランスクリプトに1行で出す。ライブのみで、
+   * スナップショットには残さない。`severity` は ACP の値をそのまま運ぶ。
+   */
+  | { type: 'agentNotice'; id: string; severity: string; title: string; description?: string }
+  /**
+   * コンテキストの圧縮（ACP `compaction_update` / `compaction_summary_chunk`）。`id` ごとに
+   * その時点の状態を丸ごと送り、最初に現れた位置で置き換える。`summary` は要約の本文。
+   */
+  | { type: 'compaction'; id: string; summary: string; state: CompactionState }
+  /**
+   * ターンが `end_turn` 以外の理由で終わった（ACP `session/prompt` の `stopReason`）。ターンの末尾に1行で出し、
+   * スナップショットにも残す。`reason` は ACP の値をそのまま運ぶ。
+   */
+  | { type: 'stopReason'; id: string; reason: string }
   /** エージェントが付けたセッションのタイトル（`session_info_update`）。タブ名に反映する。 */
   | { type: 'title'; title: string }
   /**

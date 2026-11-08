@@ -102,6 +102,34 @@ describe('transcriptReducer', () => {
     expect(state.blocks.n).toMatchObject({ role: 'SYSTEM', noticeKey: 'replayAdopted' })
   })
 
+  it('agentNotice は見出しと severity を持つ SYSTEM ブロックとして並べる', () => {
+    const state = reduce([{ type: 'agentNotice', id: 'n', severity: 'error', title: '失敗', description: '詳細' }])
+    expect(state.order).toEqual([{ kind: 'block', id: 'n' }])
+    expect(state.blocks.n).toMatchObject({ role: 'SYSTEM', markdown: '失敗', agentNotice: { severity: 'error', description: '詳細' } })
+  })
+
+  it('compaction は最初に現れた位置のまま中身を差し替える', () => {
+    const state = reduce([
+      { type: 'compaction', id: 'c', summary: '', state: { status: 'in_progress' } },
+      { type: 'block', id: 'a', role: 'AGENT', markdown: 'x', streaming: false },
+      { type: 'compaction', id: 'c', summary: '要約', state: { status: 'completed' } }
+    ])
+    expect(state.order).toEqual([
+      { kind: 'block', id: 'c' },
+      { kind: 'block', id: 'a' }
+    ])
+    expect(state.blocks.c).toMatchObject({ role: 'COMPACTION', markdown: '要約', compaction: { status: 'completed' } })
+  })
+
+  it('images は AGENT ブロックの画像を置き換え、確定しても残す', () => {
+    const state = reduce([
+      { type: 'block', id: 'a', role: 'AGENT', markdown: '', streaming: true },
+      { type: 'images', id: 'a', images: [{ mimeType: 'image/png', data: 'x' }] },
+      { type: 'blockMarkdown', id: 'a', markdown: '本文' }
+    ])
+    expect(state.blocks.a).toMatchObject({ markdown: '本文', images: [{ mimeType: 'image/png', data: 'x' }] })
+  })
+
   it('reset で空に戻す', () => {
     const state = reduce([{ type: 'block', id: 'a', role: 'AGENT', markdown: 'x', streaming: false }])
     expect(transcriptReducer(state, { type: 'reset', sessionId: 's' })).toEqual(initialTranscriptState)
@@ -115,6 +143,11 @@ describe('ライブ表示とスナップショットからの復元表示', () =
       { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '調べます。' }, messageId: 'm1' },
       { sessionUpdate: 'tool_call', toolCallId: 'tc1', title: 'Read a.ts', kind: 'read', status: 'pending' },
       { sessionUpdate: 'tool_call_update', toolCallId: 'tc1', status: 'completed' },
+      { sessionUpdate: 'plan', entries: [{ content: '読む', status: 'pending', priority: 'high' }] },
+      { sessionUpdate: 'plan', entries: [{ content: '読む', status: 'completed', priority: 'high' }] },
+      { sessionUpdate: 'compaction_update', compactionId: 'c1', status: 'in_progress' },
+      { sessionUpdate: 'compaction_summary_chunk', compactionId: 'c1', content: { type: 'text', text: '要約' } },
+      { sessionUpdate: 'compaction_update', compactionId: 'c1', status: 'completed' },
       { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '- [ ] 案A\n- [ ] 案B' }, messageId: 'm2' }
     ] as SessionUpdate[]
     return [
@@ -123,6 +156,22 @@ describe('ライブ表示とスナップショットからの復元表示', () =
       ...translator.handleStop('end_turn')
     ]
   }
+
+  it('停止理由も保存して読み戻せる', () => {
+    const translator = new SessionTranslator('/w')
+    const events = [
+      ...translator.userPrompt('長い文章を'),
+      ...translator.handleSessionUpdate({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '途中' }, messageId: 'm1' }),
+      ...translator.handleStop('max_tokens')
+    ]
+    const live = reduce(events)
+    const acc = new SnapshotAccumulator()
+    acc.track(events)
+    const restored = reduce(snapshotEntriesToEvents(acc.snapshotEntries()))
+    expect(restored.order).toEqual(live.order)
+    expect(restored.blocks).toEqual(live.blocks)
+    expect(Object.values(restored.blocks).at(-1)).toMatchObject({ role: 'SYSTEM', stopReason: 'max_tokens' })
+  })
 
   it('保存して読み戻した表示は、ライブで描いた表示と同じ並び・内容になる', () => {
     const events = liveTurn(new SessionTranslator('/w'))

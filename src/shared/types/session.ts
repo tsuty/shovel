@@ -80,7 +80,8 @@ export interface SnapshotEntry {
   /** ブロックの id。`TOOL_GROUP` のときはツールコールのグループ id。 */
   id: string
   /** `TOOL_GROUP` は連続するツールコールのまとまり（`markdown` は空、中身は `toolCalls`）。 */
-  role: 'USER' | 'AGENT' | 'THOUGHT' | 'PLAN' | 'SYSTEM' | 'COMPLETION' | 'ERROR' | 'TOOL_GROUP'
+  role: 'USER' | 'AGENT' | 'THOUGHT' | 'PLAN' | 'SYSTEM' | 'COMPLETION' | 'ERROR' | 'COMPACTION' | 'TOOL_GROUP'
+  /** `COMPACTION` のときは要約の本文。 */
   markdown: string
   /** `TOOL_GROUP` のツールコール（`rawInput` は保存しない）。 */
   toolCalls?: ToolCallPayload[]
@@ -93,6 +94,21 @@ export interface SnapshotEntry {
    * ローカル記録と `session/load` の replay の比較に使う。
    */
   messageId?: string
+  /** `SYSTEM` エントリのうち、ターンの停止理由を示すもの（ACP の `stopReason`）。 */
+  stopReason?: string
+  /** AGENT ブロックに含まれていた画像の形式（画像そのものは保存しない）。 */
+  images?: { mimeType: string }[]
+  /** `COMPACTION` エントリの状態と、失敗したときのエラー。 */
+  compaction?: CompactionState
+}
+
+/**
+ * コンテキストの圧縮（ACP `compaction_update`）の状態。`status` は ACP の値をそのまま運ぶ
+ * （`in_progress` / `completed` / `failed` / `cancelled` 以外の値もありうる）。
+ */
+export interface CompactionState {
+  status: string
+  error?: string
 }
 
 /**
@@ -227,4 +243,5 @@ export interface SessionCapabilities {
   load: boolean
   resume: boolean
   delete: boolean
+  close: boolean
 }

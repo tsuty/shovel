@@ -60,6 +60,10 @@ function isAuthRequiredError(err: unknown): boolean {
 }
 /** `session/prompt` を除く、その他のリクエストの締切。 */
 const REQUEST_DEADLINE_MS = 120_000
+/** `session/close` の応答を待つ上限。過ぎたら待たずに先へ進む。 */
+const CLOSE_SESSION_WAIT_MS = 3_000
+/** shovel が話せる ACP のプロトコルバージョン。 */
+const PROTOCOL_VERSION = 1
 
 export interface SessionRuntimeCallbacks {
   onEvent: (event: TranscriptEvent) => void
@@ -204,7 +208,7 @@ export async function openAcpSession(
    */
   let restoreEpoch = 0
   /** `initialize` の応答から読んだ対応状況。接続が確立するまでは全部 false。 */
-  let capabilities: SessionCapabilities = { list: false, load: false, resume: false, delete: false }
+  let capabilities: SessionCapabilities = { list: false, load: false, resume: false, delete: false, close: false }
 
   /** ターン終了時: 記録を保存してから、履歴一覧を取り直す契機を知らせる。 */
   function persistAfterTurn(): void {
@@ -339,10 +343,12 @@ export async function openAcpSession(
 
     if (!caps.load) {
       const response: ResumeSessionResponse = await withDeadline(
-        ctx.request(acp.AGENT_METHODS.session_resume, {
-          sessionId: acpSessionId,
-          cwd: project.sandboxPath
-        }),
+        (cancellationSignal) =>
+          ctx.request(
+            acp.AGENT_METHODS.session_resume,
+            { sessionId: acpSessionId, cwd: project.sandboxPath },
+            { cancellationSignal }
+          ),
         REQUEST_DEADLINE_MS
       )
       return {
@@ -358,11 +364,12 @@ export async function openAcpSession(
     if (!hasLocal) translator.setReplayMode(true)
     try {
       const response: LoadSessionResponse = await withDeadline(
-        ctx.request(acp.AGENT_METHODS.session_load, {
-          sessionId: acpSessionId,
-          cwd: project.sandboxPath,
-          mcpServers: []
-        }),
+        (cancellationSignal) =>
+          ctx.request(
+            acp.AGENT_METHODS.session_load,
+            { sessionId: acpSessionId, cwd: project.sandboxPath, mcpServers: [] },
+            { cancellationSignal }
+          ),
         REQUEST_DEADLINE_MS
       )
       const expected = (inboundUpdateCounts.get(acpSessionId) ?? 0) - inboundBaseline
@@ -439,6 +446,30 @@ export async function openAcpSession(
     })()
   }
 
+  /**
+   * エージェントが `session/close` に対応していれば送り、応答を最大 `CLOSE_SESSION_WAIT_MS` 待つ。
+   * 失敗しても呼び出し元の処理は続ける。
+   */
+  async function closeAgentSession(ctx: ClientContext, acpSessionId: string): Promise<void> {
+    if (!capabilities.close) return
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), CLOSE_SESSION_WAIT_MS)
+    try {
+      await Promise.race([
+        ctx.request(
+          acp.AGENT_METHODS.session_close,
+          { sessionId: acpSessionId },
+          { cancellationSignal: controller.signal }
+        ),
+        new Promise<void>((resolve) => controller.signal.addEventListener('abort', () => resolve()))
+      ])
+    } catch (err) {
+      logger.logDebug(`session/close failed: ${errorMessage(err)}`)
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
   let releaseConnection: () => void = () => {}
   const closeSignal = new Promise<void>((resolve) => {
     releaseConnection = resolve
@@ -455,11 +486,12 @@ export async function openAcpSession(
         try {
           const initResponse = await raceIdleTimeout(
             ctx.request(acp.AGENT_METHODS.initialize, {
-              protocolVersion: 1,
+              protocolVersion: PROTOCOL_VERSION,
               clientCapabilities: {
                 fs: { readTextFile: false, writeTextFile: false },
                 terminal: false,
-                elicitation: ELICITATION_CAPABILITIES
+                elicitation: ELICITATION_CAPABILITIES,
+                session: { configOptions: { boolean: {} }, notices: {}, compaction: {} }
               },
               clientInfo: { name: 'shovel', version: app.getVersion() }
             }),
@@ -467,6 +499,10 @@ export async function openAcpSession(
             INITIALIZE_IDLE_TIMEOUT_MS
           )
 
+          const agentProtocolVersion = (initResponse as InitializeResponse | undefined)?.protocolVersion
+          if (agentProtocolVersion !== PROTOCOL_VERSION) {
+            throw new Error(`エージェントが対応していないプロトコルバージョンを返しました（${String(agentProtocolVersion)}）`)
+          }
           capabilities = readCapabilities(initResponse)
           // 実際に動いている版をプロジェクトに記録する。
           recordAcpVersion(project.id, (initResponse as InitializeResponse | undefined)?.agentInfo?.version)
@@ -589,12 +625,15 @@ export async function openAcpSession(
     },
     async setMode(modeId: string) {
       if (!ready) return
+      const { ctx } = ready
       const modeIdBeforeRequest = resolvedMetaState.currentModeId
       await withDeadline(
-        ready.ctx.request(acp.AGENT_METHODS.session_set_mode, {
-          sessionId: currentSession.sessionId,
-          modeId
-        }),
+        (cancellationSignal) =>
+          ctx.request(
+            acp.AGENT_METHODS.session_set_mode,
+            { sessionId: currentSession.sessionId, modeId },
+            { cancellationSignal }
+          ),
         REQUEST_DEADLINE_MS
       )
       // 応答待ちの間に current_mode_update が届いていれば、そちらの値（実際に適用されたモード）を優先する。
@@ -604,12 +643,14 @@ export async function openAcpSession(
     },
     async setConfigOption(configId: string, value: string | boolean) {
       if (!ready) return
+      const { ctx } = ready
       const params =
         typeof value === 'boolean'
           ? { sessionId: currentSession.sessionId, configId, type: 'boolean' as const, value }
           : { sessionId: currentSession.sessionId, configId, value }
       const response: SetSessionConfigOptionResponse | undefined = await withDeadline(
-        ready.ctx.request(acp.AGENT_METHODS.session_set_config_option, params),
+        (cancellationSignal) =>
+          ctx.request(acp.AGENT_METHODS.session_set_config_option, params, { cancellationSignal }),
         REQUEST_DEADLINE_MS
       )
       // config_option_update が届かないエージェントもあるので、応答の configOptions で表示を更新する。
@@ -651,7 +692,9 @@ export async function openAcpSession(
       restoredTitle = undefined
       agentTitle = undefined
       snapshotId = randomUUID()
+      const previousAcpSessionId = currentSession.sessionId
       currentSession.dispose()
+      await closeAgentSession(ready.ctx, previousAcpSessionId)
       snapshotAcc.reset()
       translator.reset()
 
@@ -673,11 +716,13 @@ export async function openAcpSession(
     },
     async listAgentSessions() {
       if (!ready || !capabilities.list) return []
+      const { ctx } = ready
       const result: AgentSessionInfo[] = []
       let cursor: string | undefined
       do {
         const response: ListSessionsResponse = await withDeadline(
-          ready.ctx.request(acp.AGENT_METHODS.session_list, { cwd: project.sandboxPath, cursor }),
+          (cancellationSignal) =>
+            ctx.request(acp.AGENT_METHODS.session_list, { cwd: project.sandboxPath, cursor }, { cancellationSignal }),
           REQUEST_DEADLINE_MS
         )
         for (const info of response.sessions) {
@@ -694,15 +739,24 @@ export async function openAcpSession(
     },
     async deleteAgentSession(acpSessionId: string) {
       if (!ready || !capabilities.delete) throw new Error('session/delete is not available')
-      await withDeadline(ready.ctx.request(acp.AGENT_METHODS.session_delete, { sessionId: acpSessionId }), REQUEST_DEADLINE_MS)
+      const { ctx } = ready
+      await withDeadline(
+        (cancellationSignal) =>
+          ctx.request(acp.AGENT_METHODS.session_delete, { sessionId: acpSessionId }, { cancellationSignal }),
+        REQUEST_DEADLINE_MS
+      )
     },
     close() {
       restoreEpoch++
       cancelPendingRequests()
       void persistSnapshot()
-      child.kill()
-      releaseConnection()
-      logger.close()
+      // `session/close` を送れるなら、その応答（上限あり）を待ってからプロセスを終える。
+      const closing = ready ? closeAgentSession(ready.ctx, currentSession.sessionId) : Promise.resolve()
+      void closing.finally(() => {
+        child.kill()
+        releaseConnection()
+        logger.close()
+      })
     }
   }
 }
@@ -812,7 +866,8 @@ function readCapabilities(response: unknown): SessionCapabilities {
     load: agentCapabilities?.loadSession === true,
     resume: sessionCapabilities?.resume != null,
     list: sessionCapabilities?.list != null,
-    delete: sessionCapabilities?.delete != null
+    delete: sessionCapabilities?.delete != null,
+    close: sessionCapabilities?.close != null
   }
 }
 
@@ -1050,9 +1105,18 @@ async function raceIdleTimeout<T>(promise: Promise<T>, watchdog: IdleWatchdog, t
   })
 }
 
-async function withDeadline<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+/**
+ * `send` が返すリクエストに締切を設ける。締切を過ぎたら `send` に渡した signal を中断し
+ * （SDK がエージェントへ `$/cancel_request` を送る）、エラーで終える。
+ */
+async function withDeadline<T>(send: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {
+  const controller = new AbortController()
+  const promise = send(controller.signal)
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('request timed out')), timeoutMs)
+    const timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error('request timed out'))
+    }, timeoutMs)
     promise.then(
       (value) => {
         clearTimeout(timer)

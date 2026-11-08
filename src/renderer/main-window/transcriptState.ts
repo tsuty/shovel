@@ -6,8 +6,10 @@ import type {
   ElicitationValue,
   PermissionOption,
   ToolCallPayload,
-  TranscriptEvent
+  TranscriptEvent,
+  TranscriptImage
 } from '@shared/types/transcript'
+import type { CompactionState } from '@shared/types/session'
 
 export interface RenderChoice {
   id: string
@@ -23,6 +25,14 @@ export interface RenderBlock {
   choices?: RenderChoice[]
   /** SYSTEM ブロックのうち、`notice` イベント由来のもの。文言は i18n の `transcript.notice.{key}`。 */
   noticeKey?: string
+  /** SYSTEM ブロックのうち、エージェントの `notice` 由来のもの。`markdown` はその見出し（プレーンテキスト）。 */
+  agentNotice?: { severity: string; description?: string }
+  /** SYSTEM ブロックのうち、ターンの停止理由（ACP の `stopReason`）を示すもの。 */
+  stopReason?: string
+  /** AGENT ブロックに含まれていた画像。 */
+  images?: TranscriptImage[]
+  /** COMPACTION ブロックの状態。`markdown` は要約の本文。 */
+  compaction?: CompactionState
 }
 
 export interface RenderGroup {
@@ -223,10 +233,50 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
           [event.id]: { id: event.id, role: 'SYSTEM', markdown: '', streaming: false, noticeKey: event.key }
         }
       }
+    case 'agentNotice':
+      return {
+        ...state,
+        order: [...state.order, { kind: 'block', id: event.id }],
+        blocks: {
+          ...state.blocks,
+          [event.id]: {
+            id: event.id,
+            role: 'SYSTEM',
+            markdown: event.title,
+            streaming: false,
+            agentNotice: { severity: event.severity, description: event.description }
+          }
+        }
+      }
+    case 'stopReason':
+      return {
+        ...state,
+        order: [...state.order, { kind: 'block', id: event.id }],
+        blocks: {
+          ...state.blocks,
+          [event.id]: { id: event.id, role: 'SYSTEM', markdown: '', streaming: false, stopReason: event.reason }
+        }
+      }
+    case 'compaction': {
+      const block: RenderBlock = {
+        id: event.id,
+        role: 'COMPACTION',
+        markdown: event.summary,
+        streaming: false,
+        compaction: event.state
+      }
+      const order = state.blocks[event.id] ? state.order : [...state.order, { kind: 'block' as const, id: event.id }]
+      return { ...state, order, blocks: { ...state.blocks, [event.id]: block } }
+    }
     case 'attachments': {
       const block = state.blocks[event.id]
       if (!block) return state
       return { ...state, blocks: { ...state.blocks, [event.id]: { ...block, chips: event.chips } } }
+    }
+    case 'images': {
+      const block = state.blocks[event.id]
+      if (!block) return state
+      return { ...state, blocks: { ...state.blocks, [event.id]: { ...block, images: event.images } } }
     }
     case 'agent':
     case 'theme':

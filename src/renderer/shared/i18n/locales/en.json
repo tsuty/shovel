@@ -373,6 +373,24 @@
       "selectMany": "Select one or more",
       "preview": "Preview"
     },
+    "image": {
+      "open": "Open enlarged",
+      "title": "Image"
+    },
+    "stopReason": {
+      "cancelled": "Stopped",
+      "max_tokens": "The reply was cut off because it reached the output limit",
+      "max_turn_requests": "Stopped because the turn reached its request limit",
+      "refusal": "The agent declined this request",
+      "other": "The turn ended (reason: {{reason}})"
+    },
+    "compaction": {
+      "in_progress": "Compacting the context…",
+      "completed": "Context compacted",
+      "failed": "Context compaction failed",
+      "cancelled": "Context compaction cancelled",
+      "other": "Context compaction ({{status}})"
+    },
     "notice": {
       "replayAdopted": "The agent's record of this session has changed, so the previous contents were saved as a backup."
     }

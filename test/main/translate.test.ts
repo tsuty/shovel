@@ -245,6 +245,81 @@ describe('SessionTranslator: ツールコール', () => {
   })
 })
 
+const PNG_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString('base64')
+
+describe('SessionTranslator: 停止理由', () => {
+  it('end_turn では何も足さない', () => {
+    const t = new SessionTranslator(SANDBOX)
+    expect(run(t, [agent('A', 'm1')]).some((e) => e.type === 'stopReason')).toBe(false)
+  })
+
+  it.each(['cancelled', 'max_tokens', 'max_turn_requests', 'refusal'] as const)('%s は末尾に stopReason を足す', (reason) => {
+    const t = new SessionTranslator(SANDBOX)
+    t.handleSessionUpdate(agent('A', 'm1'))
+    const events = t.handleStop(reason)
+    expect(events.at(-1)).toEqual({ type: 'stopReason', id: expect.any(String), reason })
+    expect(events.at(-2)).toMatchObject({ type: 'blockMarkdown' })
+  })
+})
+
+describe('SessionTranslator: 画像', () => {
+  it('返信の画像は本文に混ぜず、ブロックの画像として累積して送る', () => {
+    const t = new SessionTranslator(SANDBOX)
+    const image = { type: 'image', data: PNG_BASE64, mimeType: 'image/png' }
+    const events = run(t, [
+      { sessionUpdate: 'agent_message_chunk', content: image, messageId: 'm1' } as SessionUpdate,
+      agent('説明', 'm1'),
+      { sessionUpdate: 'agent_message_chunk', content: { ...image, data: 'AAAA' }, messageId: 'm1' } as SessionUpdate
+    ])
+    expect(finalBlocks(events)).toEqual([{ role: 'AGENT', markdown: '説明' }])
+    const images = events.filter((e) => e.type === 'images')
+    expect(images.at(-1)).toMatchObject({
+      images: [{ mimeType: 'image/png', data: PNG_BASE64 }, { mimeType: 'image/png' }]
+    })
+    expect(images.at(-1)).not.toHaveProperty('images.1.data')
+  })
+
+  it('ツールコールの結果の画像は images に取り出し、本文には入れない', () => {
+    const t = new SessionTranslator(SANDBOX)
+    const events = t.handleSessionUpdate(
+      toolCall({
+        toolCallId: 'a',
+        title: 'Screenshot',
+        content: [
+          { type: 'content', content: { type: 'text', text: '撮りました' } },
+          { type: 'content', content: { type: 'image', data: PNG_BASE64, mimeType: 'image/png' } }
+        ]
+      })
+    )
+    const last = events.at(-1)
+    expect(last).toMatchObject({
+      type: 'toolCall',
+      toolCall: { content: '撮りました', images: [{ mimeType: 'image/png', data: PNG_BASE64 }] }
+    })
+  })
+})
+
+describe('SessionTranslator: ツールコールの名前', () => {
+  function lastToolCall(events: TranscriptEvent[]) {
+    const e = events.filter((x): x is Extract<TranscriptEvent, { type: 'toolCall' }> => x.type === 'toolCall').at(-1)
+    return e?.toolCall
+  }
+
+  it('title が無ければツール名を、どちらも無ければ toolCallId を出す', () => {
+    const t = new SessionTranslator(SANDBOX)
+    expect(lastToolCall(t.handleSessionUpdate(toolCall({ toolCallId: 'a', title: '', name: 'Bash' })))?.title).toBe('Bash')
+    expect(lastToolCall(t.handleSessionUpdate(toolCall({ toolCallId: 'b', title: '' })))?.title).toBe('b')
+  })
+
+  it('更新で届いたツール名は、id の仮置きだけを置き換える', () => {
+    const t = new SessionTranslator(SANDBOX)
+    t.handleSessionUpdate(toolCall({ toolCallId: 'a', title: '' }))
+    expect(lastToolCall(t.handleSessionUpdate(toolCallUpdate({ toolCallId: 'a', name: 'Read' })))?.title).toBe('Read')
+    t.handleSessionUpdate(toolCall({ toolCallId: 'b', title: 'Read a.ts' }))
+    expect(lastToolCall(t.handleSessionUpdate(toolCallUpdate({ toolCallId: 'b', name: 'Read' })))?.title).toBe('Read a.ts')
+  })
+})
+
 describe('SessionTranslator: その他', () => {
   it('plan はチェックボックス付きの PLAN ブロックにする', () => {
     const t = new SessionTranslator(SANDBOX)
@@ -257,6 +332,92 @@ describe('SessionTranslator: その他', () => {
     })
     expect(events).toEqual([
       { type: 'block', id: expect.any(String), role: 'PLAN', markdown: '- [x] 調査\n- [ ] 実装', streaming: false }
+    ])
+  })
+
+  it('同じターンの plan は前の PLAN ブロックを置き換え、次のターンでは新しいブロックにする', () => {
+    const t = new SessionTranslator(SANDBOX)
+    const plan = (status: 'pending' | 'completed'): SessionUpdate => ({
+      sessionUpdate: 'plan',
+      entries: [{ content: '調査', status, priority: 'high' }]
+    })
+    const first = run(t, [plan('pending'), agent('途中'), plan('completed')])
+    expect(finalBlocks(first)).toEqual([
+      { role: 'PLAN', markdown: '- [x] 調査' },
+      { role: 'AGENT', markdown: '途中' }
+    ])
+    const second = run(t, [plan('pending')])
+    expect(second[0]).toMatchObject({ type: 'block', role: 'PLAN' })
+    expect(second[0]).not.toMatchObject({ id: (first[0] as { id: string }).id })
+  })
+
+  it('replay では、ユーザーの発言をターンの区切りとして plan を新しいブロックにする', () => {
+    const t = new SessionTranslator(SANDBOX)
+    t.setReplayMode(true)
+    const plan: SessionUpdate = { sessionUpdate: 'plan', entries: [{ content: 'A', status: 'pending', priority: 'low' }] }
+    const events = run(t, [user({ type: 'text', text: '1' }, 'u1'), plan, user({ type: 'text', text: '2' }, 'u2'), plan])
+    expect(finalBlocks(events).map((b) => b.role)).toEqual(['USER', 'PLAN', 'USER', 'PLAN'])
+  })
+
+  it('空の plan は、まだ PLAN ブロックが無ければ何も描かない', () => {
+    const t = new SessionTranslator(SANDBOX)
+    expect(t.handleSessionUpdate({ sessionUpdate: 'plan', entries: [] })).toEqual([])
+  })
+
+  it('notice は agentNotice にする', () => {
+    const t = new SessionTranslator(SANDBOX)
+    expect(
+      t.handleSessionUpdate({ sessionUpdate: 'notice', severity: 'warning', title: '上限が近い', description: '残り 10%' })
+    ).toEqual([{ type: 'agentNotice', id: expect.any(String), severity: 'warning', title: '上限が近い', description: '残り 10%' }])
+  })
+
+  it('compaction は compactionId ごとに1エントリで、同じ id への更新は同じ id で送る', () => {
+    const t = new SessionTranslator(SANDBOX)
+    const events = [
+      ...t.handleSessionUpdate({ sessionUpdate: 'compaction_update', compactionId: 'c1', status: 'in_progress' }),
+      ...t.handleSessionUpdate({ sessionUpdate: 'compaction_summary_chunk', compactionId: 'c1', content: { type: 'text', text: '要約' } }),
+      ...t.handleSessionUpdate({ sessionUpdate: 'compaction_update', compactionId: 'c1', status: 'completed' })
+    ]
+    const compactions = events.filter((e) => e.type === 'compaction')
+    expect(new Set(compactions.map((e) => e.id)).size).toBe(1)
+    expect(compactions.at(-1)).toMatchObject({ summary: '要約', state: { status: 'completed' } })
+  })
+
+  it('compaction の summary は null で消え、error は値で置き換わる', () => {
+    const t = new SessionTranslator(SANDBOX)
+    t.handleSessionUpdate({
+      sessionUpdate: 'compaction_update',
+      compactionId: 'c1',
+      status: 'in_progress',
+      summary: [{ type: 'text', text: 'x' }]
+    })
+    const [event] = t.handleSessionUpdate({
+      sessionUpdate: 'compaction_update',
+      compactionId: 'c1',
+      status: 'failed',
+      summary: null,
+      error: '失敗'
+    })
+    expect(event).toMatchObject({ type: 'compaction', summary: '', state: { status: 'failed', error: '失敗' } })
+  })
+
+  it('ターンが終わっても in_progress の compaction は cancelled にする', () => {
+    const t = new SessionTranslator(SANDBOX)
+    const events = run(t, [{ sessionUpdate: 'compaction_update', compactionId: 'c1', status: 'in_progress' }])
+    expect(events.at(-1)).toMatchObject({ type: 'compaction', state: { status: 'cancelled' } })
+  })
+
+  it('compaction は開いている返信を閉じ、その後の返信を別のブロックにする', () => {
+    const t = new SessionTranslator(SANDBOX)
+    const events = run(t, [
+      agent('前', 'm1'),
+      { sessionUpdate: 'compaction_update', compactionId: 'c1', status: 'completed' },
+      agent('後', 'm1')
+    ])
+    expect(events.map((e) => e.type)).toContain('compaction')
+    expect(finalBlocks(events)).toEqual([
+      { role: 'AGENT', markdown: '前' },
+      { role: 'AGENT', markdown: '後' }
     ])
   })
 

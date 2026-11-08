@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type {
+  CompactionSummaryChunk,
+  CompactionUpdate,
   ContentBlock,
   Diff,
+  Notice,
   Plan,
   RequestPermissionRequest,
   SessionUpdate,
@@ -11,6 +14,7 @@ import type {
   ToolCallUpdate,
   ToolKind
 } from '@agentclientprotocol/sdk'
+import type { CompactionState } from '@shared/types/session'
 import type {
   AskQuestion,
   AttachmentChip,
@@ -18,9 +22,11 @@ import type {
   ToolCallKind,
   ToolCallPayload,
   ToolCallStatus,
-  TranscriptEvent
+  TranscriptEvent,
+  TranscriptImage
 } from '@shared/types/transcript'
 import { diffRowsFromTexts } from '@shared/diff'
+import { toTranscriptImage } from './images'
 
 /**
  * ACP の `session/update` / `session/request_permission` を `TranscriptEvent` へ翻訳する。
@@ -33,19 +39,35 @@ interface OpenBlock {
   buffer: string
 }
 
+/** 描画中のコンテキスト圧縮1件（ACP の `compactionId` ごと）。 */
+interface CompactionEntry {
+  id: string
+  summary: string
+  state: CompactionState
+}
+
+interface OpenAgentBlock extends OpenBlock {
+  /** この返信に含まれていた画像（`images` イベントは置き換えなので累積して送る）。 */
+  images: TranscriptImage[]
+}
+
 interface OpenUserBlock extends OpenBlock {
   /** replay で拾い直した添付チップ（`attachments` イベントは置き換えなので累積して送る）。 */
   chips: AttachmentChip[]
 }
 
 export class SessionTranslator {
-  private currentAgent: OpenBlock | null = null
+  private currentAgent: OpenAgentBlock | null = null
   private currentThought: OpenBlock | null = null
   private currentUser: OpenUserBlock | null = null
   private openGroupId: string | null = null
   private replaying = false
   /** これまでに描いたツールコール。`tool_call_update` を前回の値に重ねるのに使う。 */
   private readonly toolCalls = new Map<string, ToolCallPayload>()
+  /** このターンの PLAN ブロックの id。次の `plan` はこのブロックを置き換える。 */
+  private currentPlanId: string | null = null
+  /** ACP の `compactionId` → 描画中の圧縮。 */
+  private readonly compactions = new Map<string, CompactionEntry>()
 
   /**
    * @param sandboxPath replay された添付の `file://` URI をプロジェクト相対パスの
@@ -64,6 +86,7 @@ export class SessionTranslator {
    */
   userPrompt(text: string, attachments: AttachmentChip[] = []): TranscriptEvent[] {
     const events = [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser()]
+    this.currentPlanId = null
     const id = randomUUID()
     events.push({
       type: 'block',
@@ -95,19 +118,22 @@ export class SessionTranslator {
         return this.upsertToolCall(update)
       case 'plan':
         return this.renderPlan(update)
+      case 'notice':
+        return this.renderNotice(update)
+      case 'compaction_update':
+        return this.updateCompaction(update)
+      case 'compaction_summary_chunk':
+        return this.appendCompactionSummary(update)
       case 'available_commands_update':
       case 'current_mode_update':
       case 'config_option_update':
       case 'session_info_update':
       case 'usage_update':
-      case 'plan_update':
-      case 'plan_removed':
-      case 'compaction_update':
-      case 'compaction_summary_chunk':
         // メタ状態（モード・configOptions・使用量など）はトランスクリプトには流さない。
         return []
-      case 'notice':
-        // clientCapabilities で notices を宣言していないので、仕様上は届かない。
+      case 'plan_update':
+      case 'plan_removed':
+        // unstable の機能。clientCapabilities で plan を宣言していないので、仕様上は届かない。
         return []
       case 'subagent_update':
       case 'session_message':
@@ -121,8 +147,18 @@ export class SessionTranslator {
     }
   }
 
-  handleStop(_stopReason: StopReason): TranscriptEvent[] {
-    return [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser()]
+  /** ターンを閉じる。`end_turn` 以外で終わったときは、その理由を末尾に1行足す。 */
+  handleStop(stopReason: StopReason): TranscriptEvent[] {
+    this.currentPlanId = null
+    const events = [
+      ...this.closeOpenGroup(),
+      ...this.finalizeAgent(),
+      ...this.finalizeThought(),
+      ...this.finalizeUser(),
+      ...this.cancelUnfinishedCompactions()
+    ]
+    if (stopReason !== 'end_turn') events.push({ type: 'stopReason', id: randomUUID(), reason: stopReason })
+    return events
   }
 
   reset(): TranscriptEvent[] {
@@ -131,6 +167,8 @@ export class SessionTranslator {
     this.currentUser = null
     this.openGroupId = null
     this.toolCalls.clear()
+    this.currentPlanId = null
+    this.compactions.clear()
     return []
   }
 
@@ -176,6 +214,8 @@ export class SessionTranslator {
     const events: TranscriptEvent[] = []
     if (!this.currentUser || messageId !== this.currentUser.messageId) {
       events.push(...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser())
+      // replay にはターンの区切り（stop）が無いので、ユーザーの発言をターンの始まりとみなす。
+      this.currentPlanId = null
       const id = randomUUID()
       this.currentUser = { id, messageId, buffer: '', chips: [] }
       events.push({ type: 'block', id, role: 'USER', markdown: '', streaming: true })
@@ -220,15 +260,21 @@ export class SessionTranslator {
     return { key: relPath, label: relPath.split('/').pop() ?? relPath, path: relPath }
   }
 
+  /** 画像は本文に混ぜず、ブロックの画像として積む。 */
   private appendAgentChunk(content: ContentBlock, messageId: string | null): TranscriptEvent[] {
-    const text = contentBlockToText(content)
     const events: TranscriptEvent[] = []
     if (!this.currentAgent || messageId !== this.currentAgent.messageId) {
       events.push(...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeUser())
       const id = randomUUID()
-      this.currentAgent = { id, messageId, buffer: '' }
+      this.currentAgent = { id, messageId, buffer: '', images: [] }
       events.push({ type: 'block', id, role: 'AGENT', markdown: '', streaming: true })
     }
+    if (content.type === 'image') {
+      this.currentAgent.images = [...this.currentAgent.images, toTranscriptImage(content.data, content.mimeType)]
+      events.push({ type: 'images', id: this.currentAgent.id, images: this.currentAgent.images })
+      return events
+    }
+    const text = contentBlockToText(content)
     this.currentAgent.buffer += text
     events.push({ type: 'stream', id: this.currentAgent.id, text })
     return events
@@ -264,20 +310,72 @@ export class SessionTranslator {
     return events
   }
 
+  /**
+   * `plan` は毎回計画の全体を運ぶ。同じターンの PLAN ブロックがあればその場で置き換え、
+   * 無ければ新しいブロックを足す。
+   */
   private renderPlan(plan: Plan): TranscriptEvent[] {
-    const lines = plan.entries.map((entry) => {
-      const box = entry.status === 'completed' ? '[x]' : '[ ]'
-      return `- ${box} ${entry.content}`
-    })
+    const markdown = plan.entries
+      .map((entry) => `- ${entry.status === 'completed' ? '[x]' : '[ ]'} ${entry.content}`)
+      .join('\n')
+    if (this.currentPlanId !== null) return [{ type: 'blockMarkdown', id: this.currentPlanId, markdown }]
+    if (plan.entries.length === 0) return []
+    const id = randomUUID()
+    this.currentPlanId = id
+    return [{ type: 'block', id, role: 'PLAN', markdown, streaming: false }]
+  }
+
+  private renderNotice(notice: Notice): TranscriptEvent[] {
     return [
       {
-        type: 'block',
+        type: 'agentNotice',
         id: randomUUID(),
-        role: 'PLAN',
-        markdown: lines.join('\n'),
-        streaming: false
+        severity: notice.severity,
+        title: notice.title,
+        description: notice.description ?? undefined
       }
     ]
+  }
+
+  /**
+   * 初めての `compactionId` なら、その位置に圧縮のエントリを作る（開いているブロックとグループは閉じる）。
+   * 既知の id なら、その場で中身を差し替える。
+   */
+  private openCompaction(compactionId: string): { entry: CompactionEntry; events: TranscriptEvent[] } {
+    const existing = this.compactions.get(compactionId)
+    if (existing) return { entry: existing, events: [] }
+    const events = [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought()]
+    const entry: CompactionEntry = { id: randomUUID(), summary: '', state: { status: 'in_progress' } }
+    this.compactions.set(compactionId, entry)
+    return { entry, events }
+  }
+
+  /** `summary` と `error` は、省略なら据え置き、null なら消去、値があれば置き換え。 */
+  private updateCompaction(update: CompactionUpdate): TranscriptEvent[] {
+    const { entry, events } = this.openCompaction(update.compactionId)
+    entry.state = { ...entry.state, status: update.status }
+    if (update.summary !== undefined) entry.summary = (update.summary ?? []).map(contentBlockToText).join('')
+    if (update.error !== undefined) entry.state = { status: entry.state.status, ...(update.error ? { error: update.error } : {}) }
+    events.push(compactionEvent(entry))
+    return events
+  }
+
+  private appendCompactionSummary(chunk: CompactionSummaryChunk): TranscriptEvent[] {
+    const { entry, events } = this.openCompaction(chunk.compactionId)
+    entry.summary += contentBlockToText(chunk.content)
+    events.push(compactionEvent(entry))
+    return events
+  }
+
+  /** ターンが終わっても `in_progress` のままの圧縮は中止扱いにする。 */
+  private cancelUnfinishedCompactions(): TranscriptEvent[] {
+    const events: TranscriptEvent[] = []
+    for (const entry of this.compactions.values()) {
+      if (entry.state.status !== 'in_progress') continue
+      entry.state = { ...entry.state, status: 'cancelled' }
+      events.push(compactionEvent(entry))
+    }
+    return events
   }
 
   private closeOpenGroup(): TranscriptEvent[] {
@@ -286,6 +384,10 @@ export class SessionTranslator {
     this.openGroupId = null
     return [{ type: 'group', id, timed: true, closed: true }]
   }
+}
+
+function compactionEvent(entry: CompactionEntry): TranscriptEvent {
+  return { type: 'compaction', id: entry.id, summary: entry.summary, state: { ...entry.state } }
 }
 
 /** claude-agent-acp が `resource_link` を変換したメンション（`[@foo.md](file:///…)`）。 */
@@ -313,9 +415,9 @@ function contentBlockToText(block: ContentBlock): string {
     case 'resource_link':
       return `[${block.name}](${block.uri})`
     case 'image':
-      return '\n\n*[image]*\n\n'
+      return `\n\n*[image ${block.mimeType}]*\n\n`
     case 'audio':
-      return '\n\n*[audio]*\n\n'
+      return `\n\n*[audio ${block.mimeType}]*\n\n`
     case 'resource':
       return '\n\n*[resource]*\n\n'
     default:
@@ -340,21 +442,24 @@ function toolCallPayload(payload: ToolCall | ToolCallUpdate, groupId: string): T
   const diffs = (payload.content ?? [])
     .filter((c): c is ToolCallContent & { type: 'diff' } & Diff => c.type === 'diff')
     .map((diff) => diffToPayload(diff))
-  // diff 以外の `type: "content"` ブロックを結合して展開領域に流す。
-  const textParts = (payload.content ?? [])
+  // diff 以外の `type: "content"` ブロックを結合して展開領域に流す。画像は別に取り出す。
+  const contentBlocks = (payload.content ?? [])
     .filter((c): c is ToolCallContent & { type: 'content' } => c.type === 'content')
-    .map((c) => contentBlockToText(c.content))
+    .map((c) => c.content)
+  const textParts = contentBlocks.filter((c) => c.type !== 'image').map(contentBlockToText)
   const content = textParts.length > 0 ? textParts.join('\n') : undefined
+  const images = contentBlocks.flatMap((c) => (c.type === 'image' ? [toTranscriptImage(c.data, c.mimeType)] : []))
   return {
     id: payload.toolCallId,
     groupId,
     kind: payload.kind ? TOOL_KIND_MAP[payload.kind] : 'other',
-    title: 'title' in payload && payload.title ? payload.title : payload.toolCallId,
+    title: toolCallTitle(payload) ?? payload.toolCallId,
     status: (payload.status as ToolCallStatus | undefined) ?? 'pending',
     locations: (payload.locations ?? []).map((l) => ({ path: l.path, line: l.line ?? undefined })),
     diffs,
     rawInput: payload.rawInput,
     content,
+    ...(images.length > 0 ? { images } : {}),
     ask: !payload.kind || payload.kind === 'other' ? askQuestions(payload.rawInput) : undefined
   }
 }
@@ -388,6 +493,11 @@ function nonEmpty(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined
 }
 
+/** 表示するタイトル。`title` が無ければツール名（`name`）、どちらも無ければ undefined。 */
+function toolCallTitle(payload: ToolCall | ToolCallUpdate): string | undefined {
+  return payload.title || payload.name || undefined
+}
+
 /** `tool_call_update` で送られてきたフィールドだけを前回の値に重ねる。 */
 function mergeToolCallUpdate(previous: ToolCallPayload, payload: ToolCall | ToolCallUpdate): ToolCallPayload {
   const fresh = toolCallPayload(payload, previous.groupId)
@@ -396,11 +506,13 @@ function mergeToolCallUpdate(previous: ToolCallPayload, payload: ToolCall | Tool
   return {
     ...previous,
     kind,
-    title: 'title' in payload && payload.title ? fresh.title : previous.title,
+    // タイトルが届かなければ前回の値を残す。ただし前回が id の仮置きなら、ツール名で置き換える。
+    title: toolCallTitle(payload) && (payload.title || previous.title === previous.id) ? fresh.title : previous.title,
     status: payload.status ? fresh.status : previous.status,
     locations: payload.locations ? fresh.locations : previous.locations,
     diffs: payload.content ? fresh.diffs : previous.diffs,
     content: payload.content ? fresh.content : previous.content,
+    images: payload.content ? fresh.images : previous.images,
     rawInput: payload.rawInput !== undefined ? fresh.rawInput : previous.rawInput,
     ask: kind === 'other' ? ask : undefined
   }
@@ -445,7 +557,7 @@ function permissionOptionToPayload(option: {
 }
 
 function permissionHeadline(toolCall: ToolCallUpdate): string {
-  const title = toolCall.title ?? toolCall.toolCallId
+  const title = toolCallTitle(toolCall) ?? toolCall.toolCallId
   const diffs = (toolCall.content ?? []).filter(
     (c): c is ToolCallContent & { type: 'diff' } & Diff => c.type === 'diff'
   )

@@ -301,10 +301,19 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   writes progress to stderr). Line splitting must accept both `\n` and `\r\n`.
 - ACP v1 only, and the file/terminal client capabilities (`fs.readTextFile`, `fs.writeTextFile`,
   `terminal`) are reported as `false` — the agent always reads/writes files itself inside the sandbox.
-  The only capability advertised is `elicitation: { form: {} }` (question cards for
+  What is advertised: `elicitation: { form: {} }` (question cards for
   `elicitation/create` form mode — how claude-agent-acp delivers Claude Code's `AskUserQuestion`,
   which it disables entirely without that capability; URL mode is not advertised and gets `-32602`;
-  `src/main/acp/elicitation.ts`, `ElicitationCard.tsx`, decisions.md A-1c). This is
+  `src/main/acp/elicitation.ts`, `ElicitationCard.tsx`, decisions.md A-1c), and
+  `session: { configOptions: { boolean: {} }, notices: {}, compaction: {} }` (boolean options as checkboxes,
+  `notice` as a live-only one-line transcript entry, compactions as one folded entry per `compactionId`
+  kept in snapshots as a `COMPACTION` entry — decisions.md A-1d, which also covers per-turn `plan`
+  replacement, `session/close` on ↻/tab close and `$/cancel_request` on timed-out requests).
+  Images in agent replies / tool-call results are shown (PNG/JPEG/GIF/WebP ≤5 MiB, sniffed from the bytes in
+  `src/main/acp/images.ts`, click to zoom via `TranscriptImages.tsx`), never stored in snapshots (only `mimeType`,
+  restored as `[image <mime>]`); prompts never send `image` — images are attached as `resource_link` like any
+  file (decisions.md A-1e). A non-`end_turn` `stopReason` adds a one-line entry at the end of the turn,
+  kept in snapshots as a `SYSTEM` entry's `stopReason` (A-1f). `docs/ACP_SUPPORT.md` is the per-feature status. The file/terminal `false` is
   the load-bearing assumption behind the safety model (§6 of `architecture.md`): shovel never
   intermediates file operations, so there is no enforcement point to bypass.
 - Renderer: React + Tailwind + shadcn/ui, `react-markdown` + `remark-gfm` + `remark-gemoji`

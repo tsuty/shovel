@@ -28,6 +28,7 @@ import { Markdown } from '../../shared/components/Markdown'
 import { TextDiffView } from '../../shared/components/DiffView'
 import { Button } from '../../shared/components/ui/button'
 import { ElicitationCard, QuestionMarkdown } from './ElicitationCard'
+import { TranscriptImages } from './TranscriptImages'
 
 function blockDomId(id: string): string {
   return `transcript-block-${id}`
@@ -207,6 +208,70 @@ function useCopyFeedback(): [boolean, (text: string) => void] {
   return [copied, copy]
 }
 
+/** エージェントの `notice`。見出しと補足を1行で出し、`severity` で色を変える。 */
+function AgentNoticeView({ block }: { block: RenderBlock }): React.JSX.Element {
+  const severity = block.agentNotice?.severity
+  const description = block.agentNotice?.description
+  return (
+    <div
+      className={cn(
+        'text-center text-transcript-sm',
+        severity === 'error'
+          ? 'text-destructive'
+          : severity === 'warning'
+            ? 'text-amber-600 dark:text-amber-400'
+            : 'text-muted-foreground'
+      )}
+    >
+      {block.markdown}
+      {description && <span className="opacity-80">{` — ${description}`}</span>}
+    </div>
+  )
+}
+
+/** 文言のあるターンの停止理由。`cancelled` 以外は、返信が途中で終わったことを目立たせる。 */
+const STOP_REASONS = ['cancelled', 'max_tokens', 'max_turn_requests', 'refusal']
+
+/** ターンが `end_turn` 以外で終わった理由を1行で出す。 */
+function StopReasonView({ reason }: { reason: string }): React.JSX.Element {
+  const { t } = useTranslation()
+  const known = STOP_REASONS.includes(reason)
+  return (
+    <div
+      className={cn(
+        'text-center text-transcript-sm',
+        known && reason !== 'cancelled' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+      )}
+    >
+      {known ? t(`transcript.stopReason.${reason}`) : t('transcript.stopReason.other', { reason })}
+    </div>
+  )
+}
+
+/** コンテキストの圧縮。状態を1行で出し、要約は畳んでおく。 */
+function CompactionView({ block }: { block: RenderBlock }): React.JSX.Element {
+  const { t } = useTranslation()
+  const status = block.compaction?.status ?? 'completed'
+  const known = ['in_progress', 'completed', 'failed', 'cancelled'].includes(status)
+  const label = known ? t(`transcript.compaction.${status}`) : t('transcript.compaction.other', { status })
+  const error = block.compaction?.error
+  const heading = (
+    <span className={cn(status === 'failed' && 'text-destructive')}>
+      {label}
+      {error && ` — ${error}`}
+    </span>
+  )
+  if (!block.markdown) {
+    return <div className="text-center text-transcript-sm text-muted-foreground">{heading}</div>
+  }
+  return (
+    <details className="rounded-md border border-border bg-muted/30 px-3 py-2 text-transcript-sm text-muted-foreground">
+      <summary className="cursor-pointer select-none">{heading}</summary>
+      <Markdown className="mt-2 text-transcript" text={block.markdown} />
+    </details>
+  )
+}
+
 function BlockView({
   block,
   onOpenFile,
@@ -226,6 +291,15 @@ function BlockView({
         <div className="mt-2 whitespace-pre-wrap">{block.markdown}</div>
       </details>
     )
+  }
+  if (block.role === 'COMPACTION') {
+    return <CompactionView block={block} />
+  }
+  if (block.agentNotice) {
+    return <AgentNoticeView block={block} />
+  }
+  if (block.stopReason) {
+    return <StopReasonView reason={block.stopReason} />
   }
   if (block.role === 'SYSTEM' || block.role === 'COMPLETION') {
     return (
@@ -294,6 +368,7 @@ function BlockView({
           collapseCodeBlocks
         />
       )}
+      {block.images && block.images.length > 0 && <TranscriptImages images={block.images} className="mt-2" />}
       {block.choices && block.choices.length > 0 && (
         <ChoicesView choices={block.choices} onSubmit={onSubmitChoices} />
       )}
@@ -459,7 +534,8 @@ function GroupView({
       <ul className={cn('mt-1 flex flex-col gap-1 pl-4', !groupOpen && 'hidden')}>
         {toolCalls.map((tc) => {
           const permission = pendingByToolCall.get(tc.id)
-          const canExpand = !NON_EXPANDABLE_KINDS.has(tc.kind) && (!!tc.content || !!tc.ask)
+          const hasImages = !!tc.images && tc.images.length > 0
+          const canExpand = !NON_EXPANDABLE_KINDS.has(tc.kind) && (!!tc.content || !!tc.ask || hasImages)
           const isExpanded = expanded.has(tc.id)
           const KindIcon = KIND_ICONS[tc.kind] ?? Info
           return (
@@ -518,10 +594,13 @@ function GroupView({
                 </div>
               )}
               {canExpand && isExpanded && tc.ask && <AskQuestionsView questions={tc.ask} />}
-              {canExpand && isExpanded && !tc.ask && (
+              {canExpand && isExpanded && !tc.ask && tc.content && (
                 <div className="ml-[calc(1.25rem+1.15em)] mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-muted/40 px-2 py-1 text-transcript-xs text-muted-foreground">
                   {tc.content}
                 </div>
+              )}
+              {canExpand && isExpanded && !tc.ask && tc.images && tc.images.length > 0 && (
+                <TranscriptImages images={tc.images} className="ml-[calc(1.25rem+1.15em)] mt-1" />
               )}
               {permission && <PermissionCard permission={permission} onPermission={onPermission} />}
             </li>

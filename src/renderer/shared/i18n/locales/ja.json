@@ -370,6 +370,24 @@
       "selectMany": "1つ以上選ぶ",
       "preview": "プレビュー"
     },
+    "image": {
+      "open": "拡大して表示",
+      "title": "画像"
+    },
+    "stopReason": {
+      "cancelled": "中止しました",
+      "max_tokens": "出力の上限に達したため、返信が途中で終わりました",
+      "max_turn_requests": "1ターンのリクエスト数の上限に達したため、止まりました",
+      "refusal": "エージェントがこの依頼に応じませんでした",
+      "other": "ターンが終わりました（理由: {{reason}}）"
+    },
+    "compaction": {
+      "in_progress": "コンテキストを圧縮しています…",
+      "completed": "コンテキストを圧縮しました",
+      "failed": "コンテキストの圧縮に失敗しました",
+      "cancelled": "コンテキストの圧縮を中止しました",
+      "other": "コンテキストの圧縮（{{status}}）"
+    },
     "notice": {
       "replayAdopted": "エージェント側の記録が更新されたため、以前の内容をバックアップとして保存しました。"
     }

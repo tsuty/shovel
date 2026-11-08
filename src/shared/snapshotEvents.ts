@@ -10,6 +10,14 @@ export function snapshotEntriesToEvents(entries: SnapshotEntry[]): TranscriptEve
       for (const toolCall of entry.toolCalls ?? []) events.push({ type: 'toolCall', toolCall: { ...toolCall, groupId: entry.id } })
       continue
     }
+    if (entry.role === 'SYSTEM' && entry.stopReason) {
+      events.push({ type: 'stopReason', id: entry.id, reason: entry.stopReason })
+      continue
+    }
+    if (entry.role === 'COMPACTION') {
+      events.push({ type: 'compaction', id: entry.id, summary: entry.markdown, state: entry.compaction ?? { status: 'completed' } })
+      continue
+    }
     events.push({
       type: 'block',
       id: entry.id,
@@ -19,6 +27,7 @@ export function snapshotEntriesToEvents(entries: SnapshotEntry[]): TranscriptEve
       ...(entry.choices ? { choices: entry.choices } : {})
     })
     if (entry.chips && entry.chips.length > 0) events.push({ type: 'attachments', id: entry.id, chips: entry.chips })
+    if (entry.images && entry.images.length > 0) events.push({ type: 'images', id: entry.id, images: entry.images })
   }
   return events
 }

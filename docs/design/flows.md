@@ -169,8 +169,10 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
        │                   stdout → ACP パーサ / stderr → ログと進捗表示へ分離
        │
        ├─ 3. initialize   protocolVersion: 1, clientInfo
+       │                   応答の protocolVersion が 1 でなければ失敗（decisions.md A-1d）
        │                   応答の agentInfo.version を Project.acpVersion に記録
        │                   fs.readTextFile / fs.writeTextFile / terminal = false
+       │                   elicitation.form, session.configOptions.boolean / notices / compaction を宣言
        │                   ← アイドルタイムアウト（既定180秒。無音時間で測る）
        │
        ├─ 4. session/list  （sessionCapabilities.list があれば）
@@ -211,6 +213,16 @@ Docker の確認・認証状態の確認（・必要なら生存確認）は、�
 
 - 履歴の再開で未ログインと分かったときも認証画面を出し、ログインを確かめられたら再開をやり直す
 - ↻（今の接続を再利用して `session/new` を送り直す）は新しい接続を張らないので、この確認は行わない
+
+### セッションを閉じる
+
+エージェントが `sessionCapabilities.close` を宣言していれば、次のときに `session/close` を送る（decisions.md A-1d）。
+応答は最大 3 秒まで待ち、失敗しても先へ進む。
+
+- ↻: 前のセッションを閉じてから `session/new` を送る
+- タブを閉じたとき（ウィンドウを閉じたときも）: 閉じてから `sbx exec` のプロセスを終える
+
+`session/prompt` 以外のリクエストは 120 秒で打ち切り、エージェントにも `$/cancel_request` で取り下げを送る。
 
 ### 接続できないと分かったとき
 
@@ -285,6 +297,8 @@ Docker のログイン画面を開いてコールバックを待ったまま止�
 
 Stop ボタンで `session/cancel`（通知）を送る。`session/prompt` は
 `stopReason` を伴って応答する。
+
+`stopReason` が `end_turn` 以外なら、ターンの末尾にその理由を1行で出す（`cancelled` なら「中止しました」。decisions.md A-1f）。
 
 ### ターン終了の通知
 

@@ -193,22 +193,28 @@ ACP の生イベントを UI が扱える語彙に翻訳した中間表現。
 | `stream` | `id`, `text` | ストリーミング中のブロックに生テキストを追記 |
 | `blockHtml` | `id`, `html`, `choices` | ブロック本文を確定した Markdown で置換 |
 | `attachments` | `id`, `chips` | USER ブロックに添付チップを追加 |
+| `images` | `id`, `images[{mimeType, data}]` | AGENT ブロックの画像（置き換え）。`data` の無い画像はプレースホルダ（decisions.md A-1e） |
 | `group` | `id`, `timed`, `closed`, `elapsedMs` | ツールコールグループの開閉 |
 | `toolCall` | （下記） | ツールコールカードの追加・更新（`id` で upsert） |
 | `permission` | `id`, `toolCallId`, `headline`, `bodyHtml`, `flat`, `options` | インライン承認カード |
 | `permissionResolved` | `id`, `status` | ボタンを無効化し、選択結果を表示 |
 | `elicitation` | `id`, `message`, `title`, `description`, `fields` | 質問カード（`elicitation/create` のフォームモード）。`fields` はスキーマの各項目を入力欄の種類（`text` / `select` / `number` / `boolean` / `multiSelect`）に整理したもの。選択肢は `value` / `label` / `description` / `preview` |
 | `elicitationResolved` | `id`, `action`, `content` | 入力欄を無効化し、送った内容と結果（`accept` / `decline` / `cancel`）を表示 |
+| `agentNotice` | `id`, `severity`, `title`, `description` | エージェントの `notice` を1行で表示（スナップショットには残さない） |
+| `compaction` | `id`, `summary`, `state{status, error}` | コンテキストの圧縮。同じ `id` はその場で置き換える。`COMPACTION` ブロックとして描き、スナップショットにも残す |
+| `stopReason` | `id`, `reason` | ターンが `end_turn` 以外で終わった理由を末尾に1行で表示。スナップショットには `SYSTEM` エントリの `stopReason` として残す（decisions.md A-1f） |
 | `turnEnd` | `id`, `targetId` | 「ターンの先頭へ戻る」操作を紐付ける |
 | `toast` | `text` | 下端に一時メッセージを表示 |
 
 `toolCall` のペイロードは `id`, `groupId`, `kind`, `title`, `status`, `locations`, `diffs`, `rawInput`,
-`content`, `ask`。`ask` は `kind` が `other`（または無指定）で、入力が `AskUserQuestion` の形
+`content`, `images`, `ask`。`images` は `content` に含まれていた画像（`data` の無いものはプレースホルダ）。`ask` は `kind` が `other`（または無指定）で、入力が `AskUserQuestion` の形
 （`questions` の各要素が `question` と `label` 付きの `options` を持つ）のときだけ、main が取り出した質問
 （`header` / `question` / `multiSelect` / `options[{label, description, preview}]`）。スナップショットには
 `rawInput` を保存しないが `ask` は保存するので、履歴でも質問を開ける。
 
-`role` は `USER` / `AGENT` / `THOUGHT` / `PLAN` / `SYSTEM` / `COMPLETION` / `ERROR`。
+`role` は `USER` / `AGENT` / `THOUGHT` / `PLAN` / `SYSTEM` / `COMPLETION` / `ERROR` / `COMPACTION`。
+スナップショットには画像そのものを保存せず、AGENT エントリとツールコールの `images` に形式（`mimeType`）だけを残す。
+`COMPACTION` のスナップショットのエントリは、`markdown` に要約、`compaction` に状態（`status`・`error`）を持つ。
 枠・アイコン・タイトル・地味な見た目はこの `role` が決める。
 
 ### renderer → main（`TranscriptAction`）
@@ -225,8 +231,10 @@ main を経由せず renderer 内で `navigator.clipboard.writeText()` を直接
 
 `agent_message_chunk` / `agent_thought_chunk` / `user_message_chunk` /
 `tool_call` / `tool_call_update` / `plan` / `current_mode_update` /
-`current_model_update` / `config_option_update` / `available_commands_update` /
-`usage_update` / `session_info_update`
+`config_option_update` / `available_commands_update` /
+`usage_update` / `session_info_update` / `notice` / `compaction_update` / `compaction_summary_chunk`
+
+`plan` は同じターンの PLAN ブロックを置き換える（decisions.md A-1d）。
 
 未知のバリアントはログに残して無視し、デコード全体を失敗させない。
 

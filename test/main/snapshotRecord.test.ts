@@ -157,3 +157,30 @@ describe('SnapshotAccumulator', () => {
     expect(acc.snapshotEntries()).toEqual([])
   })
 })
+
+describe('SnapshotAccumulator: 画像', () => {
+  it('ブロックとツールコールの画像は形式だけを残し、data は保存しない', () => {
+    const acc = new SnapshotAccumulator()
+    const toolCall: ToolCallPayload = {
+      id: 't',
+      groupId: 'g',
+      kind: 'other',
+      title: 'x',
+      status: 'completed',
+      locations: [],
+      diffs: [],
+      images: [{ mimeType: 'image/png', data: 'x' }]
+    }
+    acc.track([
+      { type: 'block', id: 'a', role: 'AGENT', markdown: '', streaming: true },
+      { type: 'images', id: 'a', images: [{ mimeType: 'image/png', data: 'x' }] },
+      { type: 'blockMarkdown', id: 'a', markdown: '本文' },
+      { type: 'group', id: 'g', timed: true, closed: false },
+      { type: 'toolCall', toolCall }
+    ])
+    expect(acc.snapshotEntries()).toEqual([
+      { id: 'a', role: 'AGENT', markdown: '本文', images: [{ mimeType: 'image/png' }] },
+      { id: 'g', role: 'TOOL_GROUP', markdown: '', toolCalls: [{ ...toolCall, images: [{ mimeType: 'image/png' }] }] }
+    ])
+  })
+})

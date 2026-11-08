@@ -72,6 +72,8 @@ export class SnapshotAccumulator {
   private readonly entries = new Map<string, SnapshotEntry>()
   private readonly groups = new Map<string, Map<string, ToolCallPayload>>()
   private readonly chips = new Map<string, AttachmentChip[]>()
+  /** ブロックごとの画像の形式（画像そのものは保存しない）。 */
+  private readonly images = new Map<string, { mimeType: string }[]>()
   /**
    * ストリーミング中のブロックの role。確定時の `blockMarkdown` は role を運ばないので、
    * 開始時の `block` イベントで覚えておく。
@@ -100,8 +102,16 @@ export class SnapshotAccumulator {
         if (role === 'AGENT' && e.messageId) entry.messageId = e.messageId
         if (e.choices && e.choices.length > 0) entry.choices = e.choices
         this.entries.set(e.id, entry)
+      } else if (e.type === 'stopReason') {
+        this.place(e.id)
+        this.entries.set(e.id, { id: e.id, role: 'SYSTEM', markdown: '', stopReason: e.reason })
+      } else if (e.type === 'compaction') {
+        this.place(e.id)
+        this.entries.set(e.id, { id: e.id, role: 'COMPACTION', markdown: e.summary, compaction: { ...e.state } })
       } else if (e.type === 'attachments') {
         this.chips.set(e.id, e.chips)
+      } else if (e.type === 'images') {
+        this.images.set(e.id, e.images.map(({ mimeType }) => ({ mimeType })))
       } else if (e.type === 'group') {
         this.place(e.id)
         if (!this.groups.has(e.id)) this.groups.set(e.id, new Map())
@@ -109,9 +119,10 @@ export class SnapshotAccumulator {
         const groupId = e.toolCall.groupId
         this.place(groupId)
         const group = this.groups.get(groupId) ?? new Map<string, ToolCallPayload>()
-        // rawInput は保存しない。
+        // rawInput と画像そのものは保存しない。
         const toolCall: ToolCallPayload = { ...e.toolCall }
         delete toolCall.rawInput
+        if (toolCall.images) toolCall.images = toolCall.images.map(({ mimeType }) => ({ mimeType }))
         group.set(toolCall.id, toolCall)
         this.groups.set(groupId, group)
       }
@@ -126,9 +137,10 @@ export class SnapshotAccumulator {
         this.groups.set(entry.id, new Map((entry.toolCalls ?? []).map((tc) => [tc.id, { ...tc, groupId: entry.id }])))
         continue
       }
-      const { chips, ...rest } = entry
+      const { chips, images, ...rest } = entry
       this.entries.set(entry.id, { ...rest })
       if (chips) this.chips.set(entry.id, chips)
+      if (images) this.images.set(entry.id, images)
     }
   }
 
@@ -146,6 +158,7 @@ export class SnapshotAccumulator {
     this.entries.clear()
     this.groups.clear()
     this.chips.clear()
+    this.images.clear()
     this.streamingRoles.clear()
   }
 
@@ -160,7 +173,12 @@ export class SnapshotAccumulator {
       const entry = this.entries.get(id)
       if (!entry) continue // まだ確定していない（ストリーミング中の）ブロック
       const chips = this.chips.get(id)
-      result.push(chips && chips.length > 0 ? { ...entry, chips } : entry)
+      const images = this.images.get(id)
+      result.push({
+        ...entry,
+        ...(chips && chips.length > 0 ? { chips } : {}),
+        ...(images && images.length > 0 ? { images } : {})
+      })
     }
     return result
   }
