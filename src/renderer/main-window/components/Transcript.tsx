@@ -359,7 +359,17 @@ function BlockView({
         </div>
       )}
       {block.streaming ? (
-        <div className="whitespace-pre-wrap text-transcript">{block.markdown}</div>
+        <>
+          {block.renderedLength !== undefined && block.renderedLength > 0 && (
+            <Markdown
+              className="text-transcript"
+              text={block.markdown.slice(0, block.renderedLength)}
+              onOpenFileLink={onOpenFile}
+              collapseCodeBlocks
+            />
+          )}
+          <div className="whitespace-pre-wrap text-transcript">{block.markdown.slice(block.renderedLength ?? 0)}</div>
+        </>
       ) : (
         <Markdown
           className="text-transcript"

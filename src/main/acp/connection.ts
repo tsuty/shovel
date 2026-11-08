@@ -51,6 +51,7 @@ import { sessionTitleStore } from '../persistence/store'
 import { acpPackageSpec, recordAcpVersion } from '../domain/acpVersionService'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
+import { AfterTurnTracker } from './afterTurn'
 
 /** `initialize` のアイドルタイムアウト（既定 180 秒）。 */
 const INITIALIZE_IDLE_TIMEOUT_MS = 180_000
@@ -62,6 +63,8 @@ function isAuthRequiredError(err: unknown): boolean {
 const REQUEST_DEADLINE_MS = 120_000
 /** `session/close` の応答を待つ上限。過ぎたら待たずに先へ進む。 */
 const CLOSE_SESSION_WAIT_MS = 3_000
+/** ターンの外の作業の更新がこの間届かなければ、作業が途切れたとみなす。 */
+const AFTER_TURN_SETTLE_MS = 1_000
 /** shovel が話せる ACP のプロトコルバージョン。 */
 const PROTOCOL_VERSION = 1
 
@@ -213,6 +216,32 @@ export async function openAcpSession(
   /** ターン終了時: 記録を保存してから、履歴一覧を取り直す契機を知らせる。 */
   function persistAfterTurn(): void {
     void persistSnapshot().then(() => callbacks.onTurnSaved())
+  }
+
+  /** 開いているブロックを確定して renderer とスナップショットの蓄積へ流す。 */
+  function closeOpenBlocks(): void {
+    const events = translator.closeOpenBlocks()
+    snapshotAcc.track(events)
+    for (const event of events) callbacks.onEvent(event)
+  }
+
+  const afterTurn = new AfterTurnTracker(AFTER_TURN_SETTLE_MS, {
+    onStart: () => callbacks.onEvent({ type: 'afterTurn', active: true }),
+    onSettle: () => {
+      const events = translator.settleOpenBlocks()
+      snapshotAcc.track(events)
+      for (const event of events) callbacks.onEvent(event)
+      callbacks.onEvent({ type: 'afterTurn', active: false })
+      persistAfterTurn()
+    }
+  })
+  /** ループが処理した `stop` と更新を見張りへ伝える。 */
+  const loopHooks: LoopHooks = {
+    onStop: () => {
+      afterTurn.turnEnded()
+      persistAfterTurn()
+    },
+    onUpdate: (update) => afterTurn.update(update)
   }
 
   /**
@@ -544,7 +573,7 @@ export async function openAcpSession(
           }
           translator.setReplayMode(false)
 
-          void runUpdateLoop(session, translator, callbacks, metaState, snapshotAcc, persistAfterTurn, applyAgentTitle)
+          void runUpdateLoop(session, translator, callbacks, metaState, snapshotAcc, loopHooks, applyAgentTitle)
         } catch (err) {
           rejectReady(err)
           throw err
@@ -597,6 +626,7 @@ export async function openAcpSession(
     logger,
     async prompt(text: string, attachmentRelPaths: string[] = []) {
       restoreEpoch++
+      afterTurn.turnStarted()
       const chips = attachmentRelPaths.map((relPath) => ({
         key: relPath,
         label: relPath.split('/').pop() ?? relPath,
@@ -614,6 +644,9 @@ export async function openAcpSession(
       promptBlocks.push({ type: 'text', text })
       try {
         await currentSession.prompt(promptBlocks)
+      } catch (err) {
+        afterTurn.turnEnded()
+        throw err
       } finally {
         cancelPendingRequests()
       }
@@ -687,6 +720,8 @@ export async function openAcpSession(
       if (!ready) return snapshotId
       restoreEpoch++
       cancelPendingRequests()
+      afterTurn.flush()
+      closeOpenBlocks()
       // 前の会話の記録を閉じ、新しい会話は新しい `{snapshotId}.json` に書く。
       await persistSnapshot()
       restoredTitle = undefined
@@ -711,7 +746,7 @@ export async function openAcpSession(
 
       callbacks.onEvent({ type: 'reset', sessionId })
       callbacks.onEvent({ ...resolvedMetaState, type: 'sessionMeta' })
-      void runUpdateLoop(newSession, translator, callbacks, resolvedMetaState, snapshotAcc, persistAfterTurn, applyAgentTitle)
+      void runUpdateLoop(newSession, translator, callbacks, resolvedMetaState, snapshotAcc, loopHooks, applyAgentTitle)
       return snapshotId
     },
     async listAgentSessions() {
@@ -749,6 +784,8 @@ export async function openAcpSession(
     close() {
       restoreEpoch++
       cancelPendingRequests()
+      afterTurn.dispose()
+      closeOpenBlocks()
       void persistSnapshot()
       // `session/close` を送れるなら、その応答（上限あり）を待ってからプロセスを終える。
       const closing = ready ? closeAgentSession(ready.ctx, currentSession.sessionId) : Promise.resolve()
@@ -951,13 +988,19 @@ function handleSessionMessage(
   }
 }
 
+/** `runUpdateLoop` が処理した `stop` と更新の通知先。 */
+interface LoopHooks {
+  onStop: () => void
+  onUpdate: (update: SessionUpdate) => void
+}
+
 async function runUpdateLoop(
   session: SessionHandle,
   translator: SessionTranslator,
   callbacks: SessionRuntimeCallbacks,
   metaState: MutableMetaState,
   snapshotAcc: SnapshotAccumulator,
-  onStop: () => void,
+  hooks: LoopHooks,
   onTitle: (title: string) => void
 ): Promise<void> {
   // prompt() の完了は `stop` メッセージとして下のループに流れてくる。
@@ -969,7 +1012,8 @@ async function runUpdateLoop(
       // セッションが閉じられた（dispose/接続終了）。ループを終える。
       return
     }
-    handleSessionMessage(message, translator, callbacks, metaState, snapshotAcc, onStop, onTitle)
+    handleSessionMessage(message, translator, callbacks, metaState, snapshotAcc, hooks.onStop, onTitle)
+    if (message.kind === 'session_update') hooks.onUpdate(message.update)
   }
 }
 

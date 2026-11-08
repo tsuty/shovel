@@ -46,6 +46,8 @@ export function SessionView({
   const [state, dispatch] = useReducer(transcriptReducer, initialTranscriptState)
   const [meta, setMeta] = useState(initialMeta)
   const [sending, setSending] = useState(false)
+  /** ターンの外でエージェントが作業している。 */
+  const [workingAfterTurn, setWorkingAfterTurn] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [attachments, setAttachments] = useState<AttachmentChip[]>(() => initialAttachments.map(chipFromRelPath))
 
@@ -62,6 +64,12 @@ export function SessionView({
       }
       if (event.type === 'title') {
         onTitleChangeRef.current?.(event.title)
+        return
+      }
+      if (event.type === 'afterTurn') {
+        setWorkingAfterTurn(event.active)
+        // ターン後の作業で書かれたファイルを読み直させる。
+        if (!event.active) notifyTurnEnd()
         return
       }
       dispatch(event)
@@ -91,11 +99,12 @@ export function SessionView({
   const awaitingUser =
     Object.values(state.permissions).some((p) => p.status === 'pending') ||
     Object.values(state.elicitations).some((e) => e.status === 'pending')
-  // sending / awaitingUser の変化を親（TabBar）へ伝える。
+  const working = sending || workingAfterTurn
+  // 作業中か・回答待ちかの変化を親（TabBar）へ伝える。
   useEffect(() => {
-    onStatusChange?.({ sending, awaitingUser })
+    onStatusChange?.({ sending: working, awaitingUser })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sending, awaitingUser])
+  }, [working, awaitingUser])
 
   async function send(text: string): Promise<void> {
     // 未保存の Markdown 編集をディスクへ書き出してから送信する。

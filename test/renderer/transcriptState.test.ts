@@ -9,6 +9,21 @@ const reduce = (events: TranscriptEvent[], state: TranscriptState = initialTrans
   events.reduce(transcriptReducer, state)
 
 describe('transcriptReducer', () => {
+  it('確定済みのブロックに続きが届くと、確定済みの部分を残して下に追記し、再び確定で全文を描く', () => {
+    const settled = reduce([
+      { type: 'block', id: 'a', role: 'AGENT', markdown: '', streaming: true },
+      { type: 'stream', id: 'a', text: '```ts\nconst a = 1\n' },
+      { type: 'blockMarkdown', id: 'a', markdown: '```ts\nconst a = 1\n', choices: [{ id: 'c', label: 'x' }] },
+      { type: 'blockReopen', id: 'a' },
+      { type: 'stream', id: 'a', text: '```\n' }
+    ])
+    expect(settled.order).toEqual([{ kind: 'block', id: 'a' }])
+    expect(settled.blocks.a).toMatchObject({ markdown: '```ts\nconst a = 1\n```\n', streaming: true, renderedLength: '```ts\nconst a = 1\n'.length })
+    expect(settled.blocks.a?.choices).toBeUndefined()
+    const done = reduce([{ type: 'blockMarkdown', id: 'a', markdown: '```ts\nconst a = 1\n```\n' }], settled)
+    expect(done.blocks.a).toMatchObject({ streaming: false, renderedLength: undefined })
+  })
+
   it('ストリーミング中のブロックに追記し、確定で Markdown を差し替える', () => {
     const state = reduce([
       { type: 'block', id: 'a', role: 'AGENT', markdown: '', streaming: true },

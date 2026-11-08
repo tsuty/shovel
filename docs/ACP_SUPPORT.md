@@ -93,7 +93,7 @@
 | バリアント | 状態 | 備考 |
 |---|---|---|
 | `user_message_chunk` | 対応 | replay の中だけ描く（送信したプロンプトはその場で描いているため）。`resource_link` と `[@name](file://…)` 形式のメンションは添付チップに戻す。 |
-| `agent_message_chunk` | 対応 | ストリーミング中はプレーンテキスト、確定したら Markdown で描き直す。`messageId` はブロックの区切りと、replay とローカル記録の比較に使う。確定した返信の `- [ ]` 行は選択肢として送れるチェックボックスになる。 |
+| `agent_message_chunk` | 対応 | ストリーミング中はプレーンテキスト、確定したら Markdown で描き直す。ターンの後に届いた返信は、更新が1秒途切れたら描き直す。ブロックの区切りは変えない（decisions.md A-1h）。`messageId` はブロックの区切りと、replay とローカル記録の比較に使う。確定した返信の `- [ ]` 行は選択肢として送れるチェックボックスになる。 |
 | `agent_thought_chunk` | 対応 | 入力欄の上の思考ストリップに流し、確定したら折りたたみ表示になる。 |
 | `tool_call` / `tool_call_update` | 対応 | `title`、`name`、`kind`、`status`、`content`、`locations`、`rawInput` を使う。`title` が空ならツール名（`name`）を、どちらも無ければ `toolCallId` を出す。`rawOutput` は表示しない（方針、decisions.md A-1g）。更新は届いたフィールドだけを前回の値に重ねる。`AskUserQuestion` 形の `rawInput` は質問と選択肢に整形して表示する。 |
 | `plan` | 対応 | チェックリストの PLAN ブロックとして描き、同じターンの PLAN ブロックはその場で置き換える。次のターンの計画は新しいブロックになり、前のターンの計画は経過として残る（replay ではユーザーの発言をターンの区切りとみなす）。`priority` は表示しない。 |

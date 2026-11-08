@@ -204,6 +204,8 @@ ACP の生イベントを UI が扱える語彙に翻訳した中間表現。
 | `compaction` | `id`, `summary`, `state{status, error}` | コンテキストの圧縮。同じ `id` はその場で置き換える。`COMPACTION` ブロックとして描き、スナップショットにも残す |
 | `stopReason` | `id`, `reason` | ターンが `end_turn` 以外で終わった理由を末尾に1行で表示。スナップショットには `SYSTEM` エントリの `stopReason` として残す（decisions.md A-1f） |
 | `turnEnd` | `id`, `targetId` | 「ターンの先頭へ戻る」操作を紐付ける |
+| `blockReopen` | `id` | `blockMarkdown` で描き直したブロックに続きが届く。以降の `stream` は、描き直した部分（Markdown のまま）の下にプレーンテキストで足す（decisions.md A-1h） |
+| `afterTurn` | `active` | ターンの外でエージェントが作業を始めた（`true`）・作業が途切れた（`false`）。タブのアイコンと、ファイラーの読み直しに使う（decisions.md A-1h）。スナップショットには残さない |
 | `toast` | `text` | 下端に一時メッセージを表示 |
 
 `toolCall` のペイロードは `id`, `groupId`, `kind`, `title`, `status`, `locations`, `diffs`, `rawInput`,

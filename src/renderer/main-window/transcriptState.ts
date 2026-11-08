@@ -21,6 +21,8 @@ export interface RenderBlock {
   role: BlockRole
   markdown: string
   streaming: boolean
+  /** ストリーミング中、先頭のこの長さまでは Markdown で描く（`blockReopen` の時点の長さ）。 */
+  renderedLength?: number
   chips?: AttachmentChip[]
   choices?: RenderChoice[]
   /** SYSTEM ブロックのうち、`notice` イベント由来のもの。文言は i18n の `transcript.notice.{key}`。 */
@@ -148,7 +150,18 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
         ...state,
         blocks: {
           ...state.blocks,
-          [event.id]: { ...block, markdown: event.markdown, streaming: false, choices: event.choices }
+          [event.id]: { ...block, markdown: event.markdown, streaming: false, renderedLength: undefined, choices: event.choices }
+        }
+      }
+    }
+    case 'blockReopen': {
+      const block = state.blocks[event.id]
+      if (!block || block.streaming) return state
+      return {
+        ...state,
+        blocks: {
+          ...state.blocks,
+          [event.id]: { ...block, streaming: true, renderedLength: block.markdown.length, choices: undefined }
         }
       }
     }
@@ -283,6 +296,7 @@ export function transcriptReducer(state: TranscriptState, event: TranscriptEvent
     case 'turnEnd':
     case 'sessionMeta':
     case 'title':
+    case 'afterTurn':
       return state
   }
 }

@@ -215,6 +215,10 @@ export type TranscriptEvent =
   | { type: 'stopReason'; id: string; reason: string }
   /** エージェントが付けたセッションのタイトル（`session_info_update`）。タブ名に反映する。 */
   | { type: 'title'; title: string }
+  /** `blockMarkdown` で描いたブロックに続きが届く。以降の `stream` はその下にプレーンテキストで足す。 */
+  | { type: 'blockReopen'; id: string }
+  /** ターンの外（`session/prompt` の応答の後）でエージェントが作業を始めた・作業が途切れた。 */
+  | { type: 'afterTurn'; active: boolean }
   /**
    * セッションのメタ状態（モード・configOptions・使用量・利用可能コマンド）。
    * 更新を受け取るたびに、その時点の状態を丸ごと送る。

@@ -522,3 +522,72 @@ describe('permissionRequestToEvent', () => {
     expect(permissionRequestToEvent('p3', request({ kind: 'switch_mode' }))).toMatchObject({ flat: false })
   })
 })
+
+describe('closeOpenBlocks', () => {
+  it('finalizes an answer streamed after the turn ended, without a stop reason', () => {
+    const translator = new SessionTranslator(SANDBOX)
+    translator.handleStop('end_turn')
+    translator.handleSessionUpdate(agent('**後から**の', 'm1'))
+    translator.handleSessionUpdate(agent('回答', 'm1'))
+    const closing = translator.closeOpenBlocks()
+    expect(closing).toEqual([
+      expect.objectContaining({ type: 'blockMarkdown', markdown: '**後から**の回答', messageId: 'm1' })
+    ])
+    expect(translator.closeOpenBlocks()).toEqual([])
+  })
+
+  it('finalizes an open thought', () => {
+    const translator = new SessionTranslator(SANDBOX)
+    translator.handleSessionUpdate(thought('考え中'))
+    expect(translator.closeOpenBlocks()).toEqual([expect.objectContaining({ type: 'blockMarkdown', markdown: '考え中' })])
+  })
+
+  it('closes an open tool call group', () => {
+    const translator = new SessionTranslator(SANDBOX)
+    translator.handleSessionUpdate(toolCall({ toolCallId: 't1', title: 'Run', kind: 'execute', status: 'completed' }))
+    expect(translator.closeOpenBlocks()).toEqual([expect.objectContaining({ type: 'group', closed: true })])
+  })
+})
+
+describe('settleOpenBlocks', () => {
+  it('renders the answer so far and keeps adding to the same block, even inside a code fence', () => {
+    const translator = new SessionTranslator(SANDBOX)
+    translator.handleStop('end_turn')
+    const first = translator.handleSessionUpdate(agent('説明\n\n```ts\nconst a = 1\n', 'm1'))
+    const blockId = (first.find((e) => e.type === 'block') as { id: string }).id
+    expect(translator.settleOpenBlocks()).toEqual([
+      expect.objectContaining({ type: 'blockMarkdown', id: blockId, markdown: '説明\n\n```ts\nconst a = 1\n' })
+    ])
+    const more = translator.handleSessionUpdate(agent('```\n\n続き', 'm1'))
+    expect(more.filter((e) => e.type === 'block')).toEqual([])
+    expect(more[0]).toEqual({ type: 'blockReopen', id: blockId })
+    expect(translator.settleOpenBlocks()).toEqual([
+      expect.objectContaining({ type: 'blockMarkdown', id: blockId, markdown: '説明\n\n```ts\nconst a = 1\n```\n\n続き' })
+    ])
+  })
+
+  it('does not render again or reopen without new text', () => {
+    const translator = new SessionTranslator(SANDBOX)
+    translator.handleSessionUpdate(agent('回答', 'm1'))
+    translator.settleOpenBlocks()
+    expect(translator.settleOpenBlocks()).toEqual([])
+    expect(translator.closeOpenBlocks()).toEqual([])
+  })
+
+  it('starts a new block for a different message as usual', () => {
+    const translator = new SessionTranslator(SANDBOX)
+    translator.handleSessionUpdate(agent('一つ目', 'm1'))
+    translator.settleOpenBlocks()
+    const next = translator.handleSessionUpdate(agent('二つ目', 'm2'))
+    expect(next.map((e) => e.type)).toEqual(['block', 'stream'])
+  })
+
+  it('keeps a settled thought open for its continuation', () => {
+    const translator = new SessionTranslator(SANDBOX)
+    translator.handleSessionUpdate(thought('考え', 't1'))
+    translator.settleOpenBlocks()
+    const more = translator.handleSessionUpdate(thought('の続き', 't1'))
+    expect(more.map((e) => e.type)).toEqual(['blockReopen', 'stream'])
+    expect(translator.closeOpenBlocks()).toEqual([expect.objectContaining({ type: 'blockMarkdown', markdown: '考えの続き' })])
+  })
+})

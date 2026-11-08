@@ -133,7 +133,13 @@ with the command being run and elapsed time, swapped in place for the session ta
 (flows.md §3 接続中タブ; progress via `session:openProgress`),
 chat tab icon states (`tabAttention.ts`, decisions.md G-1-4: the robot icon spins during a turn, on every tab, and stops while
 awaiting the user; on a tab not in front of its pane it blinks after a turn ends until brought to front, and blinks with a small
-badge while a permission/question is pending, again if left unanswered), context-attachment
+badge while a permission/question is pending, again if left unanswered). Updates an agent streams *after* its
+`session/prompt` response (work resumed when a background task finishes) also count as work: `AfterTurnTracker`
+(`src/main/acp/afterTurn.ts`) spins the icon via an `afterTurn` event and, after 1s without such updates (or before the
+next prompt), re-renders open answers/thoughts as Markdown *without closing them* (`settleOpenBlocks`; a continuation of
+the same message gets `blockReopen` and is appended below as plain text, so a pause inside a code fence never splits a
+block), saves the snapshot and triggers the Filer reload; closing a tab or ↻
+also finalizes open blocks before saving, so a streaming answer is no longer lost (decisions.md A-1h, open-issues.md V-27), context-attachment
 chips (Filer "add to context" → sent as `resource_link` content blocks — path only, the agent
 reads the file itself inside the sandbox (decisions.md G-1-5a); rendered on the USER transcript
 block, and restored as chips from `session/load` replay, where claude-agent-acp echoes them back

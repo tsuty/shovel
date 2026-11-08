@@ -37,6 +37,8 @@ interface OpenBlock {
   id: string
   messageId: string | null
   buffer: string
+  /** `settleOpenBlocks()` で Markdown として描き、その後に追記が無い。 */
+  settled?: boolean
 }
 
 /** 描画中のコンテキスト圧縮1件（ACP の `compactionId` ごと）。 */
@@ -161,6 +163,42 @@ export class SessionTranslator {
     return events
   }
 
+  /** 開いているブロックとツールコールのグループを、ターンを閉じずに確定する。 */
+  closeOpenBlocks(): TranscriptEvent[] {
+    return [...this.closeOpenGroup(), ...this.finalizeAgent(), ...this.finalizeThought(), ...this.finalizeUser()]
+  }
+
+  /**
+   * 開いている返信と思考ログを、ブロックを閉じずにここまでの全文で Markdown として描く。続きのチャンクは
+   * 同じブロックに足す（`blockReopen` を出してから追記する）。ツールコールのグループは閉じる。
+   */
+  settleOpenBlocks(): TranscriptEvent[] {
+    const events = this.closeOpenGroup()
+    for (const block of [this.currentAgent, this.currentThought]) {
+      if (!block || block.settled) continue
+      block.settled = true
+      events.push(block === this.currentAgent ? this.agentMarkdownEvent(this.currentAgent) : { type: 'blockMarkdown', id: block.id, markdown: block.buffer })
+    }
+    return events
+  }
+
+  /** `settleOpenBlocks()` で描いたブロックに続きを足す前の `blockReopen`。 */
+  private reopenIfSettled(block: OpenBlock): TranscriptEvent[] {
+    if (!block.settled) return []
+    block.settled = false
+    return [{ type: 'blockReopen', id: block.id }]
+  }
+
+  private agentMarkdownEvent(block: OpenAgentBlock): TranscriptEvent {
+    return {
+      type: 'blockMarkdown',
+      id: block.id,
+      markdown: block.buffer,
+      choices: extractChoices(block.id, block.buffer),
+      messageId: block.messageId ?? undefined
+    }
+  }
+
   reset(): TranscriptEvent[] {
     this.currentAgent = null
     this.currentThought = null
@@ -177,25 +215,17 @@ export class SessionTranslator {
    * Markdown として描き直す。
    */
   private finalizeAgent(): TranscriptEvent[] {
-    if (!this.currentAgent) return []
-    const { id, buffer, messageId } = this.currentAgent
+    const block = this.currentAgent
+    if (!block) return []
     this.currentAgent = null
-    return [
-      {
-        type: 'blockMarkdown',
-        id,
-        markdown: buffer,
-        choices: extractChoices(id, buffer),
-        messageId: messageId ?? undefined
-      }
-    ]
+    return block.settled ? [] : [this.agentMarkdownEvent(block)]
   }
 
   private finalizeThought(): TranscriptEvent[] {
-    if (!this.currentThought) return []
-    const { id, buffer } = this.currentThought
+    const block = this.currentThought
+    if (!block) return []
     this.currentThought = null
-    return [{ type: 'blockMarkdown', id, markdown: buffer }]
+    return block.settled ? [] : [{ type: 'blockMarkdown', id: block.id, markdown: block.buffer }]
   }
 
   private finalizeUser(): TranscriptEvent[] {
@@ -269,6 +299,7 @@ export class SessionTranslator {
       this.currentAgent = { id, messageId, buffer: '', images: [] }
       events.push({ type: 'block', id, role: 'AGENT', markdown: '', streaming: true })
     }
+    events.push(...this.reopenIfSettled(this.currentAgent))
     if (content.type === 'image') {
       this.currentAgent.images = [...this.currentAgent.images, toTranscriptImage(content.data, content.mimeType)]
       events.push({ type: 'images', id: this.currentAgent.id, images: this.currentAgent.images })
@@ -289,6 +320,7 @@ export class SessionTranslator {
       this.currentThought = { id, messageId, buffer: '' }
       events.push({ type: 'block', id, role: 'THOUGHT', markdown: '', streaming: true })
     }
+    events.push(...this.reopenIfSettled(this.currentThought))
     this.currentThought.buffer += text
     events.push({ type: 'stream', id: this.currentThought.id, text })
     return events
