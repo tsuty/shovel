@@ -131,8 +131,9 @@ that matched the find box's own text and stole its focus, decisions.md N-1-a), a
 each connect step (sign-in check → sandbox liveness → adapter start/`initialize` → `session/new`)
 with the command being run and elapsed time, swapped in place for the session tab on success
 (flows.md §3 接続中タブ; progress via `session:openProgress`),
-background-tab notifications (a pulsing tab label while that session is sending, a small badge
-while it has a pending permission request — both suppressed on the active tab), context-attachment
+chat tab icon states (`tabAttention.ts`, decisions.md G-1-4: the robot icon spins during a turn, on every tab, and stops while
+awaiting the user; on a tab not in front of its pane it blinks after a turn ends until brought to front, and blinks with a small
+badge while a permission/question is pending, again if left unanswered), context-attachment
 chips (Filer "add to context" → sent as `resource_link` content blocks — path only, the agent
 reads the file itself inside the sandbox (decisions.md G-1-5a); rendered on the USER transcript
 block, and restored as chips from `session/load` replay, where claude-agent-acp echoes them back

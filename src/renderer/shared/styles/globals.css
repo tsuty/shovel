@@ -259,17 +259,36 @@
   user-select: none;
 }
 
-/** 背景タブの通知。ターン実行中は不透明度が約1秒周期で 1.0 ↔ 0.35 に脈動する。 */
-@keyframes tab-pulse {
+/* チャットのタブのアイコン。実行中は回転し、未確認のターン終了・確認待ちは点滅する。 */
+@keyframes tab-icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes tab-icon-blink {
   0%, 100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.15;
   }
 }
-.animate-tab-pulse {
-  animation: tab-pulse 1s ease-in-out infinite;
+.tab-icon-spin {
+  animation: tab-icon-spin 2s linear infinite;
+}
+.tab-icon-blink {
+  color: hsl(var(--foreground));
+  animation: tab-icon-blink 1s ease-in-out infinite;
+}
+/* 動きを減らす設定では、静止した濃淡で状態を示す。 */
+@media (prefers-reduced-motion: reduce) {
+  .tab-icon-spin {
+    opacity: 0.5;
+    animation: none;
+  }
+  .tab-icon-blink {
+    animation: none;
+  }
 }
 
 /* ページ内検索（FindBar）のヒット箇所。CSS Custom Highlight API で塗る。 */

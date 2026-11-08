@@ -60,6 +60,7 @@ import {
   type Pane,
   type PaneLayout
 } from './paneLayout'
+import { applyTabStatus, markTabsSeen, type TabStatus } from './tabAttention'
 
 const MAX_SESSION_TABS = 10
 /** 分割ビューのペインの最小幅（px）。前面のタブがチャットならトランスクリプトを読める幅を残す。 */
@@ -223,9 +224,7 @@ export function App(): React.JSX.Element {
   /** 注釈を付けている画像。`attachTo` があれば、保存した画像をそのチャットに添付する（無ければ開く）。 */
   const [annotating, setAnnotating] = useState<{ relPath: string; attachTo?: string } | null>(null)
   const [commandsHeight, setCommandsHeight] = useState(COMMANDS_DEFAULT_HEIGHT)
-  const [tabStatuses, setTabStatuses] = useState<
-    Record<string, { sending: boolean; awaitingUser: boolean }>
-  >({})
+  const [tabStatuses, setTabStatuses] = useState<Record<string, TabStatus>>({})
   const { settings, update: updateSettings } = useSettings()
 
   /**
@@ -255,6 +254,15 @@ export function App(): React.JSX.Element {
   const activeSessionId = focusedTabId(layout)
   const tabIdsRef = useRef(tabIds)
   tabIdsRef.current = tabIds
+  /** 各ペインの前面のタブ。 */
+  const visibleTabIds = layout.panes.flatMap((pane) => (pane.activeTabId ? [pane.activeTabId] : []))
+  const visibleTabIdsRef = useRef(visibleTabIds)
+  visibleTabIdsRef.current = visibleTabIds
+  const visibleTabsKey = visibleTabIds.join('\n')
+  // 前面に出たタブのターン終了は見たものとする。
+  useEffect(() => {
+    setTabStatuses((prev) => markTabsSeen(prev, visibleTabIdsRef.current))
+  }, [visibleTabsKey])
 
   /** 今のタブの一覧に合わせて整えたレイアウトに、操作を当てる。 */
   function updateLayout(op: (current: PaneLayout) => PaneLayout): void {
@@ -733,17 +741,13 @@ export function App(): React.JSX.Element {
     setTabs((prev) => prev.filter((tab) => !closing.includes(tab.sessionId)))
   }
 
-  /** 背景タブの通知状態。変化がなければ同一参照を返す。 */
-  function updateTabStatus(
-    sessionId: string,
-    status: { sending: boolean; awaitingUser: boolean }
-  ): void {
+  /** SessionView から届いたチャットの状態を記録する。変化がなければ同一参照を返す。 */
+  function updateTabStatus(sessionId: string, status: { sending: boolean; awaitingUser: boolean }): void {
+    const visible = visibleTabIdsRef.current.includes(sessionId)
     setTabStatuses((prev) => {
       const current = prev[sessionId]
-      if (current && current.sending === status.sending && current.awaitingUser === status.awaitingUser) {
-        return prev
-      }
-      return { ...prev, [sessionId]: status }
+      const next = applyTabStatus(current, status, visible)
+      return next === current ? prev : { ...prev, [sessionId]: next }
     })
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Bot, Clock3, Columns2, CopyX, File, FileX, Globe, Loader2, Plus, X } from 'lucide-react'
 import { cn } from '../../shared/lib/utils'
+import { tabIndicator, type TabStatus } from '../tabAttention'
 import { MenuItem } from './MenuItem'
 
 export interface TabInfo {
@@ -15,8 +16,8 @@ export interface TabInfo {
    * 始めると変わる（タブ id の `sessionId` は変わらない）。
    */
   snapshotId?: string
-  /** 背景タブの通知状態。`undefined` はセッション以外のタブ（ファイル/履歴）。 */
-  status?: { sending: boolean; awaitingUser: boolean }
+  /** チャットの状態。`undefined` はセッション以外のタブ（ファイル/履歴）。 */
+  status?: TabStatus
   /** 接続中タブの接続が失敗した。 */
   failed?: boolean
   /** 「右に分割して移動」を押せる。 */
@@ -233,9 +234,7 @@ export function TabBar({
       >
         {tabs.map((tab) => {
           const isActive = tab.sessionId === activeId
-          // 通知は前面にないタブにだけ出す。
-          const showPendingBadge = !isActive && tab.status?.awaitingUser
-          const showPulse = !isActive && tab.status?.sending
+          const indicator = tabIndicator(tab.status, isActive)
           return (
             <div
               key={tab.sessionId}
@@ -258,15 +257,20 @@ export function TabBar({
                 e.stopPropagation()
               }}
             >
-              {showPendingBadge && (
+              {indicator.badge && (
                 <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
               )}
               <button
-                className={cn('flex min-w-0 items-center gap-1.5 truncate', showPulse && 'animate-tab-pulse')}
+                className="flex min-w-0 items-center gap-1.5 truncate"
                 onClick={() => onSelect(tab.sessionId)}
               >
                 {tab.kind === 'file' && <File size={12} className="shrink-0" />}
-                {tab.kind === 'session' && <Bot size={12} className="shrink-0" />}
+                {tab.kind === 'session' && (
+                  <Bot
+                    size={12}
+                    className={cn('shrink-0', indicator.spin && 'tab-icon-spin', indicator.blink && 'tab-icon-blink')}
+                  />
+                )}
                 {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
                 {tab.kind === 'browser' && <Globe size={12} className="shrink-0" />}
                 {tab.kind === 'connecting' &&
