@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next'
 import type { AppSettings } from '@shared/types/settings'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Checkbox } from './ui/input'
+import { FontFamilySelect } from './FontFamilySelect'
+import { InfoTip } from './InfoTip'
 
 export function SettingsDialog({
   open,
@@ -65,6 +67,20 @@ export function SettingsDialog({
             />
             <span className="ml-2 text-xs text-muted-foreground">{settings.editorFontSize}px</span>
           </Field>
+          <Field label={t('settings.editorFontFamily')} hint={t('settings.editorFontFamilyHint')}>
+            <FontFamilySelect
+              kind="editor"
+              value={settings.editorFontFamily}
+              onChange={(editorFontFamily) => onUpdate({ editorFontFamily })}
+            />
+          </Field>
+          <Field label={t('settings.previewFontFamily')} hint={t('settings.previewFontFamilyHint')}>
+            <FontFamilySelect
+              kind="preview"
+              value={settings.previewFontFamily}
+              onChange={(previewFontFamily) => onUpdate({ previewFontFamily })}
+            />
+          </Field>
           <Field label={t('settings.sendKey')}>
             <select
               className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
@@ -100,10 +116,21 @@ export function SettingsDialog({
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
+function Field({
+  label,
+  hint,
+  children
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}): React.JSX.Element {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-1 text-muted-foreground">
+        {label}
+        {hint && <InfoTip text={hint} />}
+      </span>
       {children}
     </label>
   )

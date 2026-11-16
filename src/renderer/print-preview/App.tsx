@@ -114,7 +114,7 @@ export function App(): React.JSX.Element {
           )}
           {content.kind === 'text' && (
             <RenderTrackerContext.Provider value={tracker}>
-              <Markdown key={loadCount} text={content.text} className="text-[10.5pt]" forPrint allowDetails />
+              <Markdown key={loadCount} text={content.text} className="preview-font text-[10.5pt]" forPrint allowDetails />
             </RenderTrackerContext.Provider>
           )}
         </div>

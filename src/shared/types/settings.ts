@@ -7,6 +7,13 @@ export interface AppSettings {
   /** ファイルのビューア・Markdown エディタ（ソース/プレビュー）・差分表示の文字サイズ（px）。 */
   editorFontSize: number
   /**
+   * エディタ側（CodeMirror・「表示」・ビューア・CSV の表・差分表示）の書体。等幅のフォント名だけ。
+   * `null` は既定の書体。
+   */
+  editorFontFamily: string | null
+  /** Markdown のプレビューと印刷用表示の書体（コードブロックも含む）。`null` は既定の書体。 */
+  previewFontFamily: string | null
+  /**
    * プロンプト入力欄の送信キー。`enter`: Enter で送信・Shift+Enter で改行（既定）。
    * `modEnter`: Cmd/Ctrl+Enter で送信・Enter で改行。対象はプロンプトだけ。
    */

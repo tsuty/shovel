@@ -303,7 +303,20 @@
     "sendKeyModEnter": "{{mod}}+Enter to send (Enter for newline)",
     "diffLayout": "Diff view",
     "diffLayoutSplit": "Side by side",
-    "diffLayoutUnified": "Unified"
+    "diffLayoutUnified": "Unified",
+    "editorFontFamily": "Editor font (monospace)",
+    "editorFontFamilyHint": "Used when editing and viewing files, in CSV tables, and in diffs.",
+    "previewFontFamily": "Preview font",
+    "previewFontFamilyHint": "Used in Markdown previews and the print view (code blocks included).",
+    "fontDefault": "Default",
+    "fontLoading": "Loading fonts…",
+    "fontMissing": "{{name}} (not found)",
+    "fontPresetOnly": "Couldn't list installed fonts, so only common fonts are shown.",
+    "fontGroupCjkAligned": "CJK aligned (full-width = exactly 2 half-width)",
+    "fontGroupMonospace": "Other monospace",
+    "fontNotCjkAligned": "With this font, CJK characters aren't exactly twice as wide as Latin ones, so columns won't line up.",
+    "fontSampleEditor": "0O 1lI {}[] ABC abc あいう 漢字",
+    "fontSamplePreview": "The quick brown fox あいうえお 漢字 0123"
   },
   "history": {
     "title": "History",

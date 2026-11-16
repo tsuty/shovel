@@ -430,7 +430,7 @@ export function CsvTable({ data, wrap }: { data: CsvTableData; wrap: boolean }):
       <div
         ref={scrollRef}
         tabIndex={0}
-        className="h-full select-none overflow-auto text-editor outline-none [container-type:size]"
+        className="editor-font-table h-full select-none overflow-auto text-editor outline-none [container-type:size]"
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onContextMenu={handleContextMenu}

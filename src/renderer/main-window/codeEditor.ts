@@ -6,7 +6,8 @@ import {
   highlightTrailingWhitespace,
   keymap,
   lineNumbers,
-  rectangularSelection
+  rectangularSelection,
+  ViewPlugin
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { foldKeymap } from '@codemirror/language'
@@ -14,6 +15,7 @@ import { search, searchKeymap } from '@codemirror/search'
 import type { EditorLanguage } from '@shared/fileKinds'
 import { codeFolding } from './codeFolding'
 import { shikiHighlight } from './shikiHighlight'
+import { FONT_SETTINGS_APPLIED_EVENT } from '../shared/useSettings'
 
 /** 外部変更の読み直しなど、利用者の編集ではない書き換えに付ける印（自動保存を走らせない）。 */
 const externalEdit = Annotation.define<boolean>()
@@ -90,6 +92,20 @@ const theme = EditorView.theme({
   '.cm-panel.cm-search [name=close]': { color: 'hsl(var(--muted-foreground))', cursor: 'pointer' }
 })
 
+/**
+ * 設定で書体・文字サイズが変わったら、行の高さと文字幅を測り直す。CodeMirror がフォントの読み込み後に
+ * 行うのと同じ測り直しを、内部の `viewState.mustMeasureContent` を立てて行う（公開の API が無いため）。
+ */
+const remeasureOnFontSettings = ViewPlugin.define((view) => {
+  const onApplied = (): void => {
+    const viewState = (view as unknown as { viewState?: { mustMeasureContent?: unknown } }).viewState
+    if (viewState) viewState.mustMeasureContent = 'refresh'
+    view.requestMeasure()
+  }
+  window.addEventListener(FONT_SETTINGS_APPLIED_EVENT, onApplied)
+  return { destroy: () => window.removeEventListener(FONT_SETTINGS_APPLIED_EVENT, onApplied) }
+})
+
 export interface CodeEditorOptions {
   parent: HTMLElement
   doc: string
@@ -141,6 +157,7 @@ export function createCodeEditor(options: CodeEditorOptions): CodeEditor {
         readOnlyCompartment.of(EditorState.readOnly.of(options.readOnly)),
         phrasesCompartment.of(EditorState.phrases.of(options.phrases)),
         theme,
+        remeasureOnFontSettings,
         EditorView.updateListener.of((update) => {
           if (!update.docChanged) return
           if (update.transactions.every((tr) => tr.annotation(externalEdit))) return

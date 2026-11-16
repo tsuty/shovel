@@ -301,7 +301,20 @@
     "sendKeyModEnter": "{{mod}}+Enter で送信（Enter で改行）",
     "diffLayout": "差分の表示",
     "diffLayoutSplit": "左右に並べる（Side by Side）",
-    "diffLayoutUnified": "1列（Unified）"
+    "diffLayoutUnified": "1列（Unified）",
+    "editorFontFamily": "エディタの書体（等幅）",
+    "editorFontFamilyHint": "ファイルの編集・表示、CSV の表、差分の表示に使います。",
+    "previewFontFamily": "プレビューの書体",
+    "previewFontFamilyHint": "Markdown のプレビューと印刷用表示に使います（コードブロックも含む）。",
+    "fontDefault": "既定",
+    "fontLoading": "フォントを読み込んでいます…",
+    "fontMissing": "{{name}}（見つかりません）",
+    "fontPresetOnly": "インストール済みのフォントの一覧を取得できなかったため、主なフォントだけを表示しています。",
+    "fontGroupCjkAligned": "和文も等幅（全角が半角のちょうど2倍）",
+    "fontGroupMonospace": "その他の等幅",
+    "fontNotCjkAligned": "このフォントでは和文が英字のちょうど2倍幅にならず、桁が揃いません。",
+    "fontSampleEditor": "0O 1lI {}[] ABC abc あいう 漢字",
+    "fontSamplePreview": "The quick brown fox あいうえお 漢字 0123"
   },
   "history": {
     "title": "履歴",

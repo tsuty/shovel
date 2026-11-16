@@ -146,7 +146,7 @@ V-2 / V-3 / V-10 / V-11 の検証を待って埋める（[open-issues.md](./open
 | 保存するもの | 保存先 |
 | :--- | :--- |
 | プロジェクト一覧（`Project[]`） | `electron-store`（JSON） |
-| 設定（自動添付、フォントサイズ、言語 …） | `electron-store` |
+| 設定（自動添付、フォントサイズ・書体、言語 …） | `electron-store` |
 | ウィンドウ状態、サイドバー幅 | `electron-store` |
 | 開いていたタブ（プロジェクト単位・表示順。decisions.md G-1-17） | `electron-store`（`openTabs`） |
 | ブラウザのブックマーク（プロジェクト単位。decisions.md G-1-20） | `electron-store`（`bookmarks`） |

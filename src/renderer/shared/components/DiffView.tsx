@@ -63,7 +63,7 @@ export function DiffView({
   if (layout === 'split') return <SplitDiffView rows={rows} className={className} />
 
   return (
-    <div className={cn('overflow-auto font-mono text-editor-sm', className)}>
+    <div className={cn('editor-font overflow-auto text-editor-sm', className)}>
       <div className="min-w-max">
         {rows.map((row, index) => (
           <div key={index} className={cn('flex', ROW_CLASS[row.kind])}>
@@ -89,7 +89,7 @@ export function DiffView({
 function SplitDiffView({ rows, className }: { rows: DiffRow[]; className?: string }): React.JSX.Element {
   const splitRows = useMemo(() => toSplitRows(rows), [rows])
   return (
-    <div className={cn('overflow-y-auto font-mono text-editor-sm', className)}>
+    <div className={cn('editor-font overflow-y-auto text-editor-sm', className)}>
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
         {splitRows.map((splitRow, index) =>
           splitRow.kind === 'gap' ? (

@@ -34,6 +34,8 @@ const defaults: StoreSchema = {
     autoAttachActiveFile: false,
     transcriptFontSize: 14,
     editorFontSize: 14,
+    editorFontFamily: null,
+    previewFontFamily: null,
     sendKey: 'enter',
     diffLayout: 'split'
   },

@@ -83,6 +83,7 @@ import { listBookmarks, saveBookmarks } from '../domain/bookmarkService'
 import { openExternalIfSafe } from '../windows/createSecureWindow'
 import { setChatTargets } from '../windows/browserGuest'
 import { isWebUrl } from '@shared/browserUrl'
+import { sanitizeFontFamily } from '@shared/fontFamily'
 import type { Bookmark } from '@shared/types/browser'
 import { getAcpUpdateOffer, resolveAcpUpdate, rollbackAcpVersion } from '../domain/acpVersionService'
 
@@ -90,6 +91,8 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AppOpenProjectManager, () => openProjectManagerWindow())
   ipcMain.handle(IpcChannel.SettingsGet, () => settingsStore.get())
   ipcMain.handle(IpcChannel.SettingsUpdate, (_event, patch: Partial<AppSettings>) => {
+    if ('editorFontFamily' in patch) patch = { ...patch, editorFontFamily: sanitizeFontFamily(patch.editorFontFamily) }
+    if ('previewFontFamily' in patch) patch = { ...patch, previewFontFamily: sanitizeFontFamily(patch.previewFontFamily) }
     const next = settingsStore.set(patch)
     if ('locale' in patch) installAppMenu()
     for (const win of BrowserWindow.getAllWindows()) {

@@ -698,7 +698,7 @@ export function TextFileEditor({
           <div
             ref={editorHostRef}
             className={cn(
-              'h-full min-w-0 overflow-hidden border-r border-border font-mono text-editor',
+              'editor-font h-full min-w-0 overflow-hidden border-r border-border text-editor',
               mode === 'split' ? 'shrink-0' : 'flex-1',
               !showSource && 'hidden'
             )}
@@ -721,7 +721,7 @@ export function TextFileEditor({
               )}
             >
               {language === 'markdown' ? (
-                <Markdown text={text} className="text-editor" allowDetails headingLines />
+                <Markdown text={text} className="preview-font text-editor" allowDetails headingLines />
               ) : language === 'mermaid' ? (
                 <MermaidViewer code={renderedSource} className="flex-1" />
               ) : language === 'html' ? (

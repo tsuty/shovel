@@ -146,8 +146,11 @@ block, and restored as chips from `session/load` replay, where claude-agent-acp 
 as `[@name](file://…)` mentions; optional auto-attach-last-opened-file setting), resizable + persisted-width
 sidebar panels, and a settings dialog (changes broadcast to every open window) for language/theme/transcript
 font size (drives `text-transcript*` sizes in the transcript and history views)/file-view font
-size (`editorFontSize` → `text-editor*`: viewer, Markdown editor source+preview, diff view; no
-font-family setting, decisions.md G-1-13)/send key (Enter vs Cmd/Ctrl+Enter,
+size (`editorFontSize` → `text-editor*`: viewer, Markdown editor source+preview, diff view)/editor and
+preview font families (`editorFontFamily` — monospace only, grouped into "CJK = exactly 2× Latin" first vs. other monospace, CodeMirror/表示/viewer/CSV table/diff — and
+`previewFontFamily` — Markdown preview incl. code blocks + print view; select-only, no free input, listed via
+`queryLocalFonts()` with an installed-presets fallback in `localFonts.ts`; CSS prepends the chosen font to the
+default stack via `.editor-font`/`.editor-font-table`/`.preview-font`, decisions.md G-1-13 改訂 2026-11-16)/send key (Enter vs Cmd/Ctrl+Enter,
 prompt input only)/default diff layout (side-by-side vs unified, `diffLayout`)), and a Markdown/HTML "印刷用表示" (print view — for HTML it just shows the sandboxed preview, and "印刷…" prints the page alone from a hidden JavaScript-disabled window on an in-memory `shovel-html-print` session served via `shovel-print://` with a no-network CSP, `src/main/windows/htmlPrint.ts`; for Markdown: a separate
 `print-preview.html` window per file that embeds ```` ```mermaid ```` as diagrams — the one exception to "Mermaid code blocks
 only render in the popup" — always light theme, print button disabled until every diagram/highlight has rendered
