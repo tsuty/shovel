@@ -864,6 +864,7 @@ export function App(): React.JSX.Element {
         status={project?.status ?? null}
         currentProjectId={projectId}
         recentProjects={allProjects}
+        showPlanUsage={settings?.showPlanUsage ?? false}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenDetails={() => setDetailsOpen(true)}
       />

@@ -13,15 +13,29 @@ function toFriendlyError(err: NodeJS.ErrnoException): Error {
 
 const SBX_BIN = 'sbx'
 
-function run(args: string[], opts: { input?: string; cwd?: string } = {}): Promise<SbxExecResult> {
+interface RunOptions {
+  input?: string
+  cwd?: string
+  /** これを過ぎたら子プロセスを kill する（ms）。kill した場合 `code` は null。 */
+  timeoutMs?: number
+}
+
+function run(args: string[], opts: RunOptions = {}): Promise<SbxExecResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(SBX_BIN, args, { shell: false, cwd: opts.cwd })
     let stdout = ''
     let stderr = ''
+    const timer = opts.timeoutMs === undefined ? undefined : setTimeout(() => child.kill(), opts.timeoutMs)
     child.stdout.on('data', (d: Buffer) => (stdout += d.toString('utf8')))
     child.stderr.on('data', (d: Buffer) => (stderr += d.toString('utf8')))
-    child.on('error', (err) => reject(toFriendlyError(err)))
-    child.on('close', (code) => resolve({ code, stdout, stderr }))
+    child.on('error', (err) => {
+      clearTimeout(timer)
+      reject(toFriendlyError(err))
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      resolve({ code, stdout, stderr })
+    })
     if (opts.input !== undefined) {
       child.stdin.end(opts.input)
     }
@@ -124,12 +138,12 @@ export async function sbxStop(sandboxName: string): Promise<void> {
 export async function sbxExecCapture(
   sandboxName: string,
   command: string[],
-  opts: { cwd?: string } = {}
+  opts: { cwd?: string; timeoutMs?: number } = {}
 ): Promise<SbxExecResult> {
   const args = ['exec']
   if (opts.cwd) args.push('-w', opts.cwd)
   args.push(sandboxName, ...command)
-  return run(args)
+  return run(args, { timeoutMs: opts.timeoutMs })
 }
 
 /** 生存確認。終了コードのみで判定する。 */

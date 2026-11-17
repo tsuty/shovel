@@ -2,6 +2,7 @@ import { ChevronDown, FolderPlus, Info, LayoutGrid, Settings } from 'lucide-reac
 import { useTranslation } from 'react-i18next'
 import type { ProjectWithStatus, SandboxStatus } from '@shared/types/project'
 import { AppLogo } from '../../shared/components/AppLogo'
+import { PlanUsageIndicator } from './PlanUsageIndicator'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,7 @@ export function Header({
   status,
   currentProjectId,
   recentProjects,
+  showPlanUsage,
   onOpenSettings,
   onOpenDetails
 }: {
@@ -34,6 +36,7 @@ export function Header({
   status: SandboxStatus | null
   currentProjectId: string | null
   recentProjects: ProjectWithStatus[]
+  showPlanUsage: boolean
   onOpenSettings: () => void
   onOpenDetails: () => void
 }): React.JSX.Element {
@@ -86,6 +89,7 @@ export function Header({
         </DropdownMenu>
       </div>
       <div className="flex items-center gap-3">
+        {showPlanUsage && <PlanUsageIndicator />}
         {status && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className={`h-2 w-2 rounded-full ${STATUS_DOT_CLASSES[status]}`} />

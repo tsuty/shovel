@@ -27,6 +27,7 @@ import {
 } from '../domain/projectService'
 import { openSandboxTerminal, openSbxLoginTerminal } from '../domain/terminal'
 import { allowNetworkHost, getNetworkBlocks, setNetworkHostIgnored } from '../domain/networkPolicyService'
+import { applyPlanUsageSetting, getPlanUsageState, refreshPlanUsage } from '../domain/planUsageService'
 import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authService'
 import { openProjectWindow, refreshProjectWindowTitle } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
@@ -95,11 +96,14 @@ export function registerIpc(): void {
     if ('previewFontFamily' in patch) patch = { ...patch, previewFontFamily: sanitizeFontFamily(patch.previewFontFamily) }
     const next = settingsStore.set(patch)
     if ('locale' in patch) installAppMenu()
+    if ('showPlanUsage' in patch) applyPlanUsageSetting()
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.webContents.isDestroyed()) win.webContents.send(IpcChannel.SettingsChanged, next)
     }
     return next
   })
+  ipcMain.handle(IpcChannel.PlanUsageGet, () => getPlanUsageState())
+  ipcMain.handle(IpcChannel.PlanUsageRefresh, () => refreshPlanUsage({ force: true }))
   ipcMain.handle(IpcChannel.SidebarGetWidths, () => sidebarStore.getWidths())
   ipcMain.handle(IpcChannel.SidebarSetWidth, (_event, panel: string, width: number) =>
     sidebarStore.setWidth(panel, width)

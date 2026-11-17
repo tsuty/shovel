@@ -8,6 +8,7 @@ import { openProjectManagerWindow } from './windows/projectManagerWindow'
 import { installRendererProtocol, registerRendererScheme } from './windows/rendererProtocol'
 import { anyProjectWindowOpen, getProjectManagerWindow, markQuitting } from './windows/registry'
 import { installBrowserGuestPolicy } from './windows/browserGuest'
+import { applyPlanUsageSetting, notePlanUsageActivity } from './domain/planUsageService'
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -40,6 +41,8 @@ if (!gotLock) {
     ])
     registerIpc()
     installAppMenu()
+    applyPlanUsageSetting()
+    app.on('browser-window-focus', notePlanUsageActivity)
     startupDone = true
     openProjectManagerWindow()
   }).catch((err: unknown) => console.error('[startup] failed', err))

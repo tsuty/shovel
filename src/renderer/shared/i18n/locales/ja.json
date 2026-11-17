@@ -314,7 +314,9 @@
     "fontGroupMonospace": "その他の等幅",
     "fontNotCjkAligned": "このフォントでは和文が英字のちょうど2倍幅にならず、桁が揃いません。",
     "fontSampleEditor": "0O 1lI {}[] ABC abc あいう 漢字",
-    "fontSamplePreview": "The quick brown fox あいうえお 漢字 0123"
+    "fontSamplePreview": "The quick brown fox あいうえお 漢字 0123",
+    "showPlanUsage": "プランの使用率を表示する",
+    "showPlanUsageHint": "Claude のサブスクリプション（Pro / Max / Team など）を使っている場合に、画面右上にセッションと週の使用率を表示します。実行中のサンドボックスの中で /usage を実行して取得します。API キーで使っている場合は表示できません。"
   },
   "history": {
     "title": "履歴",
@@ -526,5 +528,20 @@
     "print": "印刷…",
     "htmlNote": "画面での表示です。印刷の仕上がりは印刷ダイアログで確認できます。",
     "unreadable": "このファイルは表示できません。"
+  },
+  "planUsage": {
+    "title": "プラン使用率",
+    "session": "セッション",
+    "weekAllModels": "週（全モデル）",
+    "weekModel": "週（{{model}}）",
+    "resets": "リセット {{at}}",
+    "fetchedAt": "{{at}} に更新",
+    "refresh": "更新",
+    "notYet": "まだ取得していません。",
+    "error": {
+      "noRunningSandbox": "実行中のサンドボックスが無いため取得できません。",
+      "unreadable": "使用率を読み取れませんでした（API キーでの利用などでは表示できません）。",
+      "failed": "使用率を取得できませんでした。"
+    }
   }
 }

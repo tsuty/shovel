@@ -20,6 +20,7 @@ import {
 } from '../persistence/snapshot'
 import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
 import { runConnectPreflight } from './connectPreflight'
+import { notePlanUsageActivity } from './planUsageService'
 
 /**
  * 1タブ = 1 ACP セッションのランタイム状態をプロジェクト横断で保持し、
@@ -271,7 +272,11 @@ function notifyHistoryChanged(webContents: WebContents, projectId: string): void
 }
 
 export async function promptSession(sessionId: string, text: string, attachmentRelPaths?: string[]): Promise<void> {
-  await requireTab(sessionId).opened.prompt(text, attachmentRelPaths)
+  try {
+    await requireTab(sessionId).opened.prompt(text, attachmentRelPaths)
+  } finally {
+    notePlanUsageActivity()
+  }
 }
 
 export async function cancelSession(sessionId: string): Promise<void> {

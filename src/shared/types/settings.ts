@@ -23,6 +23,8 @@ export interface AppSettings {
    * Diff ビュー内のトグルでは、そのとき開いている間だけ切り替わる。
    */
   diffLayout: DiffLayout
+  /** Header にプランの使用率（Claude のサブスクリプション）を表示するか。 */
+  showPlanUsage: boolean
 }
 
 export type DiffLayout = 'split' | 'unified'

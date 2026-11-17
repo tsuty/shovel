@@ -54,6 +54,7 @@ type AgentEntry = {
   acpPackage: string   // npx -y <package>     → "@agentclientprotocol/claude-agent-acp"
   auth:       AuthMethod
   status:     "verified" | "experimental"
+  planUsage?: { command: string[] }  // プランの使用率を出力するコマンド（decisions.md G-1-21）。無ければ表示しない
 }
 
 type AuthMethod =

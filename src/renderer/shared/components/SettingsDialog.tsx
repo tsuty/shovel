@@ -110,6 +110,14 @@ export function SettingsDialog({
             />
             {t('settings.autoAttachActiveFile')}
           </label>
+          <label className="flex items-center gap-2">
+            <Checkbox
+              checked={settings.showPlanUsage}
+              onChange={(e) => onUpdate({ showPlanUsage: e.target.checked })}
+            />
+            {t('settings.showPlanUsage')}
+            <InfoTip text={t('settings.showPlanUsageHint')} />
+          </label>
         </div>
       </DialogContent>
     </Dialog>

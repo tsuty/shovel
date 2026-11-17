@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IpcChannel, type ProjectProgress, type RendererApi, type SessionEnvelope, type SessionOpenProgress } from '@shared/ipc'
 import type { CommandExit, CommandOutputChunk, CommandTtyOutput } from '@shared/types/command'
 import type { AppSettings } from '@shared/types/settings'
+import type { PlanUsageState } from '@shared/planUsage'
 import type { DraftInsertion } from '@shared/chatDraft'
 
 /** `contextBridge` で型付き API を renderer に公開する。 */
@@ -17,6 +18,15 @@ const api: RendererApi = {
       const listener = (_event: unknown, settings: AppSettings): void => cb(settings)
       ipcRenderer.on(IpcChannel.SettingsChanged, listener)
       return () => ipcRenderer.removeListener(IpcChannel.SettingsChanged, listener)
+    }
+  },
+  planUsage: {
+    get: () => ipcRenderer.invoke(IpcChannel.PlanUsageGet),
+    refresh: () => ipcRenderer.invoke(IpcChannel.PlanUsageRefresh),
+    onChanged: (cb) => {
+      const listener = (_event: unknown, state: PlanUsageState): void => cb(state)
+      ipcRenderer.on(IpcChannel.PlanUsageChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.PlanUsageChanged, listener)
     }
   },
   sidebar: {

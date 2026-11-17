@@ -85,4 +85,9 @@ export interface AgentEntry {
     /** API キーを `sbx secret set <service>` の stdin へ渡す代替経路。 */
     secretService: string
   }
+  /** プランの使用率の取得。無ければ使用率を表示しない。 */
+  planUsage?: {
+    /** サンドボックス内で実行し、`/usage` の出力を返すコマンド。 */
+    command: string[]
+  }
 }

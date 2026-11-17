@@ -13,6 +13,9 @@ export const AGENT_TABLE: readonly AgentEntry[] = [
       loggedInPath: 'loggedIn',
       loginCommand: ['claude', 'auth', 'login'],
       secretService: 'anthropic'
+    },
+    planUsage: {
+      command: ['claude', '-p', '/usage', '--no-session-persistence']
     }
   }
 ] as const

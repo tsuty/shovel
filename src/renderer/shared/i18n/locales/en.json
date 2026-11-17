@@ -316,7 +316,9 @@
     "fontGroupMonospace": "Other monospace",
     "fontNotCjkAligned": "With this font, CJK characters aren't exactly twice as wide as Latin ones, so columns won't line up.",
     "fontSampleEditor": "0O 1lI {}[] ABC abc あいう 漢字",
-    "fontSamplePreview": "The quick brown fox あいうえお 漢字 0123"
+    "fontSamplePreview": "The quick brown fox あいうえお 漢字 0123",
+    "showPlanUsage": "Show plan usage",
+    "showPlanUsageHint": "If you use a Claude subscription (Pro / Max / Team, etc.), shows session and weekly usage at the top right. It runs /usage inside a running sandbox. Not available when using an API key."
   },
   "history": {
     "title": "History",
@@ -529,5 +531,20 @@
     "print": "Print…",
     "htmlNote": "This is the on-screen view. Check the printed result in the print dialog.",
     "unreadable": "This file cannot be displayed."
+  },
+  "planUsage": {
+    "title": "Plan usage",
+    "session": "Session",
+    "weekAllModels": "Week (all models)",
+    "weekModel": "Week ({{model}})",
+    "resets": "Resets {{at}}",
+    "fetchedAt": "Updated {{at}}",
+    "refresh": "Refresh",
+    "notYet": "Not fetched yet.",
+    "error": {
+      "noRunningSandbox": "No running sandbox to check usage with.",
+      "unreadable": "Couldn't read the usage (not available when using an API key).",
+      "failed": "Couldn't get the usage."
+    }
   }
 }

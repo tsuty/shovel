@@ -35,6 +35,7 @@
 | **V-25** | CodeMirror 6 のエディタ（decisions.md N-3-1「改訂（2026-10-17）」）で、日本語 IME の変換中の入力・確定・取り消しが崩れないか（macOS / Windows の実機。変換中の Enter・Tab・Cmd/Ctrl+F、自動保存や外部変更の読み直しと変換中が重なったとき、選択とカーソルを CodeMirror が描く `drawSelection` との組み合わせ）。開発用サンドボックス（Xvfb）では IME を確かめられない | CodeMirror に回避の設定が要るか。変換中は自動保存・読み直しを遅らせる必要があるか |
 | ~~**V-26**~~ | ~~Docker に未サインインのとき `sbx exec <name> echo` が非0で終わるか~~ | ✅ **解決（2026-10-29）。終わらない。** `sbx logout` 後に `sbx exec <name> echo` を実行すると、ブラウザで Docker のログイン URL が開き、コールバックを待ったまま止まる（標準出力をパイプにしても同じ。Ctrl+C で 130）。一方 `sbx ls --json` は待たずに `error: not signed in to Docker` / `try: sbx login` を出して終了コード 1 で終わる。`sbx diagnose --json` は 0.18 秒程度（未サインイン時）。`sbx exec --help` / `sbx --help` にログインを促さないためのフラグは無い。→ 接続前の確認の先頭に `sbx ls --json` を置き、`sbx exec` は Docker にサインイン済みと分かってから実行する（flows.md §3「接続できないと分かったとき」）。サンドボックスが見当たらない・ワークスペースが無いときの `sbx exec` の失敗の仕方は、`sbx ls` で先に止めるので確かめていない |
 | **V-27** | claude-agent-acp が `session/prompt` に応答した後も、待っていたバックグラウンドタスクの完了を受けて返信やツールコールを流してくるか。来るなら、そのとき `messageId` を送ってくるか | `messageId` が無いと、ほかのエントリを挟まずに続く返信は1つのブロックにまとまる（decisions.md A-1h）。それで困る場面があるか |
+| **V-28** | プランの使用率（decisions.md G-1-21）の取得: `claude -p /usage` そのものが使用量を消費するか、実行にかかる時間（node の起動を含む）、Max プランと API キー利用時の出力、動作中の ACP セッションと同時に実行して問題が無いか。開発用サンドボックスには `sbx` が無く、偽の `sbx` で表示を確かめただけ | 時間切れ（60 秒）や更新の間隔を変える必要があるか。API キー利用時に「読み取れなかった」以外の表示が要るか |
 
 ---
 

@@ -18,6 +18,7 @@ import type {
 import type { FileReadResult, FileSearchResults, FsEntry, WriteTextResult } from './types/filer'
 import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput } from './types/command'
 import type { AppSettings } from './types/settings'
+import type { PlanUsageState } from './planUsage'
 import type { SbxLsEntry } from './types/sbx'
 import type { NetworkBlocks } from './types/network'
 import type { NewFileKind } from './fileKinds'
@@ -48,6 +49,9 @@ export const IpcChannel = {
   SettingsGet: 'settings:get',
   SettingsUpdate: 'settings:update',
   SettingsChanged: 'settings:changed',
+  PlanUsageGet: 'planUsage:get',
+  PlanUsageRefresh: 'planUsage:refresh',
+  PlanUsageChanged: 'planUsage:changed',
   SidebarGetWidths: 'sidebar:getWidths',
   SidebarSetWidth: 'sidebar:setWidth',
   TabsRestore: 'tabs:restore',
@@ -218,6 +222,13 @@ export interface RendererApi {
     update(patch: Partial<AppSettings>): Promise<AppSettings>
     /** 変更は開いている全ウィンドウに反映する。 */
     onChanged(cb: (settings: AppSettings) => void): () => void
+  }
+  planUsage: {
+    get(): Promise<PlanUsageState>
+    /** 前回の取得からの経過時間に関わらず取り直す。 */
+    refresh(): Promise<void>
+    /** 状態の変化は開いている全ウィンドウに届く。 */
+    onChanged(cb: (state: PlanUsageState) => void): () => void
   }
   sidebar: {
     /** パネル id(tabs/filer) ごとの幅(px)。 */

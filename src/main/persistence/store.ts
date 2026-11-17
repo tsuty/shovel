@@ -37,7 +37,8 @@ const defaults: StoreSchema = {
     editorFontFamily: null,
     previewFontFamily: null,
     sendKey: 'enter',
-    diffLayout: 'split'
+    diffLayout: 'split',
+    showPlanUsage: false
   },
   sessionTitleOverrides: {},
   commandHistory: {},
