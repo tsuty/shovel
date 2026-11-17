@@ -151,8 +151,8 @@ importers:
         specifier: 11.0.0
         version: 11.0.0(supports-color@7.2.0)
       rollup-plugin-license:
-        specifier: 3.7.1
-        version: 3.7.1(picomatch@4.0.7)(rollup@4.67.4)
+        specifier: 3.7.2
+        version: 3.7.2(picomatch@4.0.7)(rollup@4.67.4)
       shiki:
         specifier: 4.6.0
         version: 4.6.0
@@ -3513,8 +3513,8 @@ packages:
   robust-predicates@3.0.3:
     resolution: {integrity: sha512-NS3levdsRIUOmiJ8FZWCP7LG3QpJyrs/TE0Zpf1yvZu8cAJJ6QMW92H1c7kWpdIHo8RvmLxN/o2JXTKHp74lUA==}
 
-  rollup-plugin-license@3.7.1:
-    resolution: {integrity: sha512-FcGXUbAmPvRSLxjVdjp/r/MUtKBlttVQd+ApUyvKfREnsoAfAZA6Ic2fE1Tz4RL0f9XqEQU9UIRNUMdtQtliDw==}
+  rollup-plugin-license@3.7.2:
+    resolution: {integrity: sha512-xsEifZTR9xIFzgXqhNEoWmdM8mwLyEynXr50krGTCv/OhBAXS8+YFDWpD7pdT3Q1DZdt9T9yu7sACEfYiRdq8A==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       rollup: ^1.0.0 || ^2.0.0 || ^3.0.0 || ^4.0.0
@@ -5515,8 +5515,8 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ajv-formats@3.0.1(ajv@8.20.0):
-    optionalDependencies:
+  ajv-formats@3.0.1:
+    dependencies:
       ajv: 8.20.0
 
   ajv@6.15.0:
@@ -5792,7 +5792,7 @@ snapshots:
   conf@15.1.0:
     dependencies:
       ajv: 8.20.0
-      ajv-formats: 3.0.1(ajv@8.20.0)
+      ajv-formats: 3.0.1
       atomically: 2.1.1
       debounce-fn: 6.0.0
       dot-prop: 10.2.0
@@ -7692,7 +7692,7 @@ snapshots:
 
   robust-predicates@3.0.3: {}
 
-  rollup-plugin-license@3.7.1(picomatch@4.0.7)(rollup@4.67.4):
+  rollup-plugin-license@3.7.2(picomatch@4.0.7)(rollup@4.67.4):
     dependencies:
       commenting: 1.1.0
       fdir: 6.5.0(picomatch@4.0.7)
