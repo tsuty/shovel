@@ -144,9 +144,10 @@ sbx diagnose
   pnpm dist        # electron-builder でインストーラを生成（証明書は未設定。decisions.md F-3）
   ```
 
-  **CI**: `main` へ push すると、`.github/workflows/ci.yml` が macOS / Windows / Linux の
-  各ランナーで typecheck・lint・test を実行する（パッケージは作らない）。パス区切りなど
-  OS 依存の失敗をリリース前に見つけるため。
+  **CI**: `main` への push と `main` 向けの PR（Dependabot の更新 PR など）で、
+  `.github/workflows/ci.yml` が macOS / Windows / Linux の各ランナーで typecheck・lint・test
+  を実行する（パッケージは作らない）。パス区切りなど OS 依存の失敗をリリース前に見つける
+  ため。
 
   **リリース**: `package.json` の `version` と同じ `v<version>` タグ（例: `v0.0.1`）を
   push すると、`.github/workflows/release.yml` が macOS / Windows / Linux の各ランナーで
@@ -186,6 +187,13 @@ sbx diagnose
   バンドルに含めたいもの（ESM 専用の `electron-store`）は `devDependencies` に置く
   （electron-vite は `dependencies` 以外をバンドルに含める）。これで `app.asar` は
   約 256 MB → 約 31 MB になった。
+
+  **依存のバージョン表記**: `package.json` の依存は `^` などの範囲指定を付けず、固定
+  バージョンで書く（`package.json` を見れば実際に入っているバージョンがわかるように
+  するため）。`pnpm-workspace.yaml` の `saveExact: true` により、`pnpm add` でも固定表記で
+  追加される。更新は Dependabot（`.github/dependabot.yml`）が週 1 回（金曜）PR を作る。
+  `versioning-strategy: increase` で `package.json` と `pnpm-lock.yaml` の両方が更新される。
+  一緒に上げるべきパッケージ群（`@codemirror/*`・React 系など）は 1 つの PR にまとめている。
 
   **サードパーティのライセンス表示**: `pnpm build` のたびに
   `out/THIRD_PARTY_NOTICES.txt` が生成される（`scripts/thirdPartyNotices.ts`。

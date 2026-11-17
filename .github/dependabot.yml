@@ -1,0 +1,50 @@
+# npm 依存（pnpm-lock.yaml）の更新 PR を週 1 回（金曜）作る。
+# package.json は固定バージョン表記なので、increase で package.json と lockfile の両方を更新させる。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: friday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    versioning-strategy: increase
+    open-pull-requests-limit: 10
+    # 一緒に上げるべきパッケージ群を 1 つの PR にまとめる。ここに無いもの（electron・
+    # @agentclientprotocol/sdk など）はパッケージごとに個別の PR になる
+    groups:
+      codemirror:
+        patterns:
+          - '@codemirror/*'
+      radix-ui:
+        patterns:
+          - '@radix-ui/*'
+      react:
+        patterns:
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+      tanstack:
+        patterns:
+          - '@tanstack/*'
+      xterm:
+        patterns:
+          - '@xterm/*'
+      tailwind:
+        patterns:
+          - tailwindcss
+          - '@tailwindcss/*'
+      eslint:
+        patterns:
+          - eslint
+          - '@eslint/*'
+          - eslint-plugin-*
+          - typescript-eslint
+      vite:
+        patterns:
+          - vite
+          - vitest
+          - '@vitejs/*'
+          - electron-vite

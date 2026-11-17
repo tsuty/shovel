@@ -1,9 +1,13 @@
-# main への push で macOS / Windows / Linux の各ランナーで typecheck・lint・test を実行する。
+# main への push と main 向けの PR（Dependabot の更新 PR など）で、macOS / Windows / Linux の
+# 各ランナーで typecheck・lint・test を実行する。
 # パッケージ作成はしない（タグ push 時の release.yml が担当）。
 name: CI
 
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
 
