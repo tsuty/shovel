@@ -8,6 +8,7 @@ import { openProjectManagerWindow } from './windows/projectManagerWindow'
 import { installRendererProtocol, registerRendererScheme } from './windows/rendererProtocol'
 import { anyProjectWindowOpen, getProjectManagerWindow, markQuitting } from './windows/registry'
 import { installBrowserGuestPolicy } from './windows/browserGuest'
+import { installAppHealthMonitor } from './windows/rendererRecovery'
 import { applyPlanUsageSetting, notePlanUsageActivity } from './domain/planUsageService'
 
 const gotLock = app.requestSingleInstanceLock()
@@ -31,6 +32,7 @@ if (!gotLock) {
     installContentSecurityPolicy()
     installRendererProtocol()
     installBrowserGuestPolicy()
+    installAppHealthMonitor()
     await Promise.all([
       // GUI から起動するとログインシェルの PATH が無く `sbx` が見つからないため、先に取り込む。
       applyLoginShellPath(),

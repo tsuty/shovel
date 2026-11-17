@@ -10,6 +10,7 @@ import {
   registerProjectWindow
 } from './registry'
 import { closeAllTabsForWindow } from '../domain/sessionManager'
+import { installRendererRecovery } from './rendererRecovery'
 import { projectsStore } from '../persistence/store'
 
 /** プロジェクトを新しいウィンドウで開く。すでに開いていれば、そのウィンドウを前面に出す。 */
@@ -34,6 +35,9 @@ export function openProjectWindow(projectId: string): void {
     // 最後のプロジェクトのウィンドウを閉じたら、入口のプロジェクトマネージャへ戻る。
     if (!isQuitting() && !anyProjectWindowOpen()) openProjectManagerWindow()
   })
+  // 再読み込み後のレンダラはそれまでのタブを知らないので、セッションを閉じて（記録は保存される）から読み直す。
+  // タブは保存済みの控えから開き直される。
+  installRendererRecovery(win, `project window ${projectId}`, () => closeAllTabsForWindow(webContents))
   // プロジェクトのウィンドウが表示されたら、プロジェクト一覧を閉じる。
   win.once('ready-to-show', closeProjectManager)
 

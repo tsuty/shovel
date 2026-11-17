@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs'
-import { mkdir, readdir, rename, stat } from 'node:fs/promises'
+import { appendFile, mkdir, readdir, rename, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { safeProjectSegment } from './persistence/snapshot'
 
@@ -47,6 +47,18 @@ export async function migrateFlatLogs(): Promise<void> {
       console.warn(`[log] could not migrate ${name}; leaving it in place`, err)
     }
   }
+}
+
+/**
+ * アプリ全体の出来事（レンダラのクラッシュ・応答なし、GPU プロセスの終了、スリープ復帰など）を
+ * `userData/logs/app.log` に `{ISO 時刻} {text}` で 1 行ずつ追記する。書けなくても無視する。
+ */
+export function logAppEvent(text: string): void {
+  console.warn(`[app] ${text}`)
+  const root = logsRootDir()
+  void mkdir(root, { recursive: true })
+    .then(() => appendFile(path.join(root, 'app.log'), `${new Date().toISOString()} ${text}\n`))
+    .catch(() => {})
 }
 
 const RING_BUFFER_LIMIT = 500
