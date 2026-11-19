@@ -9,6 +9,7 @@ import { cn } from '../../shared/lib/utils'
 import {
   ANNOTATION_COLORS,
   ANNOTATION_FONT_FAMILY,
+  DEFAULT_FONT_SIZE_INDEX,
   DEFAULT_MOSAIC_LEVEL,
   EMPTY_HISTORY,
   FONT_SIZES,
@@ -126,6 +127,7 @@ export function ImageAnnotator({
   const [tool, setTool] = useState<AnnotationTool>('rect')
   const [color, setColor] = useState<string>(ANNOTATION_COLORS[0])
   const [sizeIndex, setSizeIndex] = useState(1)
+  const [fontSizeIndex, setFontSizeIndex] = useState(DEFAULT_FONT_SIZE_INDEX)
   const [history, setHistory] = useState<AnnotationHistory>(EMPTY_HISTORY)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DragShape | null>(null)
@@ -193,11 +195,13 @@ export function ImageAnnotator({
 
   const unit = natural ? annotationUnit(natural.width, natural.height) : 1
   const strokeWidth = Math.round(STROKE_WIDTHS[sizeIndex]! * unit * 10) / 10
-  const fontSize = Math.round(FONT_SIZES[sizeIndex]! * unit)
+  const fontSize = Math.round(FONT_SIZES[fontSizeIndex]! * unit)
   const shapes = moving ?? history.present
   const selected = shapes.find((shape) => shape.id === selectedId) ?? null
   /** 太さのボタンをモザイクの細かさに使うか。 */
   const mosaicContext = tool === 'mosaic' || selected?.kind === 'mosaic'
+  /** 太さのボタンを文字の大きさに使うか（文字の道具か、文字を選んでいるか入力中のとき）。 */
+  const textContext = tool === 'text' || selected?.kind === 'text' || editing !== null
   /** 線の種類が効くか（矩形・楕円・矢印を描く道具か、それらを選んでいるとき）。 */
   const lineStyleContext =
     tool === 'rect' ||
@@ -287,13 +291,13 @@ export function ImageAnnotator({
       if ('color' in hit) setColor(hit.color)
       if (hit.kind === 'mosaic') setMosaicLevel(hit.level)
       if ('dash' in hit) setLineStyle(hit.dash)
-      const sizeIndexOfHit =
-        hit.kind === 'text'
-          ? FONT_SIZES.findIndex((size) => Math.round(size * unit) === hit.fontSize)
-          : 'width' in hit
-            ? STROKE_WIDTHS.findIndex((width) => Math.round(width * unit * 10) / 10 === hit.width)
-            : -1
-      if (sizeIndexOfHit !== -1) setSizeIndex(sizeIndexOfHit)
+      if (hit.kind === 'text') {
+        const fontSizeIndexOfHit = FONT_SIZES.findIndex((size) => Math.round(size * unit) === hit.fontSize)
+        if (fontSizeIndexOfHit !== -1) setFontSizeIndex(fontSizeIndexOfHit)
+      } else if ('width' in hit) {
+        const sizeIndexOfHit = STROKE_WIDTHS.findIndex((width) => Math.round(width * unit * 10) / 10 === hit.width)
+        if (sizeIndexOfHit !== -1) setSizeIndex(sizeIndexOfHit)
+      }
       moveRef.current = { id: hit.id, start: p, base: history.present }
       e.currentTarget.setPointerCapture(e.pointerId)
       return
@@ -398,12 +402,15 @@ export function ImageAnnotator({
 
   function changeSize(index: number): void {
     setSizeIndex(index)
-    const nextFont = Math.round(FONT_SIZES[index]! * unit)
     const nextStroke = Math.round(STROKE_WIDTHS[index]! * unit * 10) / 10
+    restyleSelected((shape) => ('width' in shape ? { ...shape, width: nextStroke } : shape))
+  }
+
+  function changeFontSize(index: number): void {
+    setFontSizeIndex(index)
+    const nextFont = Math.round(FONT_SIZES[index]! * unit)
     if (editing) setEditing({ ...editing, fontSize: nextFont })
-    restyleSelected((shape) =>
-      shape.kind === 'text' ? { ...shape, fontSize: nextFont } : 'width' in shape ? { ...shape, width: nextStroke } : shape
-    )
+    restyleSelected((shape) => (shape.kind === 'text' ? { ...shape, fontSize: nextFont } : shape))
   }
 
   function changeLineStyle(next: LineStyle): void {
@@ -586,16 +593,27 @@ export function ImageAnnotator({
                     <MosaicLevelIcon cells={MOSAIC_BLOCKS.length + 2 - index} />
                   </IconButton>
                 ))
-              : STROKE_WIDTHS.map((width, index) => (
-                  <IconButton
-                    key={width}
-                    title={t(`annotate.size.${index}`)}
-                    active={sizeIndex === index}
-                    onClick={() => changeSize(index)}
-                  >
-                    <span className="block w-3.5 rounded-full bg-current" style={{ height: width }} />
-                  </IconButton>
-                ))}
+              : textContext
+                ? FONT_SIZES.map((size, index) => (
+                    <IconButton
+                      key={size}
+                      title={t(`annotate.fontSize.${index}`)}
+                      active={fontSizeIndex === index}
+                      onClick={() => changeFontSize(index)}
+                    >
+                      <FontSizeIcon step={index} />
+                    </IconButton>
+                  ))
+                : STROKE_WIDTHS.map((width, index) => (
+                    <IconButton
+                      key={width}
+                      title={t(`annotate.size.${index}`)}
+                      active={sizeIndex === index}
+                      onClick={() => changeSize(index)}
+                    >
+                      <span className="block w-3.5 rounded-full bg-current" style={{ height: width }} />
+                    </IconButton>
+                  ))}
           </div>
           <Separator />
           <div className="flex items-center gap-0.5">
@@ -1059,6 +1077,15 @@ function LineStyleIcon({ style }: { style: LineStyle }): React.JSX.Element {
 }
 
 /** モザイクの細かさのボタンの絵。`cells` × `cells` の市松模様（多いほど細かい）。 */
+/** 文字の大きさのボタンの絵（`step` が大きいほど大きい「A」）。 */
+function FontSizeIcon({ step }: { step: number }): React.JSX.Element {
+  return (
+    <span className="block font-bold leading-none" style={{ fontSize: 9 + step * 2 }}>
+      A
+    </span>
+  )
+}
+
 function MosaicLevelIcon({ cells }: { cells: number }): React.JSX.Element {
   const size = 14 / cells
   return (

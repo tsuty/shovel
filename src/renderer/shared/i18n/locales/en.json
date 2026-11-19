@@ -214,9 +214,16 @@
       "ffffff": "White"
     },
     "size": {
-      "0": "Thin / small",
+      "0": "Thin",
       "1": "Medium",
-      "2": "Thick / large"
+      "2": "Thick"
+    },
+    "fontSize": {
+      "0": "Extra small text",
+      "1": "Small text",
+      "2": "Medium text",
+      "3": "Large text",
+      "4": "Extra large text"
     },
     "mosaicSize": {
       "0": "Fine",

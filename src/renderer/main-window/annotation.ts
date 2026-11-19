@@ -92,8 +92,11 @@ export const ANNOTATION_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#
 /** 線の太さの候補（細・中・太）。画像の大きさに応じて `annotationUnit` 倍する。 */
 export const STROKE_WIDTHS = [2, 4, 8] as const
 
-/** 文字の大きさの候補（小・中・大）。線の太さの候補と同じ位置のものを組にする。 */
-export const FONT_SIZES = [16, 24, 36] as const
+/** 文字の大きさの候補（小さいものから順に）。画像の大きさに応じて `annotationUnit` 倍する。 */
+export const FONT_SIZES = [12, 16, 24, 36, 48] as const
+
+/** 文字の大きさの既定（`FONT_SIZES` の位置）。 */
+export const DEFAULT_FONT_SIZE_INDEX = 2
 
 /** 文字の書体。画面（SVG）と保存（Canvas）で同じものを使う。 */
 export const ANNOTATION_FONT_FAMILY =
