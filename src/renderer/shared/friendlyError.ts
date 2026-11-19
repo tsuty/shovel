@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next'
 import { isSbxNotFoundMessage } from '@shared/sbxErrors'
 import { parseSandboxUnreachableMessage } from '@shared/sandboxUnreachable'
 import { parseAlreadyRegisteredMessage } from '@shared/projectErrors'
+import { parseNodeRuntimeMessage } from '@shared/nodeRuntime'
 
 /** `ipcRenderer.invoke` が main の例外に付ける前置き（`Error invoking remote method '<channel>': Error: `）。 */
 const IPC_ERROR_PREFIX = /^Error invoking remote method '[^']*': (?:\w*Error: )?/
@@ -15,6 +16,11 @@ export function friendlyErrorMessage(rawMessage: string, t: TFunction): string {
   if (unreachable) {
     const text = t(`errors.sandboxUnreachable.${unreachable.reason}`)
     return unreachable.detail ? `${text}\n\n${unreachable.detail}` : text
+  }
+  const nodeRuntime = parseNodeRuntimeMessage(rawMessage)
+  if (nodeRuntime) {
+    const text = t(`errors.nodeRuntime.${nodeRuntime.reason}`, { sandbox: nodeRuntime.sandboxName })
+    return nodeRuntime.detail ? `${text}\n\n${nodeRuntime.detail}` : text
   }
   return rawMessage.replace(IPC_ERROR_PREFIX, '')
 }

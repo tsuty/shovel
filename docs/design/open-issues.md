@@ -38,6 +38,7 @@
 | **V-28** | プランの使用率（decisions.md G-1-21）の取得: `claude -p /usage` そのものが使用量を消費するか、実行にかかる時間（node の起動を含む）、Max プランと API キー利用時の出力、動作中の ACP セッションと同時に実行して問題が無いか。開発用サンドボックスには `sbx` が無く、偽の `sbx` で表示を確かめただけ | 時間切れ（60 秒）や更新の間隔を変える必要があるか。API キー利用時に「読み取れなかった」以外の表示が要るか |
 | **V-29** | スリープ復帰後などにプロジェクトのウィンドウが真っ白のまま戻らない件（decisions.md F-1c）の原因。復旧処理は入れたが、何が起きていたか（レンダラの異常終了の `reason`、応答なし、GPU プロセスの終了）は実機で起きたときの `userData/logs/app.log` を見るまで分からない | `oom` なら renderer のメモリの使い方（トランスクリプト・開いているファイル）を、応答なしならスリープ明けに走る処理（ポーリング・計測）を調べる。GPU なら `invalidate` で足りるか |
 | **V-31** | claude-agent-acp が `sessionCapabilities.systemPrompt` を広告し、`append` の内容が実際に効くか。`session/load` / `session/resume` に同じ値を送ったとき、二重に足されないか | 広告しなければ、プロジェクトのシステムプロンプト（decisions.md A-1i）は常に送られず notice が出るだけになる |
+| **V-32** | Node.js の自動インストール（decisions.md N-2-5c）を shovel から実行したとき、実機で通るか。`sbx exec` 経由の `sudo apt-get` が起動直後の `apt-get update`（kit の startup コマンド）とぶつかったときに再試行で抜けられるか、入れた Node.js がサンドボックスの停止・起動の後も残るか。手で `sudo apt-get install -y nodejs-24 npm` を実行して npx が使えることは確認済み | 再試行・ロック待ちの時間、確認の段階の見せ方に直しが要るか |
 | **V-30** | コマンドラインツール（decisions.md G-3-4）のうち、開発用サンドボックスで確かめられなかった部分: macOS の `/usr/local/bin` へのリンク（管理者権限のダイアログ、アプリの移動後の「以前の場所を指している」）と、アプリが起動していないときに実行ファイルを直接起動した場合の Dock・前面表示、Windows の `shovel.cmd`（日本語・空白を含むパス）と `windows-path.ps1`（インストーラーからの PATH の追加・削除、ユーザー単位／全ユーザー向け、ボタンからの追加）、deb の install スクリプト（`update-alternatives` の付け替え、以前の版からの更新）、AppImage のスクリプト。Linux の展開したディレクトリ（`electron-builder --dir`）では、偽の `sbx` で初回起動・起動済み・0 件・複数件・既存プロジェクト（シンボリックリンク経由）・ボタンの入れ外しを確認済み | 各 OS の手順・スクリプトに直しが要るか |
 ---
 

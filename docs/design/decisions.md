@@ -3264,6 +3264,54 @@ AGENT で作成する**。両者を結ぶ対応表をアプリに同梱する。
 返さず、一覧を得るにはホストから `registry.npmjs.org` へ通信することになり前提が増える。
 手入力は当面見送り（必要になれば追加する）。
 
+### N-2-5c. サンドボックスに Node.js が無いとき：接続前に apt で入れる（2026-11-19 決定）
+
+**問題**: 最新の Docker Sandboxes（`sbx` v0.54.0 で確認。いつからかは不明）では、`sbx create claude` の
+既定のイメージ（Docker Hardened Images の Debian 13、kit `docker.io/sbx/claude`）に node・npm・npx が
+入っていない。ACP アダプタは `npx -y <pkg>@<version>` で起動する（N-2-5b）ので、ユーザーがコンソールで
+Node.js を入れるまでチャットを開けない。
+
+**決定**: 接続前の確認（`runConnectPreflight`）の最後に `npx` の有無を確かめ、無ければ shovel が
+サンドボックスに Node.js と npm を入れる。ACP アダプタの起動方法と版の管理（N-2-5b）は変えない。
+
+1. 接続中タブに「サンドボックスの Node.js を確認」の段階（`nodeCheck`。毎回並べる）を出し、
+   `sbx exec <name> sh -c 'command -v npx'` が 0 で終われば何もしない（以前のイメージのサンドボックスはここで終わる）
+2. 無ければ、「サンドボックスに Node.js を入れる」の段階（`nodeInstall`。実行したときだけ並べる）を出し、
+   `sbx exec <name> sh -c <スクリプト>` で `sudo apt-get update` → `sudo apt-get install -y nodejs-24 npm` を実行する
+   - `nodejs-24` と `npm` は DHI の apt リポジトリ（`dhi.io`）にある。`dhi.io` への通信は `sbx/claude` の kit が許可している
+   - `nodejs-24` が無いリポジトリでは `nodejs` を入れる
+   - `DEBIAN_FRONTEND=noninteractive`、dpkg のロック待ちは 120 秒。一覧の更新は起動時の `apt-get update`
+     （kit の startup コマンド）とぶつかりうるので3回まで試す。全体は10分で打ち切る
+   - 同じサンドボックスへ同時に入れない（複数のタブを同時に開いたときは、先に始めたインストールを待つ）
+3. 入れられなかったときは、原因（apt-get が無い／パスワード無しの sudo が使えない／その他）と、
+   その他なら apt-get の出力の末尾と手で入れるコマンドを接続中タブに出す。再試行で 1 からやり直す
+
+確認はタブを開くたびに行う（結果を覚えない）。コンテナが作り直されると入れたパッケージが消えうるが、
+次の接続で入れ直されるだけで済む。
+
+**理由**
+
+- ユーザーにコンソールでの作業をさせない（「非エンジニアでも使える」という設計目標）
+- 入れるのはサンドボックスの中だけで、ホストの前提は増えない。出どころは Docker 自身のリポジトリで、
+  通信も既定のポリシーで許可されている
+- 起動方法と版の管理を変えずに済む。以前のイメージのサンドボックスにもそのまま効く
+
+**却下した案**
+
+- **公式の ACP 用 kit（`docker.io/sbx/claude-acp`）を `sbx create --kit` / `sbx kit add` で入れ、
+  `sbx exec -i <name> claude-agent-acp` で起動する**: kit に入るのは node 本体と、ビルド時に入れた版の
+  アダプタだけで、npm・npx は入らない。そして `sbx kit add` は kit を足すだけで、外す・入れ替える
+  コマンドが無い（同じ kit を別のタグで足すと「capability が重複」のエラー）ため、アダプタの版は
+  サンドボックスを作った時点で固定され、更新や戻し（N-2-5b）にはサンドボックスの作り直しが要る
+  （サンドボックス内の会話の履歴が消え、`session/load` / `session/resume` ができなくなる）。
+  最新版の取得先も ACP レジストリではなく Docker Hub のタグになり、npm より数時間〜数版遅れる。
+  `--kit` も `kit add` も Experimental
+- **Node.js と npm を入れるだけの shovel 独自の mixin kit**: kit を「環境構築」として使う形で、
+  版の管理も今のまま使える。ただし kit の作成（sandbox-kit-spec v3）・アプリへの同梱・作成時のビルドが要り、
+  Experimental な仕組みに依存する。中身は同じ DHI のパッケージなので、`sbx exec` で apt から入れれば足りる
+- **nodejs.org の tarball をホームディレクトリに展開する**: root が要らず版も選べるが、アーキテクチャの
+  判定と PATH の管理が増える。sudo と apt が使えるイメージなので apt に任せる
+
 ### N-2-6. ログ表示
 
 **決定**: 「サンドボックスのログ表示」を「**診断情報画面**」として再定義する。

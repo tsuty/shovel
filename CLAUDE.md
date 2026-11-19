@@ -128,7 +128,9 @@ session-history panel backed by local snapshots with rename/delete, a per-tab re
 (↻, reuses the connection and sends a fresh `session/new`), Cmd/Ctrl+0-9 tab-switching shortcuts, a Cmd/Ctrl+F find bar
 (`FindBar.tsx`: searches the visible text of the tab area via the CSS Custom Highlight API, not `webContents.findInPage()` —
 that matched the find box's own text and stole its focus, decisions.md N-1-a), a "connecting" tab shown immediately on "+" that lists
-each connect step (sign-in check → sandbox liveness → adapter start/`initialize` → `session/new`)
+each connect step (sign-in check → sandbox liveness → Node.js install, only when `npx` is missing — newer `sbx` images ship
+without node/npm, so `src/main/domain/nodeRuntime.ts` runs `sudo apt-get install -y nodejs-24 npm` via `sbx exec`, decisions.md N-2-5c →
+adapter start/`initialize` → `session/new`)
 with the command being run and elapsed time, swapped in place for the session tab on success
 (flows.md §3 接続中タブ; progress via `session:openProgress`),
 chat tab icon states (`tabAttention.ts`, decisions.md G-1-4: the robot icon spins during a turn, on every tab, and stops while

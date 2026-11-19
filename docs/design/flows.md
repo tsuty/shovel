@@ -203,6 +203,10 @@ $ shovel [path]                     ← 省略時はカレントディレクト�
        │                   （非0の原因が sbx exec 自体か、エージェントのコマンドかを見分ける）
        │                   失敗 → 原因と次の行動を出す。接続を試みない
        │
+       ├─ 1b. Node.js の確認 sbx exec <name> sh -c 'command -v npx'
+       │                   無ければ sudo apt-get install -y nodejs-24 npm（decisions.md N-2-5c）
+       │                   入れられない → 原因と手で入れるコマンドを出す。接続を試みない
+       │
        ├─ 2. プロセス起動  sbx exec -i <name> npx -y <acpPackage>@<version>
        │                   version = acpVersion → 控えた最新版 → latest の順
        │                   stdout → ACP パーサ / stderr → ログと進捗表示へ分離
@@ -230,8 +234,10 @@ $ shovel [path]                     ← 省略時はカレントディレクト�
 押しても何も起きないように見えるので、**タブは押した直後に出し、いま何を実行しているかを正直に見せる**。
 
 - 段階は「Docker へのサインインとサンドボックスの確認 → ログイン状態の確認 → サンドボックスへの到達確認 →
-  エージェント（ACP アダプタ）の起動 → セッションの開始」の5つ（`SessionOpenStep`）。到達確認は実行したときだけ並べる。各段階で実行しているコマンド／メソッド
-  （`sbx ls --json`、`sbx exec <name> claude auth status --json`、`sbx exec <name> echo`、`npx -y <package>@<version>`、
+  Node.js の確認 → Node.js のインストール → エージェント（ACP アダプタ）の起動 → セッションの開始」の7つ（`SessionOpenStep`）。
+  到達確認と Node.js のインストールは実行したときだけ並べる。各段階で実行しているコマンド／メソッド
+  （`sbx ls --json`、`sbx exec <name> claude auth status --json`、`sbx exec <name> echo`、
+  `sbx exec <name> sh -c 'command -v npx'`、`sbx exec <name> sudo apt-get install -y nodejs-24 npm`、`npx -y <package>@<version>`、
   `session/new` など）と経過秒数を出す。認証確認もサンドボックス内で実行していると分かるよう `sbx exec` から見せる
 - どの段階も main が `session:openProgress` で知らせる（`openTab` に渡した `requestId` で接続中タブと対応づける）
 - エージェントの起動は `npx` のパッケージ取得と `initialize` の応答待ちを区別できないので1つの段階にまとめ、
@@ -248,7 +254,7 @@ $ shovel [path]                     ← 省略時はカレントディレクト�
 
 ### 接続前の確認はすべての接続で同じ
 
-Docker の確認・認証状態の確認（・必要なら生存確認）は、新しいチャット（「+」・ウィンドウを開いたとき）でも
+Docker の確認・認証状態の確認（・必要なら生存確認）・Node.js の確認は、新しいチャット（「+」・ウィンドウを開いたとき）でも
 履歴の再開（§6、`session/load` / `session/resume`）でも、**ACP アダプタを起動する接続では必ず同じ順に行う**
 （main の `runConnectPreflight`）。すでに別のタブが接続していても省かない——トークンの期限切れなどで、
 前に確かめた状態は嘘になりうる。

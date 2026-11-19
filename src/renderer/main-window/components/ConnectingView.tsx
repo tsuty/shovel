@@ -5,10 +5,10 @@ import type { SessionOpenStep } from '@shared/ipc'
 import { cn } from '../../shared/lib/utils'
 
 /** 表示する段階の順番。 */
-export const SESSION_OPEN_STEPS: readonly SessionOpenStep[] = ['docker', 'auth', 'sandbox', 'adapter', 'session']
+export const SESSION_OPEN_STEPS: readonly SessionOpenStep[] = ['docker', 'auth', 'sandbox', 'nodeCheck', 'nodeInstall', 'adapter', 'session']
 
 /** 実行されたときだけ表示する段階。 */
-const ON_DEMAND_STEPS: readonly SessionOpenStep[] = ['sandbox']
+const ON_DEMAND_STEPS: readonly SessionOpenStep[] = ['sandbox', 'nodeInstall']
 
 /** 始まった段階1つ分。終わった時刻は次の段階が始まった時刻（または接続の完了）。 */
 export interface ConnectingStepRecord {
@@ -95,8 +95,8 @@ export function ConnectingView({
                       {detail}
                     </div>
                   )}
-                  {state === 'running' && step === 'adapter' && (
-                    <div className="mt-0.5 text-xs text-muted-foreground">{t('connecting.adapterHint')}</div>
+                  {state === 'running' && (step === 'adapter' || step === 'nodeInstall') && (
+                    <div className="mt-0.5 text-xs text-muted-foreground">{t(`connecting.${step}Hint`)}</div>
                   )}
                 </div>
               </li>

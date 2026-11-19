@@ -517,6 +517,11 @@
       "stopped": "The stopped sandbox couldn't be started. Try again; if it keeps failing, check the diagnostics in the project details.",
       "unknown": "Couldn't reach the sandbox. Try again; if it keeps failing, check the diagnostics in the project details.",
       "signIn": "Run sbx login in a terminal"
+    },
+    "nodeRuntime": {
+      "noApt": "The sandbox doesn't have the Node.js (npx) needed to start the agent, and it couldn't be installed automatically because apt-get isn't available. Install Node.js and npm in the sandbox, then try again.",
+      "noSudo": "The sandbox doesn't have the Node.js (npx) needed to start the agent, and it couldn't be installed automatically because sudo isn't available. Install Node.js and npm in the sandbox, then try again.",
+      "failed": "Couldn't install the Node.js (npx) needed to start the agent in the sandbox. Try again. If that doesn't help, run this in a terminal:\n\nsbx exec {{sandbox}} sudo apt-get install -y nodejs-24 npm"
     }
   },
   "mainWindow": {
@@ -531,11 +536,14 @@
     "title": "Preparing a new chat",
     "failedTitle": "Couldn't open a new chat",
     "seconds": "{{value}}s",
+    "nodeInstallHint": "The sandbox doesn't have the Node.js and npm needed to start the agent, so they are being installed. This happens only once per sandbox (from tens of seconds to a few minutes).",
     "adapterHint": "Starting the agent inside the sandbox and waiting for it to respond. The first run or a version update takes longer while the package is downloaded.",
     "steps": {
       "docker": "Check the Docker sign-in and the sandbox",
       "auth": "Check the agent's sign-in status",
       "sandbox": "Check that the sandbox is reachable",
+      "nodeCheck": "Check Node.js in the sandbox",
+      "nodeInstall": "Install Node.js in the sandbox",
       "adapter": "Start the agent (ACP adapter)",
       "session": "Start the session"
     }

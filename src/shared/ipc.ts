@@ -186,10 +186,12 @@ export interface ProjectProgress {
  *   - docker: Docker へのサインインとサンドボックスの有無の確認（`sbx ls --json`）
  *   - auth: エージェントの認証状態の確認（`sbx exec <name> <statusCommand>`）
  *   - sandbox: サンドボックスの生存確認（`sbx exec <name> echo`。auth のコマンドが非0で終わったときだけ）
+ *   - nodeCheck: サンドボックスの `npx` の有無の確認
+ *   - nodeInstall: サンドボックスへの Node.js と npm のインストール（`npx` が無かったときだけ）
  *   - adapter: ACP アダプタの起動と `initialize`（`npx` によるパッケージ取得を含む）
  *   - session: `session/new`（復元時は `session/load` / `session/resume`）
  */
-export type SessionOpenStep = 'docker' | 'auth' | 'sandbox' | 'adapter' | 'session'
+export type SessionOpenStep = 'docker' | 'auth' | 'sandbox' | 'nodeCheck' | 'nodeInstall' | 'adapter' | 'session'
 
 /** `openTab` の途中経過。`requestId` は renderer が `openTab` に渡した id。 */
 export interface SessionOpenProgress {
