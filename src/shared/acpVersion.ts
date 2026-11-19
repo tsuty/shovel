@@ -1,6 +1,6 @@
 /** ACP レジストリ（registry.json）の読み取りと、バージョン文字列の比較。 */
 
-import type { Project } from './types/project'
+import type { SandboxProject } from './types/project'
 
 /** ACP レジストリの URL。 */
 export const ACP_REGISTRY_URL = 'https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json'
@@ -90,7 +90,7 @@ export function findRegistryEntry(registry: unknown, packageName: string): AcpRe
 }
 
 /** 記録する版を `latest` に上げたプロジェクト。上げる前の版を `previousAcpVersion` に残す。 */
-export function withAcpUpdate(project: Project, latest: string): Project {
+export function withAcpUpdate(project: SandboxProject, latest: string): SandboxProject {
   return { ...project, acpVersion: latest, previousAcpVersion: project.acpVersion }
 }
 
@@ -98,7 +98,7 @@ export function withAcpUpdate(project: Project, latest: string): Project {
  * 記録する版を `previousAcpVersion` に戻したプロジェクト。戻す前の版は見送り済みにする。
  * 戻せる版が無ければ null。
  */
-export function withAcpRollback(project: Project): Project | null {
+export function withAcpRollback(project: SandboxProject): SandboxProject | null {
   const { previousAcpVersion, ...rest } = project
   if (!previousAcpVersion || !project.acpVersion) return null
   const skipped =

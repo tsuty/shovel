@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { withAcpRollback } from '@shared/acpVersion'
 import type { DataDirKind, ProjectDiagnostics } from '@shared/ipc'
+import { isSandboxProject, type Project } from '@shared/types/project'
 import {
   Dialog,
   DialogContent,
@@ -17,8 +18,53 @@ import { NetworkBlocksSection } from './NetworkBlocksSection'
  * ACP トラフィックログ、エージェントの stderr、`sbx ls --json` の該当エントリ）をまとめ、
  * 丸ごとクリップボードにコピーできる。ログは最後に開いたセッションのログファイルから読み、
  * 無ければその節は表示しない。拒否された通信は「ネットワーク」欄（`NetworkBlocksSection`）に出す。
+ * サンドボックス無しのプロジェクトでは、名前とフォルダだけを出す。
  */
 export function ProjectDetailDialog({
+  project,
+  open,
+  onOpenChange
+}: {
+  project: Project | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}): React.JSX.Element {
+  if (project && !isSandboxProject(project)) {
+    return <LocalProjectDetail project={project} open={open} onOpenChange={onOpenChange} />
+  }
+  return <SandboxProjectDetail projectId={project?.id ?? null} open={open} onOpenChange={onOpenChange} />
+}
+
+function LocalProjectDetail({
+  project,
+  open,
+  onOpenChange
+}: {
+  project: Project
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{project.displayName}</DialogTitle>
+        </DialogHeader>
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">{t('detail.hostPath')}</dt>
+          <dd className="truncate" title={project.hostPath}>
+            {project.hostPath}
+          </dd>
+          <dt className="text-muted-foreground">{t('detail.sandboxName')}</dt>
+          <dd>{t('detail.noSandbox')}</dd>
+        </dl>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function SandboxProjectDetail({
   projectId,
   open,
   onOpenChange

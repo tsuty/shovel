@@ -3,7 +3,30 @@
 /** `unknown` は `sbx ls` の結果を当てにできない（未サインイン・sbx が動かない等）とき。 */
 export type SandboxStatus = 'running' | 'stopped' | 'missing' | 'workspace_missing' | 'unknown'
 
-export interface Project {
+/**
+ * プロジェクトマネージャ・Header に出す状態。サンドボックス無しのプロジェクトは `local`
+ * （フォルダが無ければ `workspace_missing`）。
+ */
+export type ProjectStatus = SandboxStatus | 'local'
+
+/** サンドボックス無しのプロジェクト（ファイラー・エディタ・ブラウザだけを使う）。 */
+export interface LocalProject {
+  kind: 'local'
+  /** shovel が生成する UUID。displayName を変えても不変。 */
+  id: string
+  /** 自由入力。日本語・スペース可。UI に出る。 */
+  displayName: string
+  /** ホストのディレクトリ（/Users/... または C:\...）。 */
+  hostPath: string
+  /** 作成時刻 (epoch ms)。プロジェクトマネージャでの並び順に使う。 */
+  createdAt: number
+}
+
+export type Project = SandboxProject | LocalProject
+
+/** サンドボックスでエージェントを動かすプロジェクト。`kind` が無いものもこれ（導入前に保存したもの）。 */
+export interface SandboxProject {
+  kind?: 'sandbox'
   /** shovel が生成する UUID。displayName を変えても不変。 */
   id: string
   /** 自由入力。日本語・スペース可。UI に出る。 */
@@ -41,9 +64,13 @@ export interface AcpUpdateOffer {
   latest: string
 }
 
+export function isSandboxProject(project: Project): project is SandboxProject {
+  return project.kind !== 'local'
+}
+
 /** `sbx ls --json` と shovel の設定を突き合わせた結果。 */
-export interface ProjectWithStatus extends Project {
-  status: SandboxStatus
+export type ProjectWithStatus = Project & {
+  status: ProjectStatus
 }
 
 /**

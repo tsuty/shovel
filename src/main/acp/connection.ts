@@ -18,7 +18,7 @@ import type {
   SessionUpdate,
   SetSessionConfigOptionResponse
 } from '@agentclientprotocol/sdk'
-import type { AgentEntry, Project } from '@shared/types/project'
+import type { AgentEntry, SandboxProject } from '@shared/types/project'
 import type {
   ConfigOption,
   SessionCapabilities,
@@ -145,7 +145,7 @@ class IdleWatchdog {
  */
 export async function openAcpSession(
   sessionId: string,
-  project: Project,
+  project: SandboxProject,
   agent: AgentEntry,
   callbacks: SessionRuntimeCallbacks,
   restore?: RestoreRequest

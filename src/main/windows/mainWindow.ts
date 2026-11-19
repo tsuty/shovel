@@ -12,6 +12,7 @@ import {
 import { closeAllTabsForWindow } from '../domain/sessionManager'
 import { installRendererRecovery } from './rendererRecovery'
 import { projectsStore } from '../persistence/store'
+import { isSandboxProject } from '@shared/types/project'
 
 /** プロジェクトを新しいウィンドウで開く。すでに開いていれば、そのウィンドウを前面に出す。 */
 export function openProjectWindow(projectId: string): void {
@@ -41,7 +42,10 @@ export function openProjectWindow(projectId: string): void {
   // プロジェクトのウィンドウが表示されたら、プロジェクト一覧を閉じる。
   win.once('ready-to-show', closeProjectManager)
 
-  void win.loadURL(rendererPageUrl('main-window.html', `projectId=${encodeURIComponent(projectId)}`))
+  // サンドボックスの有無は後から変わらないので、最初の描画から分かるよう URL に載せる。
+  const project = projectsStore.find(projectId)
+  const local = project && !isSandboxProject(project) ? '&local=1' : ''
+  void win.loadURL(rendererPageUrl('main-window.html', `projectId=${encodeURIComponent(projectId)}${local}`))
 }
 
 /** プロジェクト名の変更を、開いているウィンドウのタイトルに反映する。 */

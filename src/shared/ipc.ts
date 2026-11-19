@@ -5,7 +5,7 @@
  */
 
 import type { TranscriptAction, TranscriptEvent } from './types/transcript'
-import type { AcpUpdateOffer, AgentEntry, Project, ProjectListResult } from './types/project'
+import type { AcpUpdateOffer, AgentEntry, Project, ProjectListResult, SandboxProject } from './types/project'
 import type {
   HistoryListing,
   LocalRecordSummary,
@@ -31,6 +31,7 @@ export const IpcChannel = {
   ProjectsList: 'projects:list',
   ProjectsCreateNewDir: 'projects:createNewDir',
   ProjectsCreateExistingDir: 'projects:createExistingDir',
+  ProjectsCreateLocal: 'projects:createLocal',
   ProjectsListImportable: 'projects:listImportable',
   ProjectsCreateFromExisting: 'projects:createFromExisting',
   ProjectsRename: 'projects:rename',
@@ -134,7 +135,8 @@ export const IpcChannel = {
   BrowserFocused: 'browser:focused',
   BrowserInsertToChat: 'browser:insertToChat',
   BrowserAttachToChat: 'browser:attachToChat',
-  BrowserAnnotateScreenshot: 'browser:annotateScreenshot'
+  BrowserAnnotateScreenshot: 'browser:annotateScreenshot',
+  BrowserScreenshotSaved: 'browser:screenshotSaved'
 } as const
 
 export interface CreateNewDirRequest {
@@ -149,6 +151,12 @@ export interface CreateExistingDirRequest {
   agentId: string
   hostPath: string
   displayName: string
+}
+
+/** サンドボックス無しのプロジェクトの作成。フォルダは新しく作るか、既存のものを使う。 */
+export interface CreateLocalRequest {
+  displayName: string
+  directory: { kind: 'new'; baseDir: string; dirName: string } | { kind: 'existing'; hostPath: string }
 }
 
 export interface ImportableSandbox {
@@ -197,7 +205,7 @@ export interface SessionEnvelope {
 
 /** プロジェクトの詳細の診断情報。 */
 export interface ProjectDiagnostics {
-  project: Project
+  project: SandboxProject
   /** エージェントの表示名（ACP レジストリの `name`。例: `Claude Agent`）。 */
   agentName: string
   diagnoseOutput: string
@@ -261,6 +269,7 @@ export interface RendererApi {
     list(): Promise<ProjectListResult>
     createNewDir(req: CreateNewDirRequest): Promise<Project>
     createExistingDir(req: CreateExistingDirRequest): Promise<Project>
+    createLocal(req: CreateLocalRequest): Promise<Project>
     listImportable(): Promise<ImportableSandbox[]>
     createFromExisting(req: CreateFromExistingRequest): Promise<Project>
     rename(id: string, displayName: string): Promise<void>
@@ -406,6 +415,8 @@ export interface RendererApi {
     onAttachToChat(cb: (targetId: string, relPath: string) => void): () => void
     /** ページの右クリックから、保存したスクリーンショットに注釈を付けて `targetId` のチャットに添付するよう求められた。 */
     onAnnotateScreenshot(cb: (targetId: string, relPath: string) => void): () => void
+    /** サンドボックス無しのプロジェクトでスクリーンショットを保存した。`annotate` なら注釈を付ける画面を開く。 */
+    onScreenshotSaved(cb: (relPath: string, annotate: boolean) => void): () => void
   }
   bookmarks: {
     list(projectId: string): Promise<Bookmark[]>

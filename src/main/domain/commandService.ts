@@ -3,7 +3,7 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { sbxSpawnInteractive } from '../sbx/cli'
 import { NO_PYTHON_MARKER, resizeSequence, ttyCommandArgv } from '../sbx/ptyWrapper'
 import { projectsStore, commandHistoryStore } from '../persistence/store'
-import type { Project } from '@shared/types/project'
+import type { SandboxProject } from '@shared/types/project'
 import type { CommandHistory } from '@shared/types/command'
 
 /**
@@ -37,8 +37,8 @@ export interface TtyCommandCallbacks {
   onExit: (code: number | null, ttyUnavailable: boolean) => void
 }
 
-function requireProject(projectId: string): Project {
-  const project = projectsStore.list().find((p) => p.id === projectId)
+function requireProject(projectId: string): SandboxProject {
+  const project = projectsStore.findSandbox(projectId)
   if (!project) throw new Error(`project not found: ${projectId}`)
   return project
 }

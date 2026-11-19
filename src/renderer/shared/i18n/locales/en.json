@@ -12,6 +12,7 @@
     "close": "Close"
   },
   "detail": {
+    "noSandbox": "None (file browser, editor and browser only)",
     "title": "Details",
     "hostPath": "Host path",
     "sandboxName": "Sandbox name",
@@ -64,6 +65,7 @@
     "empty": "No projects yet.",
     "confirmRemove": "Also move the local directory to the trash?",
     "status": {
+      "local": "No sandbox",
       "running": "Running",
       "stopped": "Stopped",
       "missing": "Sandbox missing",
@@ -79,6 +81,8 @@
     }
   },
   "createFlow": {
+    "noSandboxHint": "Opens with only the file browser, editor and browser, without an agent. A sandbox can't be added later (delete the project and create it again; the folder is kept).",
+    "noSandbox": "(No sandbox)",
     "title": "New project",
     "tabNew": "New directory",
     "tabExisting": "Existing directory",
@@ -500,6 +504,7 @@
     }
   },
   "mainWindow": {
+    "localEmpty": "Open a file from the file browser, or open a new tab from the browser panel.",
     "noProject": "No project was specified.",
     "connecting": "Connecting…",
     "refreshTab": "Start a new session on this chat (reuses the current connection)",

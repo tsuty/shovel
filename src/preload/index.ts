@@ -51,6 +51,7 @@ const api: RendererApi = {
     list: () => ipcRenderer.invoke(IpcChannel.ProjectsList),
     createNewDir: (req) => ipcRenderer.invoke(IpcChannel.ProjectsCreateNewDir, req),
     createExistingDir: (req) => ipcRenderer.invoke(IpcChannel.ProjectsCreateExistingDir, req),
+    createLocal: (req) => ipcRenderer.invoke(IpcChannel.ProjectsCreateLocal, req),
     listImportable: () => ipcRenderer.invoke(IpcChannel.ProjectsListImportable),
     createFromExisting: (req) => ipcRenderer.invoke(IpcChannel.ProjectsCreateFromExisting, req),
     rename: (id, displayName) => ipcRenderer.invoke(IpcChannel.ProjectsRename, id, displayName),
@@ -207,6 +208,11 @@ const api: RendererApi = {
       const listener = (_event: unknown, targetId: string, relPath: string): void => cb(targetId, relPath)
       ipcRenderer.on(IpcChannel.BrowserAnnotateScreenshot, listener)
       return () => ipcRenderer.removeListener(IpcChannel.BrowserAnnotateScreenshot, listener)
+    },
+    onScreenshotSaved: (cb) => {
+      const listener = (_event: unknown, relPath: string, annotate: boolean): void => cb(relPath, annotate)
+      ipcRenderer.on(IpcChannel.BrowserScreenshotSaved, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserScreenshotSaved, listener)
     }
   },
   bookmarks: {

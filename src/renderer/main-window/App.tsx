@@ -183,9 +183,16 @@ function getProjectIdFromQuery(): string | null {
   return new URLSearchParams(window.location.search).get('projectId')
 }
 
+/** サンドボックス無しのプロジェクトのウィンドウか（main が URL に `local=1` を付ける）。 */
+function isLocalFromQuery(): boolean {
+  return new URLSearchParams(window.location.search).get('local') === '1'
+}
+
 export function App(): React.JSX.Element {
   const { t } = useTranslation()
   const [projectId] = useState(getProjectIdFromQuery)
+  /** サンドボックス無し。チャット・履歴・コマンド実行を出さず、ファイラー・エディタ・ブラウザだけを使う。 */
+  const [local] = useState(isLocalFromQuery)
   const [allProjects, setAllProjects] = useState<ProjectWithStatus[]>([])
   const [project, setProject] = useState<ProjectWithStatus | null>(null)
   /** 開いているタブ（並びは開いた順。タブバーの表示順はペインが持つ）。 */
@@ -205,7 +212,7 @@ export function App(): React.JSX.Element {
   /** 最後に保存したタブの控え（JSON）。同じなら保存し直さない。 */
   const lastSavedTabsRef = useRef<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [openPanels, setOpenPanels] = useState<Set<SidebarPanel>>(new Set(['tabs']))
+  const [openPanels, setOpenPanels] = useState<Set<SidebarPanel>>(() => new Set([local ? 'filer' : 'tabs']))
   const [commandsOpen, setCommandsOpen] = useState(false)
   /** 前面のペインの前面のタブの中身の要素。ページ内検索の対象。 */
   const [activePaneEl, setActivePaneEl] = useState<HTMLDivElement | null>(null)
@@ -299,7 +306,7 @@ export function App(): React.JSX.Element {
    * `paneId` のペイン（省略時は前面のペイン）に開く。
    */
   function openNewTab(paneId?: string): void {
-    if (!projectId || limitedTabCount >= MAX_SESSION_TABS) return
+    if (!projectId || local || limitedTabCount >= MAX_SESSION_TABS) return
     setError(null)
     const id = `connecting:${crypto.randomUUID()}`
     setTabs((prev) => [
@@ -379,6 +386,7 @@ export function App(): React.JSX.Element {
       didOpenInitialTabRef.current = true
       void (async () => {
         const restored = await restoreTabs(projectId)
+        if (local) return
         // 復元した Read Only タブだけで上限に達していたら、新しいチャットは開かない。
         if (restored.filter(countsTowardTabLimit).length >= MAX_SESSION_TABS) {
           setError(t('mainWindow.tabLimitReached'))
@@ -410,6 +418,8 @@ export function App(): React.JSX.Element {
       return true
     }
     for (const r of restored) {
+      // サンドボックス無しのプロジェクトではチャットの記録を開かない。
+      if (local && r.kind !== 'file' && r.kind !== 'browser') continue
       const tab = tabFromRestored(r, t('history.untitled'))
       const legacyAttached = r.kind === 'history' ? r.attachedFile : undefined
       if (push(tab, r.pane) && legacyAttached) {
@@ -551,6 +561,8 @@ export function App(): React.JSX.Element {
   activateRef.current = activate
   const attachToChatRef = useRef(attachToChat)
   attachToChatRef.current = attachToChat
+  const openFileRef = useRef(openFile)
+  openFileRef.current = openFile
   useEffect(() => {
     const offInsert = window.shovel.browser.onInsertToChat((targetId, insertion) => {
       activateRef.current(targetId)
@@ -562,10 +574,15 @@ export function App(): React.JSX.Element {
     const offAnnotate = window.shovel.browser.onAnnotateScreenshot((targetId, relPath) =>
       setAnnotating({ relPath, attachTo: targetId })
     )
+    const offSaved = window.shovel.browser.onScreenshotSaved((relPath, annotate) => {
+      if (annotate) setAnnotating({ relPath })
+      else openFileRef.current(relPath)
+    })
     return () => {
       offInsert()
       offAttach()
       offAnnotate()
+      offSaved()
     }
   }, [])
 
@@ -864,13 +881,14 @@ export function App(): React.JSX.Element {
         status={project?.status ?? null}
         currentProjectId={projectId}
         recentProjects={allProjects}
-        showPlanUsage={settings?.showPlanUsage ?? false}
+        showPlanUsage={!local && (settings?.showPlanUsage ?? false)}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenDetails={() => setDetailsOpen(true)}
       />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           projectId={projectId}
+          local={local}
           openPanels={openPanels}
           onTogglePanel={togglePanel}
           commandsOpen={commandsOpen}
@@ -930,7 +948,7 @@ export function App(): React.JSX.Element {
                   onCloseFiles={(keepId) => closeFileTabs(pane, keepId)}
                   onMove={moveTab}
                   onSplitRight={splitTabRight}
-                  onNew={() => openNewTab(pane.id)}
+                  onNew={local ? undefined : () => openNewTab(pane.id)}
                   canAddTab={limitedTabCount < MAX_SESSION_TABS}
                 />
               </div>
@@ -1022,7 +1040,7 @@ export function App(): React.JSX.Element {
                 className="flex items-center justify-center text-sm text-muted-foreground"
                 style={{ gridColumn: 1, gridRow: 2 }}
               >
-                {t('mainWindow.connecting')}
+                {local ? t('mainWindow.localEmpty') : t('mainWindow.connecting')}
               </div>
             )}
             {/* ページ内検索は前面のペインの右上に出す（高さ 0 の枠に絶対配置する）。 */}
@@ -1030,7 +1048,7 @@ export function App(): React.JSX.Element {
               <FindBar root={activePaneEl} />
             </div>
           </div>
-          {commandsOpen && (
+          {commandsOpen && !local && (
             <ResizablePanel
               edge="top"
               width={commandsHeight}
@@ -1054,7 +1072,7 @@ export function App(): React.JSX.Element {
           onUpdate={(patch) => void updateSettings(patch)}
         />
       )}
-      <ProjectDetailDialog projectId={projectId} open={detailsOpen} onOpenChange={setDetailsOpen} />
+      <ProjectDetailDialog project={project} open={detailsOpen} onOpenChange={setDetailsOpen} />
       <AcpUpdateDialog
         offer={acpUpdateOffer}
         onAnswer={(update) => void answerAcpUpdate(update)}

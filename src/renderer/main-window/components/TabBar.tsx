@@ -96,7 +96,8 @@ export function TabBar({
   /** このペインのファイルのタブをまとめて閉じる（チャット・履歴は残す）。`keepId` のタブだけは残す。 */
   onCloseFiles: (keepId: string | null) => void
   /** このペインに新しいチャットを開く。 */
-  onNew: () => void
+  /** 「+」（新しいチャット）。チャットの無いプロジェクト（サンドボックス無し）では undefined で、ボタンを出さない。 */
+  onNew?: () => void
   /** タブ `id` を `toPaneId` のペインの `beforeId` のタブの左（`null` なら右端）へ動かす。 */
   onMove: (id: string, toPaneId: string, beforeId: string | null) => void
   /** このペインを半分に分け、タブを右の新しいペインへ移す。 */
@@ -296,13 +297,15 @@ export function TabBar({
           )
         })}
       </div>
-      <button
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:opacity-40"
-        onClick={onNew}
-        disabled={!canAddTab}
-      >
-        <Plus size={14} />
-      </button>
+      {onNew && (
+        <button
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent disabled:opacity-40"
+          onClick={onNew}
+          disabled={!canAddTab}
+        >
+          <Plus size={14} />
+        </button>
+      )}
       {drag?.target && (
         <div
           className="pointer-events-none fixed z-50 w-0.5 rounded-full bg-primary"

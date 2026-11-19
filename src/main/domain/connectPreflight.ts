@@ -1,4 +1,4 @@
-import type { AgentEntry, Project } from '@shared/types/project'
+import type { AgentEntry, SandboxProject } from '@shared/types/project'
 import type { SbxLsEntry } from '@shared/types/sbx'
 import type { SessionOpenStep } from '@shared/ipc'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
@@ -20,7 +20,7 @@ import { checkAgentAuthStatus } from './authService'
  *      非0の原因が `sbx exec` 自体か statusCommand かを見分ける
  */
 export async function runConnectPreflight(
-  project: Project,
+  project: SandboxProject,
   agent: AgentEntry,
   onProgress?: (step: SessionOpenStep, detail?: string) => void
 ): Promise<void> {
@@ -38,7 +38,7 @@ export async function runConnectPreflight(
 }
 
 /** `sbx ls --json` でプロジェクトのサンドボックスを探す。接続できないと分かれば原因付きで投げる。 */
-async function findSandbox(project: Project): Promise<SbxLsEntry> {
+async function findSandbox(project: SandboxProject): Promise<SbxLsEntry> {
   let sandboxes: SbxLsEntry[]
   try {
     sandboxes = await sbxLs()

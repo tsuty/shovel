@@ -158,13 +158,22 @@ only render in the popup" — always light theme, print button disabled until ev
 builds cleanly, and the packaged app has been smoke-tested (boots, no renderer exceptions) under
 Xvfb.
 
+**Projects without a sandbox** (decisions.md G-3-6): `Project = SandboxProject | LocalProject` (`kind: 'local'`; no `kind` =
+sandbox, so old data needs no migration). Created from flows 1/2 by picking "(no sandbox)" in the agent dropdown
+(`projects:createLocal`), or from the CLI when no sandbox matches / `sbx` is unavailable. Their window (`local=1` in the
+URL) has only the Filer, editors and browser — no chat/history/command drawer/"+"/status/plan usage, no "add to context";
+the browser's right-click offers "save screenshot (and annotate)" instead of chat hand-offs. `sbx` isn't called at all when
+only local projects exist. sbx/ACP code looks projects up via `projectsStore.findSandbox`. There is no converting a
+project between kinds — delete and re-create it; a folder can be registered as only one project (G-3-5, enforced in
+`projectService.ts`'s `assertNotRegistered`), and bookmarks are keyed by folder so they survive that.
+
 A **command line tool** `shovel [path]` (decisions.md G-3-4, flows.md §2-5) opens a project from a terminal: the
 script (`resources/cli/shovel.sh` / `shovel.cmd`, version baked into `out/cli/` by `scripts/cliScripts.ts`) just starts
 the app with `--shovel-cli [-- <path>]` (detached) and exits; `--help`/`--version` are answered by the script alone.
 The app reads that from its own argv (`src/main/domain/cliCommand.ts`) and, when already running, the second process
 hands it over via `requestSingleInstanceLock`'s `additionalData` (never `second-instance`'s argv); `cliOpenService.ts`
 opens the project whose `hostPath` matches (realpath-aware), else registers the sandbox whose `workspaces[0]` matches
-(flow 3's path; 0 matches → dialog only, never `sbx create`; several → native choice dialog). Installing it is a
+(flow 3's path; 0 matches or `sbx` unavailable → asks "open without a sandbox / cancel", never `sbx create`; several → native choice dialog). Installing it is a
 settings-dialog-only button (`CliInstallSection.tsx` → `cliInstallService.ts`): macOS symlinks
 `/usr/local/bin/shovel` (osascript admin prompt on `EACCES`), Linux symlinks `~/.local/bin/shovel` (AppImage writes a
 script copy with `$APPIMAGE` baked in; deb packages own `/usr/bin/shovel` via our copies of electron-builder's

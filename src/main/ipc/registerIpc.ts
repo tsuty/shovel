@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron'
 import {
   IpcChannel,
   type CreateExistingDirRequest,
+  type CreateLocalRequest,
   type CreateFromExistingRequest,
   type CreateNewDirRequest,
   type DataDirKind
@@ -15,6 +16,7 @@ import {
   createFromExistingDirectory,
   createFromExistingSandbox,
   createFromNewDirectory,
+  createLocalProject,
   diagnose,
   getProjectDiagnostics,
   openDataDir,
@@ -140,6 +142,8 @@ export function registerIpc(): void {
     )
   })
 
+  ipcMain.handle(IpcChannel.ProjectsCreateLocal, (_event, req: CreateLocalRequest) => createLocalProject(req))
+
   ipcMain.handle(IpcChannel.ProjectsListImportable, () => listImportableSandboxes())
   ipcMain.handle(IpcChannel.ProjectsCreateFromExisting, (_event, req: CreateFromExistingRequest) =>
     createFromExistingSandbox(req)
@@ -168,8 +172,8 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IpcChannel.ProjectsOpenSbxLogin, () => openSbxLoginTerminal())
   ipcMain.handle(IpcChannel.ProjectsOpenTerminal, (_event, id: string) => {
-    const project = projectsStore.list().find((p) => p.id === id)
-    if (!project) throw new Error(`project not found: ${id}`)
+    const project = projectsStore.findSandbox(id)
+    if (!project) throw new Error(`sandbox project not found: ${id}`)
     openSandboxTerminal(project.sandboxName)
   })
 

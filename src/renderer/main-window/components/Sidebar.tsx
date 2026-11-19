@@ -23,6 +23,7 @@ const DEFAULT_PANEL_WIDTH = 224
  */
 export function Sidebar({
   projectId,
+  local,
   openPanels,
   onTogglePanel,
   commandsOpen,
@@ -46,6 +47,8 @@ export function Sidebar({
   onDeleteBookmark
 }: {
   projectId: string
+  /** サンドボックス無しのプロジェクト。チャット履歴とコマンド実行を出さない。 */
+  local: boolean
   openPanels: Set<SidebarPanel>
   onTogglePanel: (panel: SidebarPanel) => void
   commandsOpen: boolean
@@ -83,13 +86,15 @@ export function Sidebar({
   return (
     <div className="flex h-full shrink-0">
       <div className="flex w-11 flex-col items-center gap-1 border-r border-border py-2">
-        <IconButton
-          active={openPanels.has('tabs')}
-          onClick={() => onTogglePanel('tabs')}
-          title={t('sidebar.tabs')}
-        >
-          <MessageSquare size={18} />
-        </IconButton>
+        {!local && (
+          <IconButton
+            active={openPanels.has('tabs')}
+            onClick={() => onTogglePanel('tabs')}
+            title={t('sidebar.tabs')}
+          >
+            <MessageSquare size={18} />
+          </IconButton>
+        )}
         <IconButton
           active={openPanels.has('filer')}
           onClick={() => onTogglePanel('filer')}
@@ -105,11 +110,13 @@ export function Sidebar({
           <Globe size={18} />
         </IconButton>
         <div className="flex-1" />
-        <IconButton active={commandsOpen} onClick={onToggleCommands} title={t('sidebar.commands')}>
-          <SquareTerminal size={18} />
-        </IconButton>
+        {!local && (
+          <IconButton active={commandsOpen} onClick={onToggleCommands} title={t('sidebar.commands')}>
+            <SquareTerminal size={18} />
+          </IconButton>
+        )}
       </div>
-      {PANEL_ORDER.filter((p) => openPanels.has(p)).map((panel) => (
+      {PANEL_ORDER.filter((p) => openPanels.has(p) && !(local && p === 'tabs')).map((panel) => (
         <ResizablePanel
           key={panel}
           width={widths[panel] ?? DEFAULT_PANEL_WIDTH}
@@ -132,7 +139,7 @@ export function Sidebar({
             <Filer
               projectId={projectId}
               onOpenFile={onOpenFile}
-              chatTargets={chatTargets}
+              chatTargets={local ? undefined : chatTargets}
               onAddToContext={onAddToContext}
             />
           )}

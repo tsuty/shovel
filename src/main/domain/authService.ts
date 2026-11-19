@@ -1,4 +1,4 @@
-import type { AgentEntry, Project } from '@shared/types/project'
+import type { AgentEntry, SandboxProject } from '@shared/types/project'
 import { getAgentEntry } from '@shared/agentTable'
 import { sbxExecCapture, sbxSecretSet } from '../sbx/cli'
 import { projectsStore } from '../persistence/store'
@@ -19,8 +19,8 @@ export interface AgentAuthCheck extends AuthStatus {
   exitedZero: boolean
 }
 
-function requireProjectAndAgent(projectId: string): { project: Project; agent: AgentEntry } {
-  const project = projectsStore.list().find((p) => p.id === projectId)
+function requireProjectAndAgent(projectId: string): { project: SandboxProject; agent: AgentEntry } {
+  const project = projectsStore.findSandbox(projectId)
   if (!project) throw new Error(`project not found: ${projectId}`)
   const agent = getAgentEntry(project.agentId)
   if (!agent) throw new Error(`unknown agent: ${project.agentId}`)
@@ -40,7 +40,7 @@ export async function checkAuthStatus(projectId: string): Promise<AuthStatus> {
   return { loggedIn, checkFailed }
 }
 
-export async function checkAgentAuthStatus(project: Project, agent: AgentEntry): Promise<AgentAuthCheck> {
+export async function checkAgentAuthStatus(project: SandboxProject, agent: AgentEntry): Promise<AgentAuthCheck> {
   const result = await sbxExecCapture(project.sandboxName, agent.auth.statusCommand, {
     cwd: project.sandboxPath
   })

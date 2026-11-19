@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron'
 import { IpcChannel } from '@shared/ipc'
 import { getAgentEntry } from '@shared/agentTable'
 import { parsePlanUsage, type PlanUsageState } from '@shared/planUsage'
-import type { Project } from '@shared/types/project'
+import { isSandboxProject, type SandboxProject } from '@shared/types/project'
 import { projectsStore, settingsStore } from '../persistence/store'
 import { sbxExecCapture, sbxLs } from '../sbx/cli'
 import { getProjectWindow } from '../windows/registry'
@@ -84,9 +84,10 @@ async function fetchPlanUsage(): Promise<void> {
  * 使用率を取得できるエージェントの、実行中のサンドボックスを持つプロジェクト。
  * ウィンドウを開いているプロジェクトを優先する。停止中のサンドボックスは起動しないよう選ばない。
  */
-async function pickRunningProject(): Promise<{ project: Project; command: string[] } | null> {
+async function pickRunningProject(): Promise<{ project: SandboxProject; command: string[] } | null> {
   const candidates = projectsStore
     .list()
+    .filter(isSandboxProject)
     .flatMap((project) => {
       const command = getAgentEntry(project.agentId)?.planUsage?.command
       return command ? [{ project, command }] : []

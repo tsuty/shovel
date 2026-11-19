@@ -119,7 +119,8 @@ export function Filer({
   /** `at` があれば、開いた後にその位置（コンテンツ検索の一致箇所）へ移る。 */
   onOpenFile: (relPath: string, at?: Omit<FileReveal, 'nonce'>) => void
   /** 「コンテキストに追加 ▸」のサブメニューに出す、渡す先に選べるチャット。 */
-  chatTargets: ChatTarget[]
+  /** 「コンテキストに追加」の渡す先。チャットの無いプロジェクト（サンドボックス無し）では undefined で、項目を出さない。 */
+  chatTargets?: ChatTarget[]
   /** `relPath` のファイルを `targetId` のチャットに添付する。 */
   onAddToContext: (relPath: string, targetId: string) => void
 }): React.JSX.Element {
@@ -462,7 +463,7 @@ export function Filer({
               {t('filer.copyPath')}
             </MenuItem>
           )}
-          {menu.node && !menu.node.isDir && (
+          {menu.node && !menu.node.isDir && chatTargets && (
             <SubMenu icon={<FilePlus size={14} />} label={t('filer.addToContext')}>
               {chatTargets.length === 0 ? (
                 <MenuItem disabled onClick={() => {}}>

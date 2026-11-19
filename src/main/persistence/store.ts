@@ -1,5 +1,5 @@
 import Store from 'electron-store'
-import type { Project } from '@shared/types/project'
+import { isSandboxProject, type Project, type SandboxProject } from '@shared/types/project'
 import type { AppSettings } from '@shared/types/settings'
 import type { AcpRegistryEntry } from '@shared/acpVersion'
 import type { CommandHistory } from '@shared/types/command'
@@ -57,6 +57,14 @@ const store = new Store<StoreSchema>({ defaults })
 export const projectsStore = {
   list(): Project[] {
     return store.get('projects')
+  },
+  find(id: string): Project | undefined {
+    return store.get('projects').find((p) => p.id === id)
+  },
+  /** サンドボックスのあるプロジェクトだけを探す。サンドボックス無しなら undefined。 */
+  findSandbox(id: string): SandboxProject | undefined {
+    const project = this.find(id)
+    return project && isSandboxProject(project) ? project : undefined
   },
   save(projects: Project[]): void {
     store.set('projects', projects)

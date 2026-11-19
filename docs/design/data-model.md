@@ -10,7 +10,19 @@
 名前の制約が異なる。分離して持つ。
 
 ```ts
-type Project = {
+type Project = SandboxProject | LocalProject
+
+// サンドボックス無し（decisions.md G-3-6）。ファイラー・エディタ・ブラウザだけを使う
+type LocalProject = {
+  kind:        'local'
+  id:          string
+  displayName: string
+  hostPath:    string
+  createdAt:   number
+}
+
+type SandboxProject = {
+  kind?:       'sandbox' // 無ければこれ（導入前に保存したもの）
   id:          string   // UUID。shovel が生成。displayName を変えても不変
   displayName: string   // 自由。日本語・スペース可。UI に出る
   hostPath:    string   // ホストのディレクトリ（/Users/... または C:\...）

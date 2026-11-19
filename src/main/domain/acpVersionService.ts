@@ -8,7 +8,7 @@ import {
   withAcpRollback,
   withAcpUpdate
 } from '@shared/acpVersion'
-import type { AcpUpdateOffer, AgentEntry, Project } from '@shared/types/project'
+import type { AcpUpdateOffer, AgentEntry, SandboxProject } from '@shared/types/project'
 import { acpRegistryStore, projectsStore } from '../persistence/store'
 
 /**
@@ -37,7 +37,7 @@ export async function refreshLatestAcpVersions(): Promise<void> {
 }
 
 /** `npx -y` に渡すパッケージ指定。プロジェクトに記録した版、無ければ控えた最新版、それも無ければ `@latest`。 */
-export function acpPackageSpec(project: Project, agent: AgentEntry): string {
+export function acpPackageSpec(project: SandboxProject, agent: AgentEntry): string {
   const version = project.acpVersion ?? acpRegistryStore.get(agent.acpPackage)?.version
   return `${agent.acpPackage}@${version ?? 'latest'}`
 }
@@ -50,14 +50,14 @@ export function acpAgentName(agent: AgentEntry): string {
 /** セッション開始時に、エージェントが告げた版をプロジェクトに記録する。 */
 export function recordAcpVersion(projectId: string, version: unknown): void {
   if (!isValidVersion(version)) return
-  const project = projectsStore.list().find((p) => p.id === projectId)
+  const project = projectsStore.findSandbox(projectId)
   if (!project || project.acpVersion === version) return
   projectsStore.upsert({ ...project, acpVersion: version })
 }
 
 /** 更新を尋ねるべきなら、その内容。尋ねなくてよければ null。 */
 export function getAcpUpdateOffer(projectId: string): AcpUpdateOffer | null {
-  const project = projectsStore.list().find((p) => p.id === projectId)
+  const project = projectsStore.findSandbox(projectId)
   const agent = project && getAgentEntry(project.agentId)
   if (!project?.acpVersion || !agent) return null
   const latest = acpRegistryStore.get(agent.acpPackage)?.version
@@ -69,7 +69,7 @@ export function getAcpUpdateOffer(projectId: string): AcpUpdateOffer | null {
 /** 更新の確認への答え。更新するなら記録する版を最新版に（前の版は残す）、しないならその版を見送り済みにする。 */
 export function resolveAcpUpdate(projectId: string, update: boolean): void {
   const offer = getAcpUpdateOffer(projectId)
-  const project = projectsStore.list().find((p) => p.id === projectId)
+  const project = projectsStore.findSandbox(projectId)
   if (!offer || !project) return
   projectsStore.upsert(
     update ? withAcpUpdate(project, offer.latest) : { ...project, skippedAcpVersion: offer.latest }
@@ -78,7 +78,7 @@ export function resolveAcpUpdate(projectId: string, update: boolean): void {
 
 /** 記録する版を更新前の版に戻す。戻せる版が無ければ何もしない。 */
 export function rollbackAcpVersion(projectId: string): void {
-  const project = projectsStore.list().find((p) => p.id === projectId)
+  const project = projectsStore.findSandbox(projectId)
   const rolledBack = project && withAcpRollback(project)
   if (rolledBack) projectsStore.upsert(rolledBack)
 }

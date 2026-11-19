@@ -17,6 +17,9 @@ import { friendlyErrorMessage } from '../shared/friendlyError'
 
 type Flow = 'new' | 'existing' | 'sandbox'
 
+/** エージェントのプルダウンで「（サンドボックスなし）」を表す値。エージェント対応表の id とは重ならない。 */
+const NO_SANDBOX = '__no-sandbox__'
+
 export function CreateProjectDialog({
   open,
   onOpenChange,
@@ -121,6 +124,7 @@ function NewDirForm(props: {
   }, [displayName, dirName])
 
   const sandboxName = sanitizeSandboxNamePreview(dirName || displayName)
+  const local = agentId === NO_SANDBOX
   const canSubmit = agentId && displayName && baseDir && dirName && !busy
 
   async function pickBaseDir(): Promise<void> {
@@ -132,13 +136,17 @@ function NewDirForm(props: {
     setBusy(true)
     setError(null)
     try {
-      await window.shovel.projects.createNewDir({
-        agentId,
-        displayName,
-        baseDir,
-        dirName,
-        sandboxName
-      })
+      if (local) {
+        await window.shovel.projects.createLocal({ displayName, directory: { kind: 'new', baseDir, dirName } })
+      } else {
+        await window.shovel.projects.createNewDir({
+          agentId,
+          displayName,
+          baseDir,
+          dirName,
+          sandboxName
+        })
+      }
       onCreated()
     } catch (err) {
       setError(friendlyErrorMessage(err instanceof Error ? err.message : String(err), t))
@@ -149,19 +157,7 @@ function NewDirForm(props: {
 
   return (
     <div className="flex flex-col gap-3">
-      <Field label={t('createFlow.agent')}>
-        <select
-          className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-          value={agentId}
-          onChange={(e) => setAgentId(e.target.value)}
-        >
-          {agents.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <AgentSelect agents={agents} value={agentId} onChange={setAgentId} />
       <Field label={t('createFlow.projectName')}>
         <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoFocus />
       </Field>
@@ -179,14 +175,16 @@ function NewDirForm(props: {
           {baseDir ? `${baseDir}/${dirName}` : dirName}
         </p>
       </Field>
-      <details className="text-sm">
-        <summary className="cursor-pointer text-muted-foreground">{t('createFlow.details')}</summary>
-        <div className="mt-2 flex flex-col gap-2">
-          <Field label={t('createFlow.sandboxName')}>
-            <Input value={sandboxName} readOnly />
-          </Field>
-        </div>
-      </details>
+      {!local && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-muted-foreground">{t('createFlow.details')}</summary>
+          <div className="mt-2 flex flex-col gap-2">
+            <Field label={t('createFlow.sandboxName')}>
+              <Input value={sandboxName} readOnly />
+            </Field>
+          </div>
+        </details>
+      )}
       <DialogFooter>
         <Button disabled={!canSubmit} onClick={() => void submit()}>
           {busy ? t('common.creating') : t('common.create')}
@@ -222,13 +220,18 @@ function ExistingDirForm(props: {
     }
   }
 
-  const canSubmit = agentId && hostPath && displayName && ack && !busy
+  const local = agentId === NO_SANDBOX
+  const canSubmit = agentId && hostPath && displayName && (ack || local) && !busy
 
   async function submit(): Promise<void> {
     setBusy(true)
     setError(null)
     try {
-      await window.shovel.projects.createExistingDir({ agentId, hostPath, displayName })
+      if (local) {
+        await window.shovel.projects.createLocal({ displayName, directory: { kind: 'existing', hostPath } })
+      } else {
+        await window.shovel.projects.createExistingDir({ agentId, hostPath, displayName })
+      }
       onCreated()
     } catch (err) {
       setError(friendlyErrorMessage(err instanceof Error ? err.message : String(err), t))
@@ -247,29 +250,19 @@ function ExistingDirForm(props: {
           </Button>
         </div>
       </Field>
-      <Field label={t('createFlow.agent')}>
-        <select
-          className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-          value={agentId}
-          onChange={(e) => setAgentId(e.target.value)}
-        >
-          {agents.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <AgentSelect agents={agents} value={agentId} onChange={setAgentId} />
       <Field label={t('createFlow.projectName')}>
         <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
       </Field>
-      <div className="rounded-md border border-border bg-muted/50 p-3 text-sm">
-        <p>{t('createFlow.existingWarning')}</p>
-        <label className="mt-2 flex items-center gap-2">
-          <Checkbox checked={ack} onChange={(e) => setAck(e.target.checked)} />
-          {t('createFlow.acknowledge')}
-        </label>
-      </div>
+      {!local && (
+        <div className="rounded-md border border-border bg-muted/50 p-3 text-sm">
+          <p>{t('createFlow.existingWarning')}</p>
+          <label className="mt-2 flex items-center gap-2">
+            <Checkbox checked={ack} onChange={(e) => setAck(e.target.checked)} />
+            {t('createFlow.acknowledge')}
+          </label>
+        </div>
+      )}
       <DialogFooter>
         <Button disabled={!canSubmit} onClick={() => void submit()}>
           {busy ? t('common.creating') : t('common.create')}
@@ -354,6 +347,36 @@ function ExistingSandboxForm(props: {
         </Button>
       </DialogFooter>
     </div>
+  )
+}
+
+/** エージェントの選択。対応表のエージェントの後に「（サンドボックスなし）」を出す。 */
+function AgentSelect({
+  agents,
+  value,
+  onChange
+}: {
+  agents: AgentEntry[]
+  value: string
+  onChange: (value: string) => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <Field label={t('createFlow.agent')}>
+      <select
+        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {agents.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.label}
+          </option>
+        ))}
+        <option value={NO_SANDBOX}>{t('createFlow.noSandbox')}</option>
+      </select>
+      {value === NO_SANDBOX && <p className="mt-1 text-xs text-muted-foreground">{t('createFlow.noSandboxHint')}</p>}
+    </Field>
   )
 }
 

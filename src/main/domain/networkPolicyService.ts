@@ -1,11 +1,11 @@
-import type { Project } from '@shared/types/project'
+import type { SandboxProject } from '@shared/types/project'
 import type { NetworkBlocks } from '@shared/types/network'
 import { sbxPolicyAllowNetwork, sbxPolicyLog, sbxPolicyLs } from '../sbx/cli'
 import { projectsStore } from '../persistence/store'
 import { isAllowableResource, readBlockedEntries, readPolicyRules, summarizeBlocked } from './networkPolicy'
 
-function findProject(id: string): Project {
-  const project = projectsStore.list().find((p) => p.id === id)
+function findProject(id: string): SandboxProject {
+  const project = projectsStore.findSandbox(id)
   if (!project) throw new Error(`project not found: ${id}`)
   return project
 }

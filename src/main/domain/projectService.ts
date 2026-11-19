@@ -4,13 +4,23 @@ import path from 'node:path'
 import { dialog, shell } from 'electron'
 import { getAgentEntry } from '@shared/agentTable'
 import { acpAgentName } from './acpVersionService'
-import type { Project, ProjectListResult, SandboxStatus, SbxProblem } from '@shared/types/project'
+import {
+  isSandboxProject,
+  type LocalProject,
+  type Project,
+  type ProjectListResult,
+  type ProjectStatus,
+  type SandboxProject,
+  type SandboxStatus,
+  type SbxProblem
+} from '@shared/types/project'
 import type { SbxLsEntry } from '@shared/types/sbx'
 import { isSbxNotFoundMessage } from '@shared/sbxErrors'
 import { alreadyRegisteredMessage } from '@shared/projectErrors'
 import type {
   CreateExistingDirRequest,
   CreateFromExistingRequest,
+  CreateLocalRequest,
   CreateNewDirRequest,
   DataDirKind,
   ImportableSandbox,
@@ -45,7 +55,16 @@ export function deriveSandboxName(seed: string, existingNames: ReadonlySet<strin
  * 原因が sbx 側にあれば、「サンドボックスがありません」と誤って出さず `unknown` にする。
  */
 export async function listProjectsWithStatus(): Promise<ProjectListResult> {
-  const projects = projectsStore.list()
+  const all = projectsStore.list()
+  const projects = all.filter(isSandboxProject)
+  const localStatuses = new Map<string, ProjectStatus>()
+  for (const project of all) {
+    if (!isSandboxProject(project)) localStatuses.set(project.id, await localStatus(project))
+  }
+  // サンドボックス無しのプロジェクトしか無ければ sbx を呼ばない（sbx が無い環境でも使えるように）。
+  if (projects.length === 0) {
+    return { projects: all.map((p) => ({ ...p, status: localStatuses.get(p.id) ?? 'local' })), sbxProblem: null }
+  }
   let sandboxes: SbxLsEntry[] | null = null
   let sbxProblem: SbxProblem | null = null
   try {
@@ -63,13 +82,23 @@ export async function listProjectsWithStatus(): Promise<ProjectListResult> {
       sbxProblem = 'notSignedIn'
     }
   }
+  const listedSandboxes = sandboxes
   return {
-    projects: projects.map((project) => ({
+    projects: all.map((project) => ({
       ...project,
-      status: sandboxes ? resolveStatus(project, sandboxes) : 'unknown'
+      status: isSandboxProject(project)
+        ? listedSandboxes
+          ? resolveStatus(project, listedSandboxes)
+          : 'unknown'
+        : (localStatuses.get(project.id) ?? 'local')
     })),
     sbxProblem
   }
+}
+
+async function localStatus(project: LocalProject): Promise<ProjectStatus> {
+  const info = await stat(project.hostPath).catch(() => null)
+  return info?.isDirectory() ? 'local' : 'workspace_missing'
 }
 
 /**
@@ -97,7 +126,7 @@ async function diagnoseSbxProblem(): Promise<SbxProblem> {
 }
 
 function resolveStatus(
-  project: Project,
+  project: SandboxProject,
   sandboxes: { id: string; status: 'running' | 'stopped'; workspace_missing?: boolean }[]
 ): SandboxStatus {
   const match = sandboxes.find((s) => s.id === project.sandboxId)
@@ -107,8 +136,7 @@ function resolveStatus(
 }
 
 export async function listImportableSandboxes(): Promise<ImportableSandbox[]> {
-  const projects = projectsStore.list()
-  const known = new Set(projects.map((p) => p.sandboxId))
+  const known = new Set(projectsStore.list().filter(isSandboxProject).map((p) => p.sandboxId))
   const sandboxes = await sbxLs()
   const items: ImportableSandbox[] = []
   for (const s of sandboxes) {
@@ -218,7 +246,7 @@ async function createSandboxAndPersist(args: {
   args.onProgress({ step: 'measure', message: 'ワークスペースのパスを確認しています…' })
   const sandboxPath = await sbxMeasureSandboxPath(args.sandboxName)
 
-  const project: Project = {
+  const project: SandboxProject = {
     id: randomUUID(),
     displayName: args.displayName,
     hostPath: args.hostPath,
@@ -243,7 +271,7 @@ export async function createFromExistingSandbox(req: CreateFromExistingRequest):
   await assertNotRegistered(hostPath)
 
   const sandboxPath = await sbxMeasureSandboxPath(req.sandboxName)
-  const project: Project = {
+  const project: SandboxProject = {
     id: randomUUID(),
     displayName: req.displayName,
     hostPath,
@@ -251,6 +279,28 @@ export async function createFromExistingSandbox(req: CreateFromExistingRequest):
     sandboxName: match.name,
     sandboxId: match.id,
     agentId: agent.id,
+    createdAt: Date.now()
+  }
+  projectsStore.upsert(project)
+  return project
+}
+
+/** サンドボックス無しのプロジェクトを作る。新しいディレクトリなら作ってから登録する。 */
+export async function createLocalProject(req: CreateLocalRequest): Promise<Project> {
+  const hostPath =
+    req.directory.kind === 'new' ? path.join(req.directory.baseDir, req.directory.dirName) : req.directory.hostPath
+  await assertNotRegistered(hostPath)
+  if (req.directory.kind === 'new') {
+    await mkdir(hostPath, { recursive: true })
+  } else {
+    const info = await stat(hostPath).catch(() => null)
+    if (!info?.isDirectory()) throw new Error(`not a directory: ${hostPath}`)
+  }
+  const project: LocalProject = {
+    kind: 'local',
+    id: randomUUID(),
+    displayName: req.displayName,
+    hostPath,
     createdAt: Date.now()
   }
   projectsStore.upsert(project)
@@ -267,9 +317,11 @@ export async function removeProject(id: string, trashHostDir: boolean): Promise<
   const project = projectsStore.list().find((p) => p.id === id)
   if (!project) throw new Error(`project not found: ${id}`)
 
-  await sbxRm(project.sandboxName).catch(() => {
-    // サンドボックスが無くても登録は削除する。
-  })
+  if (isSandboxProject(project)) {
+    await sbxRm(project.sandboxName).catch(() => {
+      // サンドボックスが無くても登録は削除する。
+    })
+  }
   if (trashHostDir) {
     await shell.trashItem(project.hostPath)
   }
@@ -331,8 +383,8 @@ async function readSessionLogs(projectId: string): Promise<Pick<ProjectDiagnosti
 }
 
 export async function getProjectDiagnostics(id: string): Promise<ProjectDiagnostics> {
-  const project = projectsStore.list().find((p) => p.id === id)
-  if (!project) throw new Error(`project not found: ${id}`)
+  const project = projectsStore.findSandbox(id)
+  if (!project) throw new Error(`sandbox project not found: ${id}`)
   const [diagnoseOutput, sandboxes, logs] = await Promise.all([
     sbxDiagnose(),
     sbxLs().catch(() => []),
@@ -368,7 +420,7 @@ export async function openDataDir(id: string, kind: DataDirKind): Promise<void> 
 }
 
 export async function stopProject(id: string): Promise<void> {
-  const project = projectsStore.list().find((p) => p.id === id)
-  if (!project) throw new Error(`project not found: ${id}`)
+  const project = projectsStore.findSandbox(id)
+  if (!project) throw new Error(`sandbox project not found: ${id}`)
   await sbxStop(project.sandboxName)
 }

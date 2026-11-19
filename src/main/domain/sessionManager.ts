@@ -56,7 +56,7 @@ async function startTab(
   if (tabCountForWindow(webContents) >= MAX_TABS_PER_WINDOW) {
     throw new Error('タブは最大10個までです。')
   }
-  const project = projectsStore.list().find((p) => p.id === projectId)
+  const project = projectsStore.findSandbox(projectId)
   if (!project) throw new Error(`project not found: ${projectId}`)
   const agent = getAgentEntry(project.agentId)
   if (!agent) throw new Error(`unknown agent: ${project.agentId}`)

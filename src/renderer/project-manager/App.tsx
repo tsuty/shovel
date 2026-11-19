@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderPlus, Settings, AlertTriangle } from 'lucide-react'
-import type { ProjectWithStatus, SandboxStatus, SbxProblem } from '@shared/types/project'
+import type { ProjectStatus, ProjectWithStatus, SbxProblem } from '@shared/types/project'
 import { Button } from '../shared/components/ui/button'
 import { Badge } from '../shared/components/ui/badge'
 import { CreateProjectDialog } from './CreateProjectDialog'
@@ -190,7 +190,7 @@ export function App(): React.JSX.Element {
         />
       )}
       <ProjectDetailDialog
-        projectId={detailId}
+        project={projects?.find((p) => p.id === detailId) ?? null}
         open={detailId !== null}
         onOpenChange={(open) => !open && setDetailId(null)}
       />
@@ -199,7 +199,8 @@ export function App(): React.JSX.Element {
 }
 
 // Tailwind が拾えるよう、完全なクラス名のルックアップテーブルにする。
-const STATUS_DOT_CLASSES: Record<SandboxStatus, string> = {
+const STATUS_DOT_CLASSES: Record<ProjectStatus, string> = {
+  local: 'bg-sky-500 ring-sky-500/15',
   running: 'bg-green-500 ring-green-500/15',
   stopped: 'bg-muted-foreground ring-muted-foreground/15',
   missing: 'bg-destructive ring-destructive/15',
@@ -207,13 +208,13 @@ const STATUS_DOT_CLASSES: Record<SandboxStatus, string> = {
   unknown: 'bg-amber-500 ring-amber-500/15'
 }
 
-function StatusDot({ status }: { status: SandboxStatus }): React.JSX.Element {
+function StatusDot({ status }: { status: ProjectStatus }): React.JSX.Element {
   return <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full ring-4', STATUS_DOT_CLASSES[status])} />
 }
 
-function StatusBadge({ status }: { status: SandboxStatus }): React.JSX.Element | null {
+function StatusBadge({ status }: { status: ProjectStatus }): React.JSX.Element | null {
   const { t } = useTranslation()
-  if (status === 'running' || status === 'stopped' || status === 'unknown') {
+  if (status === 'running' || status === 'stopped' || status === 'unknown' || status === 'local') {
     return <Badge variant="secondary" className="shrink-0 whitespace-nowrap">{t(`projectManager.status.${status}`)}</Badge>
   }
   return <Badge variant="destructive" className="shrink-0 whitespace-nowrap">{t(`projectManager.status.${status}`)}</Badge>

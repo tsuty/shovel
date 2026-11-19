@@ -7,6 +7,8 @@ import { saveScreenshot } from '../domain/filerService'
 import { editMenuTemplate } from './editContextMenu'
 import { openExternalIfSafe } from './createSecureWindow'
 import { projectIdOfWindow } from './registry'
+import { projectsStore } from '../persistence/store'
+import { isSandboxProject } from '@shared/types/project'
 
 /** ブラウザのタブの保存領域（Cookie・ログイン状態）。全プロジェクトで共通にし、再起動しても残す。 */
 export const BROWSER_PARTITION = 'persist:shovel-browser'
@@ -25,6 +27,8 @@ const labels = {
     pageUrlToChat: 'Paste page URL into chat',
     screenshotToChat: 'Attach screenshot to chat',
     annotatedScreenshotToChat: 'Annotate screenshot and attach to chat',
+    saveScreenshot: 'Save screenshot',
+    annotateScreenshot: 'Annotate screenshot and save',
     visibleChat: (title: string) => `${title} (visible)`,
     noChats: 'No open chats'
   },
@@ -41,6 +45,8 @@ const labels = {
     pageUrlToChat: 'ページの URL をチャットに貼る',
     screenshotToChat: 'スクリーンショットをチャットに添付',
     annotatedScreenshotToChat: 'スクリーンショットに注釈を付けてチャットに添付',
+    saveScreenshot: 'スクリーンショットを保存',
+    annotateScreenshot: 'スクリーンショットに注釈を付けて保存',
     visibleChat: (title: string) => `${title}（表示中）`,
     noChats: '開いているチャットはありません'
   }
@@ -169,6 +175,15 @@ function chatMenuItems(
   t: (typeof labels)[keyof typeof labels]
 ): MenuItemConstructorOptions[] {
   const host = contents.hostWebContents
+  const projectId = window ? projectIdOfWindow(window) : undefined
+  const project = projectId ? projectsStore.find(projectId) : undefined
+  // サンドボックス無しのプロジェクトにはチャットが無いので、スクリーンショットの保存だけを出す。
+  if (projectId && project && !isSandboxProject(project)) {
+    return [
+      { label: t.saveScreenshot, click: () => void saveScreenshotForLocal(contents, projectId, false) },
+      { label: t.annotateScreenshot, click: () => void saveScreenshotForLocal(contents, projectId, true) }
+    ]
+  }
   const targets = (host && chatTargetsByHost.get(host.id)) ?? []
   const targetMenu = (onPick: (targetId: string) => void): MenuItemConstructorOptions[] =>
     targets.length === 0
@@ -195,7 +210,6 @@ function chatMenuItems(
   } else if (isWebUrl(pageUrl)) {
     items.push({ label: t.pageUrlToChat, submenu: targetMenu((id) => insert(id, { text: pageUrl, mode: 'inline' })) })
   }
-  const projectId = window ? projectIdOfWindow(window) : undefined
   if (projectId) {
     items.push({
       label: t.screenshotToChat,
@@ -207,6 +221,18 @@ function chatMenuItems(
     })
   }
   return items
+}
+
+/** ページの見えている範囲を撮ってプロジェクトに保存し、開く（`annotate` なら注釈を付ける画面を開く）よう renderer へ伝える。 */
+async function saveScreenshotForLocal(contents: WebContents, projectId: string, annotate: boolean): Promise<void> {
+  try {
+    const image = await contents.capturePage()
+    if (image.isEmpty()) throw new Error('captured image is empty')
+    const relPath = await saveScreenshot(projectId, image.toPNG())
+    contents.hostWebContents?.send(IpcChannel.BrowserScreenshotSaved, relPath, annotate)
+  } catch (err) {
+    console.warn('[browser] screenshot failed:', err)
+  }
 }
 
 /**

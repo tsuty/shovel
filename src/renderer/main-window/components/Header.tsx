@@ -1,6 +1,6 @@
 import { ChevronDown, FolderPlus, Info, LayoutGrid, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ProjectWithStatus, SandboxStatus } from '@shared/types/project'
+import type { ProjectStatus, ProjectWithStatus } from '@shared/types/project'
 import { AppLogo } from '../../shared/components/AppLogo'
 import { PlanUsageIndicator } from './PlanUsageIndicator'
 import {
@@ -12,7 +12,8 @@ import {
   DropdownMenuTrigger
 } from '../../shared/components/ui/dropdown-menu'
 
-const STATUS_DOT_CLASSES: Record<SandboxStatus, string> = {
+const STATUS_DOT_CLASSES: Record<ProjectStatus, string> = {
+  local: 'bg-sky-500',
   running: 'bg-green-500',
   stopped: 'bg-muted-foreground',
   missing: 'bg-destructive',
@@ -33,7 +34,8 @@ export function Header({
   onOpenDetails
 }: {
   displayName: string
-  status: SandboxStatus | null
+  /** サンドボックス無しのプロジェクトでは、フォルダが無いとき（`workspace_missing`）だけ出す。 */
+  status: ProjectStatus | null
   currentProjectId: string | null
   recentProjects: ProjectWithStatus[]
   showPlanUsage: boolean
@@ -90,7 +92,7 @@ export function Header({
       </div>
       <div className="flex items-center gap-3">
         {showPlanUsage && <PlanUsageIndicator />}
-        {status && (
+        {status && status !== 'local' && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className={`h-2 w-2 rounded-full ${STATUS_DOT_CLASSES[status]}`} />
             {t(`projectManager.status.${status}`)}
