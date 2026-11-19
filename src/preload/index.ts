@@ -68,6 +68,7 @@ const api: RendererApi = {
     allowNetworkHost: (id, host) => ipcRenderer.invoke(IpcChannel.ProjectsAllowNetworkHost, id, host),
     setNetworkHostIgnored: (id, host, ignored) =>
       ipcRenderer.invoke(IpcChannel.ProjectsSetNetworkHostIgnored, id, host, ignored),
+    setSystemPrompt: (id, text) => ipcRenderer.invoke(IpcChannel.ProjectsSetSystemPrompt, id, text),
     onProgress: (cb) => {
       const listener = (_event: unknown, payload: ProjectProgress): void => cb(payload)
       ipcRenderer.on(IpcChannel.ProjectsProgress, listener)

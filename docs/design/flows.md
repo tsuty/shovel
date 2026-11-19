@@ -217,6 +217,9 @@ $ shovel [path]                     ← 省略時はカレントディレクト�
        ├─ 4. session/list  （sessionCapabilities.list があれば）
        │
        └─ 5. session/new   cwd = sandboxPath, mcpServers = []
+                           systemPrompt = { mode: append, content: [text] }
+                             （プロジェクトに追記があり、sessionCapabilities.systemPrompt があるときだけ。
+                              送った値はスナップショットに記録し、再開時の session/load・resume にも送る。decisions.md A-1i）
                            ← sessionId / models / modes / configOptions
 ```
 

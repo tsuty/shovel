@@ -47,6 +47,7 @@ export const IpcChannel = {
   ProjectsNetworkBlocks: 'projects:networkBlocks',
   ProjectsAllowNetworkHost: 'projects:allowNetworkHost',
   ProjectsSetNetworkHostIgnored: 'projects:setNetworkHostIgnored',
+  ProjectsSetSystemPrompt: 'projects:setSystemPrompt',
   AppOpenProjectManager: 'app:openProjectManager',
   SettingsGet: 'settings:get',
   SettingsUpdate: 'settings:update',
@@ -293,6 +294,8 @@ export interface RendererApi {
     allowNetworkHost(id: string, host: string): Promise<void>
     /** 宛先をプロジェクトの無視リストに入れる／外す。 */
     setNetworkHostIgnored(id: string, host: string, ignored: boolean): Promise<void>
+    /** システムプロンプトの追記を保存する（前後の空白は除き、空なら消す）。 */
+    setSystemPrompt(id: string, text: string): Promise<void>
     onProgress(cb: (p: ProjectProgress) => void): () => void
   }
   agents: {

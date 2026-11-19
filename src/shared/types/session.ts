@@ -72,6 +72,11 @@ export interface SessionSnapshot {
   savedAt: number
   /** エージェントが報告する最終更新時刻。 */
   agentUpdatedAt?: number
+  /**
+   * このセッションを `session/new` で始めたときに送ったシステムプロンプトの追記。送っていなければ
+   * undefined。`session/load` / `session/resume` で再開するときに同じ値を送る。
+   */
+  systemPrompt?: string
   /** トランスクリプトの再描画に使うエントリ。 */
   entries: SnapshotEntry[]
 }
@@ -244,4 +249,6 @@ export interface SessionCapabilities {
   resume: boolean
   delete: boolean
   close: boolean
+  /** `systemPrompt`（`append`）を受け付けるか。 */
+  systemPrompt: boolean
 }

@@ -17,6 +17,7 @@ import {
 import type { SbxLsEntry } from '@shared/types/sbx'
 import { isSbxNotFoundMessage } from '@shared/sbxErrors'
 import { alreadyRegisteredMessage } from '@shared/projectErrors'
+import { normalizeSystemPrompt } from '@shared/systemPrompt'
 import type {
   CreateExistingDirRequest,
   CreateFromExistingRequest,
@@ -311,6 +312,13 @@ export function renameProject(id: string, displayName: string): void {
   const project = projectsStore.list().find((p) => p.id === id)
   if (!project) throw new Error(`project not found: ${id}`)
   projectsStore.upsert({ ...project, displayName })
+}
+
+/** システムプロンプトの追記を保存する。空なら消す。サンドボックス無しのプロジェクトには持たせない。 */
+export function setProjectSystemPrompt(id: string, text: string): void {
+  const project = projectsStore.findSandbox(id)
+  if (!project) throw new Error(`project not found: ${id}`)
+  projectsStore.upsert({ ...project, systemPrompt: normalizeSystemPrompt(text) })
 }
 
 export async function removeProject(id: string, trashHostDir: boolean): Promise<void> {

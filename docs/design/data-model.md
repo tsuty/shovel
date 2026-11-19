@@ -34,6 +34,7 @@ type SandboxProject = {
   skippedAcpVersion?: string  // 更新の確認で「今のまま」を選んだ版（decisions.md N-2-5b）
   previousAcpVersion?: string // 「更新する」を選ぶ前の版。プロジェクトの詳細から戻せる（decisions.md N-2-5b）
   ignoredNetworkHosts?: string[]  // 拒否された通信のうち「無視」にした宛先 host:port（decisions.md N-2-8）
+  systemPrompt?:      string  // 新しいセッションでシステムプロンプトに追記する文章（ACP systemPrompt の append。decisions.md A-1i）
 }
 ```
 
@@ -139,6 +140,8 @@ V-2 / V-3 / V-10 / V-11 の検証を待って埋める（[open-issues.md](./open
 - 書き込みは一時ファイル経由の**アトミックな move**（中断時の破損を防ぐ）
 - **`schemaVersion` を持つ。** 移行経路の無いバージョンは「履歴なし」として破棄する
   （読み込み失敗で接続そのものを壊さないため）
+- **`systemPrompt` を持つ**（`session/new` で送ったシステムプロンプトの追記。送らなかったら無い）。
+  再開時の `session/load` / `session/resume` に同じ値を送る（decisions.md A-1i）
 - プロンプトを一度も受け取っていないセッションは、別セッションへ切り替える際に
   破棄する（空セッションがエージェント側に溜まるのを防ぐ）
 

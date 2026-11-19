@@ -345,7 +345,12 @@ by this repo's setup steps; the user installs it separately per Docker's docs.
   `src/main/acp/images.ts`, click to zoom via `TranscriptImages.tsx`), never stored in snapshots (only `mimeType`,
   restored as `[image <mime>]`); prompts never send `image` — images are attached as `resource_link` like any
   file (decisions.md A-1e). A non-`end_turn` `stopReason` adds a one-line entry at the end of the turn,
-  kept in snapshots as a `SYSTEM` entry's `stopReason` (A-1f). `docs/ACP_SUPPORT.md` is the per-feature status. The file/terminal `false` is
+  kept in snapshots as a `SYSTEM` entry's `stopReason` (A-1f). A per-project appended system prompt
+  (`SandboxProject.systemPrompt`, edited in the project details dialog's `SystemPromptSection`) goes out as
+  `systemPrompt: { mode: 'append' }` on `session/new` (incl. ↻) only when the agent advertises
+  `sessionCapabilities.systemPrompt` (else a `systemPromptUnsupported` notice); `override` is never sent. The value sent is
+  recorded in the snapshot (`SessionSnapshot.systemPrompt`) and re-sent on `session/load`/`resume` instead of the
+  project's current value (A-1i). `docs/ACP_SUPPORT.md` is the per-feature status. The file/terminal `false` is
   the load-bearing assumption behind the safety model (§6 of `architecture.md`): shovel never
   intermediates file operations, so there is no enforcement point to bypass.
 - Renderer: React + Tailwind + shadcn/ui, `react-markdown` + `remark-gfm` + `remark-gemoji`

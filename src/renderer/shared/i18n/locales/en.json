@@ -28,6 +28,14 @@
     "copyAll": "Copy all",
     "copied": "Copied"
   },
+  "systemPrompt": {
+    "title": "System prompt (appended)",
+    "info": "Instructions appended to the agent's system prompt when a chat starts in this project. Lets you give the agent standing rules (e.g. \"summarize findings under docs/\") without putting a file in the project folder, unlike CLAUDE.md or AGENTS.md.",
+    "placeholder": "e.g. Answer concisely, conclusion first.",
+    "appliesToNewChats": "Used by chats opened from now on and by ↻. Open chats and resumed history keep what they started with.",
+    "save": "Save",
+    "saved": "Saved"
+  },
   "network": {
     "title": "Network (blocked connections)",
     "info": "Connections from inside the sandbox only reach allowed destinations. When the agent's work fails with network errors, the blocked destinations show up here. Only allow destinations you recognize.",
@@ -452,7 +460,8 @@
       "other": "Context compaction ({{status}})"
     },
     "notice": {
-      "replayAdopted": "The agent's record of this session has changed, so the previous contents were saved as a backup."
+      "replayAdopted": "The agent's record of this session has changed, so the previous contents were saved as a backup.",
+      "systemPromptUnsupported": "This agent doesn't accept an appended system prompt, so it wasn't sent."
     }
   },
   "elicitation": {

@@ -127,7 +127,8 @@ export async function resumeTab(
     snapshotId: snapshot.sessionId,
     acpSessionId: snapshot.acpSessionId,
     entries: snapshot.entries,
-    title: snapshot.title
+    title: snapshot.title,
+    systemPrompt: snapshot.systemPrompt
   })
 }
 

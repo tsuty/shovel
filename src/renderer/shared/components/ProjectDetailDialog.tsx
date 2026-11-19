@@ -12,12 +12,14 @@ import {
 } from './ui/dialog'
 import { Button } from './ui/button'
 import { NetworkBlocksSection } from './NetworkBlocksSection'
+import { SystemPromptSection } from './SystemPromptSection'
 
 /**
  * プロジェクトの詳細ダイアログ。基本情報・操作（停止/OSターミナル）・診断情報（`sbx diagnose` 出力、
  * ACP トラフィックログ、エージェントの stderr、`sbx ls --json` の該当エントリ）をまとめ、
  * 丸ごとクリップボードにコピーできる。ログは最後に開いたセッションのログファイルから読み、
  * 無ければその節は表示しない。拒否された通信は「ネットワーク」欄（`NetworkBlocksSection`）に出す。
+ * システムプロンプトの追記は `SystemPromptSection` で編集する。
  * サンドボックス無しのプロジェクトでは、名前とフォルダだけを出す。
  */
 export function ProjectDetailDialog({
@@ -184,6 +186,8 @@ function SandboxProjectDetail({
                 {t('detail.stop')}
               </Button>
             </div>
+
+            <SystemPromptSection projectId={diagnostics.project.id} initialValue={diagnostics.project.systemPrompt} />
 
             <NetworkBlocksSection projectId={diagnostics.project.id} sandboxName={diagnostics.project.sandboxName} />
 

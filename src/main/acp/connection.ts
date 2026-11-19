@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import type {
+  ActiveSession,
   ActiveSessionMessage,
   ClientContext,
   ContentBlock,
@@ -16,7 +17,8 @@ import type {
   SessionConfigOption,
   SessionModeState,
   SessionUpdate,
-  SetSessionConfigOptionResponse
+  SetSessionConfigOptionResponse,
+  SystemPrompt
 } from '@agentclientprotocol/sdk'
 import type { AgentEntry, SandboxProject } from '@shared/types/project'
 import type {
@@ -47,7 +49,7 @@ import {
 import { backupSnapshot, saveSnapshot } from '../persistence/snapshot'
 import { mergeConfigOptions } from './configOptions'
 import { compareByMessageId, describeMessageIdComparison, SnapshotAccumulator } from './snapshotRecord'
-import { sessionTitleStore } from '../persistence/store'
+import { projectsStore, sessionTitleStore } from '../persistence/store'
 import { acpPackageSpec, recordAcpVersion } from '../domain/acpVersionService'
 import { AUTH_REQUIRED_MARKER } from '@shared/authMarker'
 import { RESTORE_UNSUPPORTED_MARKER } from '@shared/restoreMarker'
@@ -211,7 +213,19 @@ export async function openAcpSession(
    */
   let restoreEpoch = 0
   /** `initialize` の応答から読んだ対応状況。接続が確立するまでは全部 false。 */
-  let capabilities: SessionCapabilities = { list: false, load: false, resume: false, delete: false, close: false }
+  let capabilities: SessionCapabilities = {
+    list: false,
+    load: false,
+    resume: false,
+    delete: false,
+    close: false,
+    systemPrompt: false
+  }
+  /**
+   * いまの ACP セッションを始めたときに送ったシステムプロンプトの追記（スナップショットに記録する）。
+   * 復元したセッションでは、スナップショットに記録されていた値。
+   */
+  let sessionSystemPrompt: string | undefined = restore?.systemPrompt
 
   /** ターン終了時: 記録を保存してから、履歴一覧を取り直す契機を知らせる。 */
   function persistAfterTurn(): void {
@@ -264,6 +278,7 @@ export async function openAcpSession(
       // 名前変更の上書き → エージェントが付けたタイトル → 復元元のタイトル → 最初の発言、の順。
       title: sessionTitleStore.get(snapshotId) ?? agentTitle ?? restoredTitle ?? snapshotAcc.title(),
       savedAt: Date.now(),
+      systemPrompt: sessionSystemPrompt,
       entries: snapshotAcc.snapshotEntries()
     }).catch(() => {
       // 書き込みに失敗しても接続は維持する。
@@ -331,8 +346,32 @@ export async function openAcpSession(
     replayForComparison: ActiveSessionMessage[] | null
   }
 
+  /**
+   * `session/new` を送る。プロジェクトにシステムプロンプトの追記があれば、エージェントが対応して
+   * いるときだけ添え、送った値を `sessionSystemPrompt` に残す。`unsupported` は、追記があるのに
+   * エージェントが対応していなかったこと。
+   */
+  async function createAgentSession(ctx: ClientContext): Promise<{ session: ActiveSession; unsupported: boolean }> {
+    const wanted = projectsStore.findSandbox(project.id)?.systemPrompt ?? project.systemPrompt
+    const sent = wanted && capabilities.systemPrompt ? wanted : undefined
+    const session = await ctx
+      .buildSession({
+        cwd: project.sandboxPath,
+        mcpServers: [],
+        ...(sent ? { systemPrompt: appendSystemPrompt(sent) } : {})
+      })
+      .start()
+    sessionSystemPrompt = sent
+    return { session, unsupported: Boolean(wanted) && !sent }
+  }
+
+  function notifySystemPromptUnsupported(): void {
+    callbacks.onEvent({ type: 'notice', id: randomUUID(), key: 'systemPromptUnsupported' })
+  }
+
   async function startNewSession(ctx: ClientContext): Promise<StartedSession> {
-    const session = await ctx.buildSession(project.sandboxPath).start()
+    const { session, unsupported } = await createAgentSession(ctx)
+    if (unsupported) notifySystemPromptUnsupported()
     return {
       session,
       modes: session.modes,
@@ -361,6 +400,9 @@ export async function openAcpSession(
     const hasLocal = target.entries.length > 0
 
     const acpSessionId = target.acpSessionId
+    // 作成時に送ったシステムプロンプトを、再開でも同じく送る。
+    const systemPromptParam =
+      target.systemPrompt && caps.systemPrompt ? { systemPrompt: appendSystemPrompt(target.systemPrompt) } : {}
     const manual = new ManualSession(acpSessionId, ctx, acp.AGENT_METHODS.session_prompt, () =>
       manualSessions.delete(acpSessionId)
     )
@@ -369,13 +411,14 @@ export async function openAcpSession(
 
     // ローカル記録があれば、エージェントの応答を待たずに描く。
     if (hasLocal) seedFromSnapshot(target.entries)
+    if (target.systemPrompt && !caps.systemPrompt) notifySystemPromptUnsupported()
 
     if (!caps.load) {
       const response: ResumeSessionResponse = await withDeadline(
         (cancellationSignal) =>
           ctx.request(
             acp.AGENT_METHODS.session_resume,
-            { sessionId: acpSessionId, cwd: project.sandboxPath },
+            { sessionId: acpSessionId, cwd: project.sandboxPath, ...systemPromptParam },
             { cancellationSignal }
           ),
         REQUEST_DEADLINE_MS
@@ -396,7 +439,7 @@ export async function openAcpSession(
         (cancellationSignal) =>
           ctx.request(
             acp.AGENT_METHODS.session_load,
-            { sessionId: acpSessionId, cwd: project.sandboxPath, mcpServers: [] },
+            { sessionId: acpSessionId, cwd: project.sandboxPath, mcpServers: [], ...systemPromptParam },
             { cancellationSignal }
           ),
         REQUEST_DEADLINE_MS
@@ -733,7 +776,7 @@ export async function openAcpSession(
       snapshotAcc.reset()
       translator.reset()
 
-      const newSession = await ready.ctx.buildSession(project.sandboxPath).start()
+      const { session: newSession, unsupported } = await createAgentSession(ready.ctx)
       currentSession = newSession
       currentAcpSessionId = newSession.sessionId
       const newMetaState = initialMetaState(newSession.modes, newSession.newSessionResponse.configOptions)
@@ -745,6 +788,7 @@ export async function openAcpSession(
       resolvedMetaState.commands = []
 
       callbacks.onEvent({ type: 'reset', sessionId })
+      if (unsupported) notifySystemPromptUnsupported()
       callbacks.onEvent({ ...resolvedMetaState, type: 'sessionMeta' })
       void runUpdateLoop(newSession, translator, callbacks, resolvedMetaState, snapshotAcc, loopHooks, applyAgentTitle)
       return snapshotId
@@ -904,8 +948,14 @@ function readCapabilities(response: unknown): SessionCapabilities {
     resume: sessionCapabilities?.resume != null,
     list: sessionCapabilities?.list != null,
     delete: sessionCapabilities?.delete != null,
-    close: sessionCapabilities?.close != null
+    close: sessionCapabilities?.close != null,
+    systemPrompt: sessionCapabilities?.systemPrompt != null
   }
+}
+
+/** ACP の `systemPrompt`（`append` モード、テキスト1ブロック）を組み立てる。 */
+function appendSystemPrompt(text: string): SystemPrompt {
+  return { mode: 'append', content: [{ type: 'text', text }] }
 }
 
 /** 過去のセッションを復元して開くときの指定。`sessionManager` が組み立てる。 */
@@ -918,6 +968,8 @@ export interface RestoreRequest {
   entries: SnapshotEntry[]
   /** 元のスナップショットのタイトル。記録を保存し直すときに引き継ぐ。 */
   title?: string
+  /** 元のセッションを始めたときに送ったシステムプロンプトの追記（スナップショットに記録してある）。 */
+  systemPrompt?: string
 }
 
 interface MutableMetaState {

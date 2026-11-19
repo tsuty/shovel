@@ -196,8 +196,10 @@ export type TranscriptEvent =
    * 文言は renderer 側の i18n で `transcript.notice.{key}` から引く。
    *   - `replayAdopted`: `session/load` の replay とローカル記録が食い違ったため、
    *     ローカルをバックアップへ退避して表示をエージェント側の記録に置き換えた。
+   *   - `systemPromptUnsupported`: システムプロンプトの追記があるが、エージェントが受け付けない
+   *     ため送らなかった。
    */
-  | { type: 'notice'; id: string; key: 'replayAdopted' }
+  | { type: 'notice'; id: string; key: 'replayAdopted' | 'systemPromptUnsupported' }
   /**
    * エージェントからの知らせ（ACP `notice`）。トランスクリプトに1行で出す。ライブのみで、
    * スナップショットには残さない。`severity` は ACP の値をそのまま運ぶ。

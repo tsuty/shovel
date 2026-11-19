@@ -25,6 +25,7 @@ import {
   pickDirectory,
   removeProject,
   renameProject,
+  setProjectSystemPrompt,
   stopProject
 } from '../domain/projectService'
 import { openSandboxTerminal, openSbxLoginTerminal } from '../domain/terminal'
@@ -152,6 +153,9 @@ export function registerIpc(): void {
     renameProject(id, displayName)
     refreshProjectWindowTitle(id)
   })
+  ipcMain.handle(IpcChannel.ProjectsSetSystemPrompt, (_event, id: string, text: string) =>
+    setProjectSystemPrompt(id, text)
+  )
   ipcMain.handle(IpcChannel.ProjectsRemove, (_event, id: string, trashHostDir: boolean) =>
     removeProject(id, trashHostDir)
   )

@@ -54,6 +54,11 @@ export interface SandboxProject {
   skippedAcpVersion?: string
   /** 拒否された通信のうち、ユーザーが「無視」にした宛先（`host:port`）。 */
   ignoredNetworkHosts?: string[]
+  /**
+   * 新しいセッションを始めるときにエージェントのシステムプロンプトへ追記する文章
+   * （ACP `systemPrompt` の `append`）。未設定なら undefined（空文字は保存しない）。
+   */
+  systemPrompt?: string
 }
 
 /** プロジェクトのウィンドウを開いたときに尋ねる、ACP アダプタの更新。 */
