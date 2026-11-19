@@ -158,6 +158,8 @@ export interface ImportableSandbox {
   sbxAgentRaw: string
   hostPath: string
   status: 'running' | 'stopped'
+  /** ワークスペースのフォルダがすでにプロジェクトとして登録されていれば、その名前。取り込めない。 */
+  registeredProjectName: string | null
 }
 
 export interface CreateFromExistingRequest {

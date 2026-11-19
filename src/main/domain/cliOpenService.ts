@@ -11,7 +11,7 @@ import { logAppEvent } from '../log'
 import { openProjectWindow } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
 import { hostPathsEqual } from './pathTranslate'
-import { createFromExistingSandbox, sbxLsRetryingPath } from './projectService'
+import { createFromExistingSandbox, findRegisteredProject, sbxLsRetryingPath } from './projectService'
 import { type CliOpenRequest, matchSandboxesForPath, resolveCliTarget } from './cliCommand'
 
 const labels = {
@@ -73,11 +73,10 @@ async function openTarget(target: string, t: Labels): Promise<boolean> {
   const samePlace = async (candidate: string): Promise<boolean> =>
     hostPathsEqual(candidate, target) || hostPathsEqual(await canonical(candidate), real)
 
-  for (const project of projectsStore.list()) {
-    if (await samePlace(project.hostPath)) {
-      show(project.id)
-      return true
-    }
+  const registered = await findRegisteredProject(target)
+  if (registered) {
+    show(registered.id)
+    return true
   }
 
   let sandboxes: SbxLsEntry[]

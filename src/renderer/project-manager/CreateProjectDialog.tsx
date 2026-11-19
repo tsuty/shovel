@@ -320,11 +320,14 @@ function ExistingSandboxForm(props: {
         {items.map((item) => (
           <label
             key={item.sandboxId}
-            className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-sm"
+            className={`flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-sm ${
+              item.registeredProjectName !== null ? 'opacity-50' : ''
+            }`}
           >
             <input
               type="radio"
               name="sandbox"
+              disabled={item.registeredProjectName !== null}
               checked={selected === item.sandboxName}
               onChange={() => {
                 setSelected(item.sandboxName)
@@ -333,6 +336,11 @@ function ExistingSandboxForm(props: {
             />
             <span className="font-medium">{item.sandboxName}</span>
             <span className="text-muted-foreground">{item.sbxAgentRaw}</span>
+            {item.registeredProjectName !== null && (
+              <span className="text-xs text-muted-foreground">
+                {t('createFlow.importRegistered', { name: item.registeredProjectName })}
+              </span>
+            )}
             <span className="ml-auto text-xs text-muted-foreground">{item.hostPath}</span>
           </label>
         ))}

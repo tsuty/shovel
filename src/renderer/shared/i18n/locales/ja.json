@@ -92,7 +92,8 @@
     "sandboxName": "サンドボックス名",
     "existingWarning": "このディレクトリ内のファイルは、隠しファイルを含めすべて AI に参照されます。",
     "acknowledge": "確認しました",
-    "noImportable": "取り込めるサンドボックスはありません。"
+    "noImportable": "取り込めるサンドボックスはありません。",
+    "importRegistered": "登録済み:「{{name}}」"
   },
   "sidebar": {
     "tabs": "チャット",
@@ -483,6 +484,7 @@
     "usageTitle": "このセッションのコンテキストで {{used}} / {{size}} トークンを使用"
   },
   "errors": {
+    "alreadyRegistered": "このフォルダはプロジェクト「{{name}}」として登録済みです。1つのフォルダは1つのプロジェクトにしか登録できません。",
     "sbxNotFound": "Docker Sandboxes の「sbx」コマンドが見つかりません。インストールしてからもう一度お試しください: https://docs.docker.com/ai/sandboxes/",
     "sandboxUnreachable": {
       "notSignedIn": "Docker にサインインしていないため、サンドボックスに接続できません。ターミナルで sbx login を実行してサインインしてから、もう一度お試しください。",

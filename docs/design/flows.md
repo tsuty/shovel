@@ -105,7 +105,8 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
 
 ### フロー3：既存サンドボックスから追加
 
-`sbx ls --json` にあって shovel の一覧に無いものを提示する。
+`sbx ls --json` にあって shovel の一覧に無いものを提示する。ワークスペースが登録済みのフォルダであるものは
+「登録済み」と添えて選べなくする（decisions.md G-3-5）。
 エージェントもパスも `sbx` が知っているため、聞くのは表示名だけ。
 
 ```
@@ -117,6 +118,7 @@ sbx exec <name> claude auth status --json     ← 高速な事前チェック
 ### 2-4. 共通処理（作成フローの中で完了まで待つ）
 
 ```
+0. 同じフォルダのプロジェクトが登録済みなら止める（decisions.md G-3-5。フロー3 でも行う）
 1. ディレクトリを用意             （フロー1 のみ）
 2. sbx create <sbxAgent> <hostPath> --name <sandboxName>
      ↑ 初回はイメージ取得で数分かかりうる。進捗を必ず表示する

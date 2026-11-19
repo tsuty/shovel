@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
+import { mkdir, readdir, readFile, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { dialog, shell } from 'electron'
 import { getAgentEntry } from '@shared/agentTable'
@@ -7,6 +7,7 @@ import { acpAgentName } from './acpVersionService'
 import type { Project, ProjectListResult, SandboxStatus, SbxProblem } from '@shared/types/project'
 import type { SbxLsEntry } from '@shared/types/sbx'
 import { isSbxNotFoundMessage } from '@shared/sbxErrors'
+import { alreadyRegisteredMessage } from '@shared/projectErrors'
 import type {
   CreateExistingDirRequest,
   CreateFromExistingRequest,
@@ -109,16 +110,44 @@ export async function listImportableSandboxes(): Promise<ImportableSandbox[]> {
   const projects = projectsStore.list()
   const known = new Set(projects.map((p) => p.sandboxId))
   const sandboxes = await sbxLs()
-  return sandboxes
-    .filter((s) => !known.has(s.id))
-    .map((s) => ({
+  const items: ImportableSandbox[] = []
+  for (const s of sandboxes) {
+    if (known.has(s.id)) continue
+    const hostPath = s.workspaces[0] ?? ''
+    const registered = hostPath ? await findRegisteredProject(hostPath) : undefined
+    items.push({
       sandboxName: s.name,
       sandboxId: s.id,
       agentId: getAgentEntry(s.agent) ? s.agent : null,
       sbxAgentRaw: s.agent,
-      hostPath: s.workspaces[0] ?? '',
-      status: s.status
-    }))
+      hostPath,
+      status: s.status,
+      registeredProjectName: registered?.displayName ?? null
+    })
+  }
+  return items
+}
+
+async function canonicalPath(p: string): Promise<string> {
+  return realpath(p).catch(() => p)
+}
+
+/**
+ * このフォルダを使っている登録済みのプロジェクト。シンボリックリンクを解いた先が同じものも同じフォルダとみなす。
+ */
+export async function findRegisteredProject(hostPath: string): Promise<Project | undefined> {
+  const real = await canonicalPath(hostPath)
+  for (const project of projectsStore.list()) {
+    if (hostPathsEqual(project.hostPath, hostPath)) return project
+    if (hostPathsEqual(await canonicalPath(project.hostPath), real)) return project
+  }
+  return undefined
+}
+
+/** 同じフォルダのプロジェクトが登録済みなら、目印付きの Error を投げる。 */
+async function assertNotRegistered(hostPath: string): Promise<void> {
+  const registered = await findRegisteredProject(hostPath)
+  if (registered) throw new Error(alreadyRegisteredMessage(registered.displayName))
 }
 
 export async function createFromNewDirectory(
@@ -128,6 +157,7 @@ export async function createFromNewDirectory(
   const agent = getAgentEntry(req.agentId)
   if (!agent) throw new Error(`unknown agent: ${req.agentId}`)
   const hostPath = path.join(req.baseDir, req.dirName)
+  await assertNotRegistered(hostPath)
 
   onProgress({ step: 'mkdir', message: 'プロジェクトディレクトリを作成しています…' })
   await mkdir(hostPath, { recursive: true })
@@ -147,6 +177,7 @@ export async function createFromExistingDirectory(
 ): Promise<Project> {
   const agent = getAgentEntry(req.agentId)
   if (!agent) throw new Error(`unknown agent: ${req.agentId}`)
+  await assertNotRegistered(req.hostPath)
   const existingNames = new Set((await sbxLs().catch(() => [])).map((s) => s.name))
   const sandboxName = deriveSandboxName(path.basename(req.hostPath), existingNames)
 
@@ -209,6 +240,7 @@ export async function createFromExistingSandbox(req: CreateFromExistingRequest):
   if (!agent) throw new Error(`unsupported agent for existing sandbox: ${match.agent}`)
   const hostPath = match.workspaces[0]
   if (!hostPath) throw new Error(`sandbox ${req.sandboxName} has no primary workspace`)
+  await assertNotRegistered(hostPath)
 
   const sandboxPath = await sbxMeasureSandboxPath(req.sandboxName)
   const project: Project = {
@@ -339,8 +371,4 @@ export async function stopProject(id: string): Promise<void> {
   const project = projectsStore.list().find((p) => p.id === id)
   if (!project) throw new Error(`project not found: ${id}`)
   await sbxStop(project.sandboxName)
-}
-
-export function findProjectByHostPath(hostPath: string): Project | undefined {
-  return projectsStore.list().find((p) => hostPathsEqual(p.hostPath, hostPath))
 }

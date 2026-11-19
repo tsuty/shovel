@@ -93,7 +93,8 @@
     "sandboxName": "Sandbox name",
     "existingWarning": "All files in this directory, including hidden files, will be visible to the AI.",
     "acknowledge": "I understand",
-    "noImportable": "No sandboxes to import."
+    "noImportable": "No sandboxes to import.",
+    "importRegistered": "Already registered: \"{{name}}\""
   },
   "sidebar": {
     "tabs": "Chats",
@@ -486,6 +487,7 @@
     "usageTitle": "{{used}} / {{size}} tokens used in this session's context"
   },
   "errors": {
+    "alreadyRegistered": "This folder is already registered as the project \"{{name}}\". A folder can belong to only one project.",
     "sbxNotFound": "The \"sbx\" (Docker Sandboxes) command line tool was not found. Install it and try again: https://docs.docker.com/ai/sandboxes/",
     "sandboxUnreachable": {
       "notSignedIn": "Can't connect to the sandbox because you are not signed in to Docker. Run sbx login in a terminal to sign in, then try again.",
