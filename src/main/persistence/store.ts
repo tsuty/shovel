@@ -22,8 +22,10 @@ interface StoreSchema {
   acpRegistryEntries: Record<string, AcpRegistryEntry>
   /** プロジェクトごとの、開いていたタブ（表示順）。 */
   openTabs: Record<string, SavedTab[]>
-  /** プロジェクトごとの、ブラウザのブックマーク。 */
-  bookmarks: Record<string, Bookmark[]>
+  /** ホストのパス（`hostPathKey`）ごとの、ブラウザのブックマーク。 */
+  bookmarksByHostPath: Record<string, Bookmark[]>
+  /** 旧形式: プロジェクト ID ごとのブックマーク。読み出し時に `bookmarksByHostPath` へ移して消す。 */
+  bookmarks?: Record<string, Bookmark[]>
 }
 
 const defaults: StoreSchema = {
@@ -47,7 +49,7 @@ const defaults: StoreSchema = {
   lastPickedDirectory: null,
   acpRegistryEntries: {},
   openTabs: {},
-  bookmarks: {}
+  bookmarksByHostPath: {}
 }
 
 const store = new Store<StoreSchema>({ defaults })
@@ -207,17 +209,28 @@ export const openTabsStore = {
   }
 }
 
+/** ブラウザのブックマーク。キーはホストのパス（`hostPathKey`）。 */
 export const bookmarksStore = {
-  get(projectId: string): Bookmark[] {
-    return store.get('bookmarks')[projectId] ?? []
+  get(hostPathKey: string): Bookmark[] {
+    return store.get('bookmarksByHostPath')[hostPathKey] ?? []
   },
-  set(projectId: string, bookmarks: Bookmark[]): void {
-    const map = store.get('bookmarks')
-    if (bookmarks.length > 0) map[projectId] = bookmarks
-    else delete map[projectId]
-    store.set('bookmarks', map)
+  set(hostPathKey: string, bookmarks: Bookmark[]): void {
+    const map = store.get('bookmarksByHostPath')
+    if (bookmarks.length > 0) map[hostPathKey] = bookmarks
+    else delete map[hostPathKey]
+    store.set('bookmarksByHostPath', map)
   },
-  remove(projectId: string): void {
-    this.set(projectId, [])
+  getAll(): Record<string, Bookmark[]> {
+    return store.get('bookmarksByHostPath')
+  },
+  replaceAll(map: Record<string, Bookmark[]>): void {
+    store.set('bookmarksByHostPath', map)
+  },
+  /** 旧形式（プロジェクト ID ごと）の一覧。無ければ null。 */
+  getLegacy(): Record<string, Bookmark[]> | null {
+    return store.has('bookmarks') ? (store.get('bookmarks') ?? null) : null
+  },
+  deleteLegacy(): void {
+    store.delete('bookmarks')
   }
 }

@@ -34,11 +34,13 @@ export function sandboxToHostPath(roots: PathTranslationRoots, sandboxAbsPath: s
   return relParts.length === 0 ? roots.hostPath : path.join(roots.hostPath, ...relParts)
 }
 
+/** ホストのパスを比較・キー用に揃える（末尾の区切りを除き、Windows では小文字にする）。 */
+export function hostPathKey(p: string): string {
+  const normalized = path.normalize(p).replace(/[/\\]+$/, '')
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+}
+
 /** `sbx ls --json` の `workspaces` と `Project.hostPath` を照合する（Windows では大文字小文字を無視）。 */
 export function hostPathsEqual(a: string, b: string): boolean {
-  const normalize = (p: string): string => {
-    const normalized = path.normalize(p).replace(/[/\\]+$/, '')
-    return process.platform === 'win32' ? normalized.toLowerCase() : normalized
-  }
-  return normalize(a) === normalize(b)
+  return hostPathKey(a) === hostPathKey(b)
 }

@@ -118,7 +118,7 @@ submenu listing every connected chat (left pane first, "（表示中）" on visi
 none), and picking a hidden chat brings it to front and focuses its composer. The renderer pushes that list to main via
 `browser:setChatTargets` (decisions.md G-1-20「チャットへ渡す項目」, `src/shared/chatDraft.ts`). The Filer's "add to
 context ▸" uses the same chat list submenu and the same bring-to-front + focus behavior. Bookmarks are
-per project (`electron-store` `bookmarks`, `bookmarkService.ts`), managed from a "browser" sidebar panel
+per project folder (`electron-store` `bookmarksByHostPath`, keyed by `hostPathKey(hostPath)` so they survive deleting and re-creating the project; the old per-project-id `bookmarks` is migrated on first access — `bookmarkService.ts`), managed from a "browser" sidebar panel
 (`BrowserPanel.tsx`/`BookmarkDialog.tsx`). The browser runs on the host, outside the sandbox, and the agent can't drive
 it. Playwright's synthetic mouse/keys don't reach a `<webview>` guest — use real X input (`xdotool` + a window manager
 such as openbox under Xvfb) when testing it. A command-execution drawer (terminal-styled surface, resizable/persisted height, per-entry history delete, and a

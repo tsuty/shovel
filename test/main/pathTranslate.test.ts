@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { hostPathsEqual, hostToSandboxPath, sandboxToHostPath } from '@main/domain/pathTranslate'
+import { hostPathKey, hostPathsEqual, hostToSandboxPath, sandboxToHostPath } from '@main/domain/pathTranslate'
 
 const hostRoot = process.platform === 'win32' ? 'C:\\Users\\me\\project' : '/Users/me/project'
 const roots = { hostPath: hostRoot, sandboxPath: '/workspace/project' }
@@ -58,5 +58,11 @@ describe('hostPathsEqual', () => {
 
   it('別のディレクトリは一致しない', () => {
     expect(hostPathsEqual('/Users/me/project', '/Users/me/project2')).toBe(false)
+  })
+})
+
+describe('hostPathKey', () => {
+  it('末尾の区切りを除く', () => {
+    expect(hostPathKey(host() + path.sep)).toBe(hostPathKey(host()))
   })
 })
