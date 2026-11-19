@@ -318,7 +318,40 @@
     "fontSampleEditor": "0O 1lI {}[] ABC abc あいう 漢字",
     "fontSamplePreview": "The quick brown fox あいうえお 漢字 0123",
     "showPlanUsage": "Show plan usage",
-    "showPlanUsageHint": "If you use a Claude subscription (Pro / Max / Team, etc.), shows session and weekly usage at the top right. It runs /usage inside a running sandbox. Not available when using an API key."
+    "showPlanUsageHint": "If you use a Claude subscription (Pro / Max / Team, etc.), shows session and weekly usage at the top right. It runs /usage inside a running sandbox. Not available when using an API key.",
+    "cli": {
+      "title": "Command line tool",
+      "hint": "Type “shovel <folder>” in a terminal (the current directory if omitted) to open that folder's project. If there is no project yet, it is added from the sandbox whose workspace is the folder (no sandbox is created).",
+      "loading": "Checking…",
+      "dev": "Not available when running from source. Use a packaged build of shovel.",
+      "dirNotOnPath": "The folder is not on your PATH. Add it to PATH in your shell settings.",
+      "shadowed": "Another shovel comes first on your PATH: {{path}}",
+      "command": {
+        "installed": "Installed",
+        "notInstalled": "Not installed",
+        "stale": "Points to shovel in its previous location. Reinstall it.",
+        "foreign": "Cannot install: another file is already there.",
+        "install": "Install",
+        "reinstall": "Reinstall",
+        "uninstall": "Uninstall"
+      },
+      "path": {
+        "installed": "Added to PATH (available in newly opened terminals)",
+        "notInstalled": "Not on PATH",
+        "stale": "Not on PATH",
+        "foreign": "Not on PATH",
+        "byInstaller": "Added to the system PATH by the installer",
+        "install": "Add to PATH",
+        "reinstall": "Add to PATH",
+        "uninstall": "Remove from PATH"
+      },
+      "package": {
+        "installed": "Installed by the package",
+        "notInstalled": "Not found. Reinstall the package.",
+        "stale": "Set up by an older version. Reinstall the package.",
+        "foreign": "Another file is there."
+      }
+    }
   },
   "history": {
     "title": "History",

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Checkbox } from './ui/input'
 import { FontFamilySelect } from './FontFamilySelect'
 import { InfoTip } from './InfoTip'
+import { CliInstallSection } from './CliInstallSection'
 
 export function SettingsDialog({
   open,
@@ -20,7 +21,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-h-[90vh] max-w-sm overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('settings.title')}</DialogTitle>
         </DialogHeader>
@@ -118,6 +119,9 @@ export function SettingsDialog({
             {t('settings.showPlanUsage')}
             <InfoTip text={t('settings.showPlanUsageHint')} />
           </label>
+          <div className="border-t pt-4">
+            <CliInstallSection />
+          </div>
         </div>
       </DialogContent>
     </Dialog>

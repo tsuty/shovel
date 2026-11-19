@@ -20,6 +20,11 @@ const api: RendererApi = {
       return () => ipcRenderer.removeListener(IpcChannel.SettingsChanged, listener)
     }
   },
+  cli: {
+    status: () => ipcRenderer.invoke(IpcChannel.CliStatus),
+    install: () => ipcRenderer.invoke(IpcChannel.CliInstall),
+    uninstall: () => ipcRenderer.invoke(IpcChannel.CliUninstall)
+  },
   planUsage: {
     get: () => ipcRenderer.invoke(IpcChannel.PlanUsageGet),
     refresh: () => ipcRenderer.invoke(IpcChannel.PlanUsageRefresh),

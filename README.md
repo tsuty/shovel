@@ -21,6 +21,7 @@ Docker Sandboxes の中で動く AI エージェントを、ACP（Agent Client P
 * [ブラウザ](./docs/FEATURES.md#ブラウザ) — アプリ内のブラウザのタブ。ブックマークはプロジェクトごと
 * [画像の注釈](./docs/FEATURES.md#画像の注釈) — スクリーンショットに矩形・矢印・文字・モザイクを書き込み、切り抜いてチャットに添付
 * [権限の確認とテーマ](./docs/FEATURES.md#権限の確認とテーマ) — 操作ごとの許可カード、ライト／ダークテーマ
+* [コマンドラインツール](./docs/FEATURES.md#コマンドラインツール) — ターミナルから `shovel [path]` でプロジェクトを開く
 
 詳しくはスクリーンショット付きの [docs/FEATURES.md](./docs/FEATURES.md) を参照。
 

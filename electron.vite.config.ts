@@ -3,12 +3,13 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { thirdPartyNotices } from './scripts/thirdPartyNotices'
+import { cliScripts } from './scripts/cliScripts'
 
 export default defineConfig({
   main: {
     // dependencies は実行時に node_modules から require する（配布物にも入る）。それ以外は
     // バンドルに含める。
-    plugins: [externalizeDepsPlugin(), thirdPartyNotices()],
+    plugins: [externalizeDepsPlugin(), thirdPartyNotices(), cliScripts()],
     build: {
       rollupOptions: {
         input: {

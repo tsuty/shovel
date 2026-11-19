@@ -158,6 +158,20 @@ only render in the popup" — always light theme, print button disabled until ev
 builds cleanly, and the packaged app has been smoke-tested (boots, no renderer exceptions) under
 Xvfb.
 
+A **command line tool** `shovel [path]` (decisions.md G-3-4, flows.md §2-5) opens a project from a terminal: the
+script (`resources/cli/shovel.sh` / `shovel.cmd`, version baked into `out/cli/` by `scripts/cliScripts.ts`) just starts
+the app with `--shovel-cli [-- <path>]` (detached) and exits; `--help`/`--version` are answered by the script alone.
+The app reads that from its own argv (`src/main/domain/cliCommand.ts`) and, when already running, the second process
+hands it over via `requestSingleInstanceLock`'s `additionalData` (never `second-instance`'s argv); `cliOpenService.ts`
+opens the project whose `hostPath` matches (realpath-aware), else registers the sandbox whose `workspaces[0]` matches
+(flow 3's path; 0 matches → dialog only, never `sbx create`; several → native choice dialog). Installing it is a
+settings-dialog-only button (`CliInstallSection.tsx` → `cliInstallService.ts`): macOS symlinks
+`/usr/local/bin/shovel` (osascript admin prompt on `EACCES`), Linux symlinks `~/.local/bin/shovel` (AppImage writes a
+script copy with `$APPIMAGE` baked in; deb packages own `/usr/bin/shovel` via our copies of electron-builder's
+after-install/remove templates in `resources/linux/`, guarded by `scripts/checkDebTemplates.cjs` at `beforePack`),
+Windows adds `<install>\bin` to the user PATH via `resources/windows/windows-path.ps1` (the NSIS include uses the same
+script, system PATH for per-machine installs). Not available in `pnpm dev` (`app.isPackaged`); test from `pnpm run pack`.
+
 This dev sandbox does have a display available (Xvfb) and has been used for real interactive
 testing (mouse clicks, screenshots, DOM/clipboard assertions via Playwright's `_electron` API and
 CDP attach) — it does not have `sbx`, so ACP/agent flows still can't be exercised end-to-end here;

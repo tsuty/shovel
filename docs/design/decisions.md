@@ -1998,6 +1998,105 @@ N-2-6（`sbx diagnose`）が集まる。
 これは「前提条件を最小化する」「使い方を強制しない」という設計指針の具体化であり、
 **うまくいっている人には何も聞かない**という原則に従う。
 
+### G-3-4. コマンドラインツール `shovel`（2026-11-19 決定）
+
+ターミナルから `shovel [path]` でプロジェクトを開けるようにする。手順は flows.md §2-5。
+
+**書式と対象**
+
+- `shovel [path]`。`path` はワーキングディレクトリで、省略時はカレントディレクトリ（`shovel .` と同じ）。
+- `shovel --help` / `shovel --version` を持つ。この2つはアプリを起動せず、CLI だけで出力して終わる。
+- 既存プロジェクト（`hostPath` が一致）はそのまま開く。照合は `hostPathsEqual` と同じ正規化に、
+  シンボリックリンクの解決（`realpath`）を加えたもので行う。
+- 無ければ新規プロジェクトとして登録する。プロジェクト名はディレクトリ名、サンドボックスは
+  `sbx ls --json` の主ワークスペース（`workspaces[0]`）が一致するもの。登録はフロー3（既存サンドボックスから追加）と
+  同じ処理で、`sbx create` は行わない。表示名が既存プロジェクトと同じでも許す（区別はパスで付く）。
+  - **一致 0 件**: ダイアログで知らせて終える。サンドボックスは作らない。
+  - **一致 1 件**: そのまま登録して開く。
+  - **一致が複数**: 選択ダイアログで選ばせる。
+  - 対応表に無いエージェントのサンドボックスは一致に数えない（フロー3と同じく登録できないため）。
+  - 停止中のサンドボックスも一致に数え、自動で起動する。登録時の `sbx exec <name> pwd`（`sandboxPath` の実測）と
+    その後の接続が起動を兼ねるため、特別な処理は要らない（N-2-3）。
+
+**0 件でサンドボックスを作らない理由**: 「サンドボックス無しのプロジェクトを開く」機能を別に検討しており、
+その際に「サンドボックスを作る / 作らずに開く」を選ばせる形にしたい。CLI だけが先に「作る」を
+既定にすると、その選択肢と食い違う。
+
+**受け渡し**: CLI は shovel の実行ファイルを `--shovel-cli [-- <path>]` を付けて起動するだけにする
+（macOS・Linux はターミナルから切り離して起動する。`setsid`、無ければ `nohup`）。既存の単一インスタンスロック
+（`requestSingleInstanceLock`）を使い、2 つ目のプロセスが自分の `argv` と `cwd` から絶対パスを求めて
+`additionalData` で1つ目へ渡す。`second-instance` の `argv` は Chromium のスイッチと混ざって順序が
+変わりうるため、そちらは読まない。初回起動では自分の `argv` を読み、起動処理が終わるまで待ってから開く
+（このときはプロジェクトマネージャを開かない。開けなかったときだけ、ダイアログの後にプロジェクトマネージャを開く）。
+macOS で `open -a shovel --args …` を使わないのは、アプリが起動済みだと引数が渡らないため。
+CLI は起動したらすぐ終わり、エラーは GUI のダイアログで出す。
+
+**インストール方法**
+
+| OS | 方式 | 置き場所 |
+| :--- | :--- | :--- |
+| macOS | 既存の PATH にシンボリックリンクを置く（アプリ内ボタン） | `/usr/local/bin/shovel` → `shovel.app/Contents/Resources/bin/shovel`。管理者権限は OS の認証ダイアログで求め、ディレクトリが無ければ作る |
+| Linux（AppImage） | 既存の PATH に CLI スクリプトを置く（アプリ内ボタン） | `~/.local/bin/shovel`。起動する実行ファイルとして `$APPIMAGE` を書き込んだ CLI スクリプトのコピー。PATH に含まれていなければ警告する |
+| Linux（展開したディレクトリ） | 既存の PATH にシンボリックリンクを置く（アプリ内ボタン） | `~/.local/bin/shovel` → `<展開先>/resources/bin/shovel`（`electron-builder --dir` の出力など） |
+| Linux（deb） | パッケージが入れる（ボタンは「パッケージでインストール済み」と表示するだけ） | `/usr/bin/shovel` → `/opt/shovel/resources/bin/shovel`（下記） |
+| Windows | PATH を追加する（インストーラーとアプリ内ボタンの両方） | `<インストール先>\bin`（`shovel.cmd` だけを置く）を、ユーザー単位のインストールならユーザー PATH（HKCU）に、全ユーザー向けならシステム PATH（HKLM）に追加 |
+
+- **シェルの設定ファイル（`.zshrc` など）は書き換えない。** シェルごとに書き方が違い、ユーザーの dotfiles を
+  汚し、元に戻すのも難しいため。
+- macOS・Linux はコピーではなくシンボリックリンクにする。アプリを更新してもリンク先が新しい版になる。
+  AppImage だけは例外で、中のファイルは起動中だけ一時的にマウントされる場所にあり、リンクを張れない。
+  `$APPIMAGE` へ直接リンクすると Electron 本体を起動することになり、deb と同じ問題（下記）が起きるため、
+  実行ファイルの場所を書き込んだスクリプトを置く。AppImage を移動・更新したら「入れ直す」で直す。
+- macOS の `/usr/local/bin` は、まず自分の権限で書き込み、書き込めないとき（`EACCES` / `EPERM`）だけ
+  `osascript` の `with administrator privileges` で OS の認証ダイアログを出す（Homebrew を入れた Intel Mac では
+  自分の権限で書き込めることが多い）。
+- Windows の PATH の書き換えは、インストーラーとボタンで同じ PowerShell スクリプト（`resources/windows/windows-path.ps1`。
+  配布物では `<インストール先>\resources\cli\windows-path.ps1`）を使う。レジストリを直接読み書きし、`%VAR%` を展開しないまま残す。NSIS の文字列で扱わないのは、長い PATH が
+  切り詰められて壊れるのを避けるため。ボタンが書き換えるのはユーザーの PATH だけ（管理者権限を求めない）。
+  システムの PATH にインストーラーが足したものは「インストーラーが追加済み」と表示し、ボタンでは外さない。
+  アンインストール時（更新は除く）はユーザーの PATH から、全ユーザー向けならシステムの PATH からも外す。
+- Windows で PATH を追加するのは、ユーザーが書き込めて最初から PATH に入っているディレクトリが実質無いため。
+  インストール先そのものではなく `bin` を足すのは、DLL などを PATH に出さないため。
+- インストール前に同名の `shovel` が PATH 上に無いか確かめ、あれば知らせる。
+- アプリ内ボタンは**設定ダイアログにだけ**置く。
+- ボタンにはアンインストールと状態の表示（未インストール / インストール済み / 以前の場所を指している / 置き場所に
+  別のファイルがある）を付ける。アプリの移動や AppImage の置き場所の変化でリンクが切れるため。
+  - 「以前の場所を指している」は、リンク先が shovel の CLI スクリプト（`…/Contents/Resources/bin/shovel`、
+    `…/resources/bin/shovel`）だが今の自分ではないもの。「入れ直す」で張り替える。
+  - 置き場所に shovel 以外のファイル・リンクがあれば上書きしない（ボタンを出さない）。
+- 開発中の起動（`app.isPackaged` が偽）では使えない。CLI スクリプトは配布物の中にしか無いため。
+- CLI スクリプトの元は `resources/cli/`（`shovel.sh` / `shovel.cmd`）。`--version` の版は、electron-vite の
+  ビルドで `out/cli/` に書き出すときに埋め込む（`scripts/cliScripts.ts`）。
+
+**deb の `/usr/bin/shovel`**
+
+electron-builder の deb は install スクリプトで `/usr/bin/shovel` を Electron 本体（`/opt/shovel/shovel`）への
+リンクとして作る（`update-alternatives`、無ければ `ln -sf`）。これをそのまま CLI に使うと、アプリが起動して
+いないときにターミナルを占有し（閉じるとアプリも終わる）、`--help` / `--version` も出せない。
+
+- **決定**: `deb.afterInstall` / `deb.afterRemove` に自前のスクリプトを指定し、`/usr/bin/shovel` の向き先を
+  CLI スクリプト `/opt/shovel/resources/bin/shovel` に変える。ほかの処理（`chrome-sandbox` の権限、AppArmor の
+  プロファイル、MIME・デスクトップのデータベース更新）は electron-builder のテンプレートをそのまま写す。
+- デスクトップエントリの `Exec` は `/opt/shovel/shovel` を直接起動するため、差し替えても GUI からの起動に影響しない。
+- 写したテンプレートが古くならないよう、ビルド時（electron-builder の `beforePack`、
+  `scripts/checkDebTemplates.cjs`）に electron-builder 同梱のテンプレート
+  （`app-builder-lib/templates/linux/after-install.tpl` / `after-remove.tpl`）と、写したときの内容
+  （`resources/linux/upstream/`）を比べ、違いがあればビルドを止めて知らせる。
+- 以前の版の deb が登録した `update-alternatives`（向き先が Electron 本体）は、install スクリプトで外してから登録し直す。
+- Windows のインストーラーと同じく「入れればすぐ使える」にそろう。
+
+退けた案:
+
+- **Electron 本体のまま、アプリ側で CLI として振る舞う**（ターミナルから起動されたら自分を切り離して起動し直す、
+  `--help` もアプリが出す）: deb だけ仕組みが変わり、起動し直す処理は実機でしか確かめにくい。
+- **`/usr/bin/shovel` は放置し、ボタンで `~/.local/bin/shovel` を置く**: 同名のコマンドが2つでき、どちらが
+  使われるかは PATH の順に依存する。
+
+**退けた案**
+
+- **シェルの設定ファイルに PATH を足す**: 上の理由。開いているターミナルにも反映されない。
+- **macOS で `~/.local/bin` に置く**: 権限は要らないが、macOS の初期状態では PATH に入っていない。
+
 ---
 
 ## N-4. コマンド実行：TTY なしの対話コンソール ＋ TTY モード ＋ OS ターミナルへの逃げ道

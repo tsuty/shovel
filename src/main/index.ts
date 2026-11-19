@@ -10,8 +10,13 @@ import { anyProjectWindowOpen, getProjectManagerWindow, markQuitting } from './w
 import { installBrowserGuestPolicy } from './windows/browserGuest'
 import { installAppHealthMonitor } from './windows/rendererRecovery'
 import { applyPlanUsageSetting, notePlanUsageActivity } from './domain/planUsageService'
+import { CLI_OPEN_KEY, type CliOpenRequest, parseCliArgv, parseCliOpenData } from './domain/cliCommand'
+import { openFromCli } from './domain/cliOpenService'
 
-const gotLock = app.requestSingleInstanceLock()
+// コマンドラインツール（`shovel [path]`）から起動されたときの要求。すでに起動していれば、
+// 1 つ目のプロセスへ `additionalData` で渡す（`second-instance` の argv は順序が変わりうるので使わない）。
+const cliOpen = parseCliArgv(process.argv, process.cwd())
+const gotLock = app.requestSingleInstanceLock(cliOpen ? { [CLI_OPEN_KEY]: cliOpen } : {})
 if (!gotLock) {
   app.quit()
 } else {
@@ -19,8 +24,16 @@ if (!gotLock) {
 
   // PATH の取り込みと IPC 登録が済むまでは、Dock クリックなどの `activate` でウィンドウを開かない。
   let startupDone = false
+  // 起動処理が終わる前に届いたコマンドラインツールの要求。
+  const pendingCliOpens: CliOpenRequest[] = cliOpen ? [cliOpen] : []
 
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, _argv, _workingDirectory, additionalData) => {
+    const request = parseCliOpenData(additionalData)
+    if (request) {
+      if (startupDone) void openFromCli(request)
+      else pendingCliOpens.push(request)
+      return
+    }
     // 単一インスタンス。2 回目の起動要求ではプロジェクトマネージャを前面に出す。
     if (!startupDone) return
     const existing = getProjectManagerWindow()
@@ -46,7 +59,10 @@ if (!gotLock) {
     applyPlanUsageSetting()
     app.on('browser-window-focus', notePlanUsageActivity)
     startupDone = true
-    openProjectManagerWindow()
+    // コマンドラインツールから起動されたら、プロジェクトマネージャを経ずにプロジェクトを開く
+    // （開けなければ openFromCli がプロジェクトマネージャを開く）。
+    if (pendingCliOpens.length === 0) openProjectManagerWindow()
+    for (const request of pendingCliOpens.splice(0)) void openFromCli(request)
   }).catch((err: unknown) => console.error('[startup] failed', err))
 
   app.on('before-quit', markQuitting)

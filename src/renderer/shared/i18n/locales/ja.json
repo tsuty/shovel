@@ -316,7 +316,40 @@
     "fontSampleEditor": "0O 1lI {}[] ABC abc あいう 漢字",
     "fontSamplePreview": "The quick brown fox あいうえお 漢字 0123",
     "showPlanUsage": "プランの使用率を表示する",
-    "showPlanUsageHint": "Claude のサブスクリプション（Pro / Max / Team など）を使っている場合に、画面右上にセッションと週の使用率を表示します。実行中のサンドボックスの中で /usage を実行して取得します。API キーで使っている場合は表示できません。"
+    "showPlanUsageHint": "Claude のサブスクリプション（Pro / Max / Team など）を使っている場合に、画面右上にセッションと週の使用率を表示します。実行中のサンドボックスの中で /usage を実行して取得します。API キーで使っている場合は表示できません。",
+    "cli": {
+      "title": "コマンドラインツール",
+      "hint": "ターミナルで「shovel フォルダ」（省略時はカレントディレクトリ）と入力すると、そのフォルダのプロジェクトを開けます。まだプロジェクトが無ければ、そのフォルダをワークスペースにしているサンドボックスから追加します（サンドボックスは作りません）。",
+      "loading": "確認しています…",
+      "dev": "開発中の起動では使えません。配布用にビルドした shovel から設定してください。",
+      "dirNotOnPath": "置き場所のフォルダが PATH に含まれていません。シェルの設定で PATH に追加してください。",
+      "shadowed": "PATH 上で先に別の shovel が見つかります: {{path}}",
+      "command": {
+        "installed": "インストール済み",
+        "notInstalled": "インストールされていません",
+        "stale": "以前の場所の shovel を指しています。入れ直してください。",
+        "foreign": "置き場所に別のファイルがあるため、インストールできません。",
+        "install": "インストール",
+        "reinstall": "入れ直す",
+        "uninstall": "アンインストール"
+      },
+      "path": {
+        "installed": "PATH に追加済み（新しく開いたターミナルから使えます）",
+        "notInstalled": "PATH に追加されていません",
+        "stale": "PATH に追加されていません",
+        "foreign": "PATH に追加されていません",
+        "byInstaller": "インストーラーがシステムの PATH に追加済み",
+        "install": "PATH に追加",
+        "reinstall": "PATH に追加",
+        "uninstall": "PATH から外す"
+      },
+      "package": {
+        "installed": "パッケージでインストール済み",
+        "notInstalled": "見つかりません。パッケージを入れ直してください。",
+        "stale": "古い版の設定のままです。パッケージを入れ直してください。",
+        "foreign": "別のファイルがあります。"
+      }
+    }
   },
   "history": {
     "title": "履歴",

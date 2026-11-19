@@ -18,6 +18,7 @@ import type {
 import type { FileReadResult, FileSearchResults, FsEntry, WriteTextResult } from './types/filer'
 import type { CommandExit, CommandHistory, CommandOutputChunk, CommandTtyOutput } from './types/command'
 import type { AppSettings } from './types/settings'
+import type { CliInstallResult, CliInstallStatus } from './types/cli'
 import type { PlanUsageState } from './planUsage'
 import type { SbxLsEntry } from './types/sbx'
 import type { NetworkBlocks } from './types/network'
@@ -49,6 +50,9 @@ export const IpcChannel = {
   SettingsGet: 'settings:get',
   SettingsUpdate: 'settings:update',
   SettingsChanged: 'settings:changed',
+  CliStatus: 'cli:status',
+  CliInstall: 'cli:install',
+  CliUninstall: 'cli:uninstall',
   PlanUsageGet: 'planUsage:get',
   PlanUsageRefresh: 'planUsage:refresh',
   PlanUsageChanged: 'planUsage:changed',
@@ -222,6 +226,12 @@ export interface RendererApi {
     update(patch: Partial<AppSettings>): Promise<AppSettings>
     /** 変更は開いている全ウィンドウに反映する。 */
     onChanged(cb: (settings: AppSettings) => void): () => void
+  }
+  /** コマンドラインツール `shovel`（設定ダイアログから入れ外しする）。 */
+  cli: {
+    status(): Promise<CliInstallStatus>
+    install(): Promise<CliInstallResult>
+    uninstall(): Promise<CliInstallResult>
   }
   planUsage: {
     get(): Promise<PlanUsageState>

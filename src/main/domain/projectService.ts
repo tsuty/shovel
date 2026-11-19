@@ -75,7 +75,7 @@ export async function listProjectsWithStatus(): Promise<ProjectListResult> {
  * `sbx` が見つからなければ、ログインシェルの PATH を取り込み直してもう一度だけ試す。
  * 起動時の取り込みが（rc ファイルの遅さなどで）失敗していても、「再確認」で回復できるようにする。
  */
-async function sbxLsRetryingPath(): Promise<SbxLsEntry[]> {
+export async function sbxLsRetryingPath(): Promise<SbxLsEntry[]> {
   try {
     return await sbxLs()
   } catch (err) {

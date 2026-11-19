@@ -205,6 +205,16 @@ sbx diagnose
   パッケージ自体にライセンスファイルが同梱されていないもの（`react-arborist` など）は
   本文の代わりに注記が入る。生成物なのでリポジトリにはコミットしない。
 
+  **コマンドラインツール**（`shovel [path]`、decisions.md G-3-4）: `pnpm build` のたびに
+  `resources/cli/` のスクリプトへ `package.json` の版を埋め込んで `out/cli/` に書き出す
+  （`scripts/cliScripts.ts`）。electron-builder がそこから各 OS の配布物へ入れる（macOS・Linux は
+  `resources/bin/shovel`、Windows は `bin\shovel.cmd`。`electron-builder.yml`）。deb の
+  install / remove スクリプト（`resources/linux/*.tpl`）は electron-builder のテンプレートの写しなので、
+  electron-builder を上げてテンプレートが変わると `beforePack`（`scripts/checkDebTemplates.cjs`）が
+  ビルドを止める。そのときは変更を `resources/linux/*.tpl` に取り込み、`resources/linux/upstream/` を
+  新しいテンプレートで置き換える。設定ダイアログのインストールボタンは開発中の起動（`pnpm dev`）では
+  使えないので、確かめるときは `pnpm run pack` の出力から起動する。
+
   TypeScript は 6.0 に留めている。7.0（Go 製のネイティブ版）は従来の JavaScript API を
   持たず、型情報を使う lint（typescript-eslint、対応は `<6.1`）が動かないため。tsconfig は
   7.0 で削除された設定（`baseUrl`、`moduleResolution: "Node"`）を使わない形にしてあるので、

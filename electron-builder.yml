@@ -11,7 +11,12 @@ files:
   - out/**/*
   - package.json
 asarUnpack: []
+# コマンドラインツールの CLI スクリプトを各 OS の配布物へ入れる。out/cli/ は electron-vite のビルドで作られる。
+beforePack: scripts/checkDebTemplates.cjs
 mac:
+  extraResources:
+    - from: out/cli/shovel
+      to: bin/shovel
   target:
     - target: dmg
       arch: [x64, arm64]
@@ -22,7 +27,16 @@ win:
   target:
     - target: nsis
       arch: [x64]
+  extraFiles:
+    - from: out/cli/shovel.cmd
+      to: bin/shovel.cmd
+  extraResources:
+    - from: out/cli/windows-path.ps1
+      to: cli/windows-path.ps1
 linux:
+  extraResources:
+    - from: out/cli/shovel
+      to: bin/shovel
   target:
     - target: AppImage
       arch: [x64]
@@ -31,12 +45,18 @@ linux:
   category: Development
   maintainer: tsuty
   syncDesktopName: true
+deb:
+  # /usr/bin/shovel をコマンドラインツールに向ける（electron-builder のテンプレートの写し）。
+  afterInstall: resources/linux/after-install.tpl
+  afterRemove: resources/linux/after-remove.tpl
 appImage:
   artifactName: ${productName}-${version}-${arch}.${ext}
 nsis:
   artifactName: ${productName}-Setup-${version}.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
+  # <インストール先>\bin を PATH に足す・外す。
+  include: resources/windows/installer.nsh
 extraFiles:
   - from: out/THIRD_PARTY_NOTICES.txt
     to: THIRD_PARTY_NOTICES.txt

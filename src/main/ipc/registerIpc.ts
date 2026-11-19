@@ -29,6 +29,7 @@ import { openSandboxTerminal, openSbxLoginTerminal } from '../domain/terminal'
 import { allowNetworkHost, getNetworkBlocks, setNetworkHostIgnored } from '../domain/networkPolicyService'
 import { applyPlanUsageSetting, getPlanUsageState, refreshPlanUsage } from '../domain/planUsageService'
 import { checkAuthStatus, openLoginTerminal, setApiKey } from '../domain/authService'
+import { getCliInstallStatus, installCli, uninstallCli } from '../domain/cliInstallService'
 import { openProjectWindow, refreshProjectWindowTitle } from '../windows/mainWindow'
 import { openProjectManagerWindow } from '../windows/projectManagerWindow'
 import { openPrintPreviewWindow } from '../windows/printPreviewWindow'
@@ -102,6 +103,9 @@ export function registerIpc(): void {
     }
     return next
   })
+  ipcMain.handle(IpcChannel.CliStatus, () => getCliInstallStatus())
+  ipcMain.handle(IpcChannel.CliInstall, () => installCli())
+  ipcMain.handle(IpcChannel.CliUninstall, () => uninstallCli())
   ipcMain.handle(IpcChannel.PlanUsageGet, () => getPlanUsageState())
   ipcMain.handle(IpcChannel.PlanUsageRefresh, () => refreshPlanUsage({ force: true }))
   ipcMain.handle(IpcChannel.SidebarGetWidths, () => sidebarStore.getWidths())
