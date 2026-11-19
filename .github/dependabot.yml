@@ -26,6 +26,17 @@ updates:
           - react-dom
           - '@types/react'
           - '@types/react-dom'
+      # react-arborist は react-dnd・react-dnd-html5-backend を peer で要求する
+      react-arborist:
+        patterns:
+          - react-arborist
+          - react-dnd
+          - react-dnd-html5-backend
+      # react-i18next はメジャーごとに対応する i18next の版が決まっている
+      i18next:
+        patterns:
+          - i18next
+          - react-i18next
       tanstack:
         patterns:
           - '@tanstack/*'

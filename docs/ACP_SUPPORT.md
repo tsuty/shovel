@@ -17,8 +17,8 @@
 | 項目 | 値 |
 |---|---|
 | プロトコルバージョン | `1`（`initialize` で送る） |
-| 照合した仕様 | ACP リリース `v1.15.1`（2026-11-02）の `schema/v1/schema.json` と `meta.json` |
-| 使っている SDK | `@agentclientprotocol/sdk` 2.4.0（既定の入口 = stable の ACP v1。`/unstable`・`/experimental/v2` は使わない） |
+| 照合した仕様 | ACP リリース `v1.17.0`（2026-11-10）の `schema/v1/schema.json` と `meta.json` |
+| 使っている SDK | `@agentclientprotocol/sdk` 2.6.0（既定の入口 = stable の ACP v1。`/unstable`・`/experimental/v2` は使わない） |
 | shovel のバージョン | 1.5.0 |
 | unstable の機能（`schema.unstable.json`） | 方針（§7。stable になってから検討する） |
 | ACP v2（`schema-v2.0.0-alpha.*`） | 方針（decisions.md A-1b。v1 のみ） |
@@ -62,7 +62,7 @@
 | `initialize` | 対応 | 締切ではなくアイドルタイムアウト（stdout が 180 秒無音で失敗）。初回の `npx` のダウンロードに時間がかかるため。応答の `protocolVersion` が `1` でなければ接続を失敗させる。応答の `agentInfo.version` をプロジェクトに記録し、次回の起動で同じ版を使う（decisions.md N-2-5b）。 |
 | `authenticate` | 方針 | 呼ばない。`authMethods` も読まない。サインインはサンドボックスの中で行い、接続前にログイン状態を確かめる。接続（`initialize` 〜 `session/new`）が `-32000`（auth required）で失敗したら、サインインの案内を出す。 |
 | `logout` | 方針 | 認証はサンドボックスの中で管理しており、shovel から再ログインもできないため。 |
-| `session/new` | 対応 | `cwd` はプロジェクトの `sandboxPath`。`mcpServers` は常に `[]`（方針）: shovel が渡す MCP サーバーはサンドボックスの中で動くか、ホストに届いてしまう。`additionalDirectories` は送らない（方針）: サンドボックスのマウントは `sbx` 側で決まり、shovel はプロジェクトのフォルダ以外を知らない。タブの ↻ でも、接続を使い回して `session/new` を送り直す。 |
+| `session/new` | 対応 | `cwd` はプロジェクトの `sandboxPath`。`mcpServers` は常に `[]`（方針）: shovel が渡す MCP サーバーはサンドボックスの中で動くか、ホストに届いてしまう。`additionalDirectories` は送らない（方針）: サンドボックスのマウントは `sbx` 側で決まり、shovel はプロジェクトのフォルダ以外を知らない。`systemPrompt` は送らない（未対応、`session/load`・`session/resume` も同じ）。タブの ↻ でも、接続を使い回して `session/new` を送り直す。 |
 | `session/load` | 対応 | `agentCapabilities.loadSession` が宣言されていれば、履歴の再開に `session/resume` より優先して使う。ローカル記録があればそれを先に描き、replay は描かずに `messageId` の並びで比べる。食い違っていたらローカル記録をバックアップへ退避して replay の内容に置き換える（decisions.md C-1/C-2）。`mcpServers` は `[]`。 |
 | `session/resume` | 対応 | `sessionCapabilities.resume` が宣言され、`loadSession` が無いときに使う。どちらも無ければ履歴は読み取り専用。 |
 | `session/list` | 対応 | `sessionCapabilities.list` が宣言されていれば。`cwd` で絞り、`nextCursor` を最後まで辿る。履歴一覧はこの結果とローカル記録の和集合（decisions.md C-1/C-2 補遺）。プロジェクトに開いている接続が1つも無ければ呼べない。 |
@@ -155,12 +155,13 @@
 | v1.8.0 | ツールコールの `name` | 対応 |
 | v1.11.0 | Session notices | 対応 |
 | v1.11.0 | Session compaction | 対応 |
+| v1.16.0 | クライアントのシステムプロンプト（`systemPrompt`） | 未対応 |
 
 ---
 
 ## 7. unstable の機能
 
-`schema.unstable.json` の機能は何も実装していない。v1.15.1 の時点では、`session/fork`、
+`schema.unstable.json` の機能は何も実装していない。v1.17.0 の時点では、`session/fork`、`session/options`、
 `session/archive` / `session/unarchive`、`session/status`、`session/set_title`、`plan_update` / `plan_removed`、
 サブエージェント（`subagent_update`、`session_message` など）、`providers/*`、`auth/status` / `auth/status_update`、
 `mcp/message`、プロキシの `proxy/initialize` / `proxy/successor` などがある。

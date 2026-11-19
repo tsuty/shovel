@@ -301,7 +301,7 @@ function FieldView({
         <QuestionMarkdown className="text-transcript-sm text-muted-foreground" text={field.description} />
       )}
       {control}
-      {error && <div className="text-transcript-xs text-destructive">{t(`elicitation.error.${error.code}`, error.params)}</div>}
+      {error && <div className="text-transcript-xs text-destructive">{t(`elicitation.error.${error.code}`, error.params ?? {})}</div>}
     </div>
   )
 }
