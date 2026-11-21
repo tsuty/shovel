@@ -28,7 +28,7 @@ interface StoreSchema {
   bookmarks?: Record<string, Bookmark[]>
 }
 
-const defaults: StoreSchema = {
+const defaults = {
   projects: [],
   settings: {
     locale: null,
@@ -50,7 +50,7 @@ const defaults: StoreSchema = {
   acpRegistryEntries: {},
   openTabs: {},
   bookmarksByHostPath: {}
-}
+} satisfies StoreSchema
 
 const store = new Store<StoreSchema>({ defaults })
 
