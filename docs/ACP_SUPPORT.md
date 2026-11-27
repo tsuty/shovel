@@ -17,8 +17,8 @@
 | 項目 | 値 |
 |---|---|
 | プロトコルバージョン | `1`（`initialize` で送る） |
-| 照合した仕様 | ACP リリース `v1.19.0`（2026-11-18）の `schema/v1/schema.json` と `meta.json` |
-| 使っている SDK | `@agentclientprotocol/sdk` 2.8.0（既定の入口 = stable の ACP v1。`/unstable`・`/experimental/v2` は使わない） |
+| 照合した仕様 | ACP リリース `v1.20.0`（2026-11-20）の `schema/v1/schema.json` と `meta.json` |
+| 使っている SDK | `@agentclientprotocol/sdk` 2.9.1（既定の入口 = stable の ACP v1。`/unstable`・`/experimental/v2` は使わない） |
 | shovel のバージョン | 1.6.0 |
 | unstable の機能（`schema.unstable.json`） | 方針（§7。stable になってから検討する） |
 | ACP v2（`schema-v2.0.0-alpha.*`） | 方針（decisions.md A-1b。v1 のみ） |
@@ -46,6 +46,8 @@
 | `session.configOptions.boolean` | `{}` | 入力欄の下のチェックボックス（§5）。 |
 | `session.notices` | `{}` | トランスクリプトの1行（§4）。 |
 | `session.compaction` | `{}` | トランスクリプトの1エントリ（§4）。 |
+| `plan` | 省略（未対応） | 計画は `plan` バリアントで受け取る（§4）。 |
+| `subagents` | 省略（未対応） | サブエージェントの子セッションは受け取らない（§4）。 |
 
 宣言していない capability は、エージェントからは「非対応」と見なされ、その機能は使われない。
 
@@ -104,6 +106,8 @@
 | `usage_update` | 対応 | 入力欄の下にトークン使用量（`used` / `size`）と費用を表示する。 |
 | `notice` | 対応 | `title` と `description` をプレーンテキストの1行で出し、`severity` で色を変える（`error` は赤、`warning` は琥珀）。ライブのみで、スナップショットには残さない。 |
 | `compaction_update` / `compaction_summary_chunk` | 対応 | `compactionId` ごとに1エントリ。最初に届いた位置に置き、以後はその場で差し替える。状態を1行で出し、要約は畳む。`summary` / `error` は省略なら据え置き、`null` なら消去。ターンが終わっても `in_progress` のものは `cancelled` にする。スナップショットに残す。 |
+| `plan_update` / `plan_removed` | 未対応 | `plan` capability を宣言していないので届かない。届いても無視する。計画は従来の `plan` で表示する。 |
+| `subagent_update` / `session_message` / `session_message_chunk` | 未対応 | `subagents` capability を宣言していないので届かない。届いても無視する。 |
 
 知らないバリアントはログに残して無視する。デコードの失敗にはしない。
 
@@ -156,14 +160,15 @@
 | v1.11.0 | Session notices | 対応 |
 | v1.11.0 | Session compaction | 対応 |
 | v1.16.0 | クライアントのシステムプロンプト（`systemPrompt`） | 一部（`append` のみ。`override` は方針） |
+| v1.20.0 | 計画の操作（`plan` capability、`plan_update` / `plan_removed`） | 未対応 |
+| v1.20.0 | サブエージェントのセッション（`subagents` capability、`subagent_update`、`session_message` など） | 未対応 |
 
 ---
 
 ## 7. unstable の機能
 
-`schema.unstable.json` の機能は何も実装していない。v1.19.0 の時点では、`session/fork`、`session/options`、
-`session/archive` / `session/unarchive`、`session/status`、`session/set_title`、`plan_update` / `plan_removed`、
-サブエージェント（`subagent_update`、`session_message` など）、`providers/*`、`auth/status` / `auth/status_update`、
+`schema.unstable.json` の機能は何も実装していない。v1.20.0 の時点では、`session/fork`、`session/options`、
+`session/archive` / `session/unarchive`、`session/status`、`session/set_title`、`providers/*`、`auth/status` / `auth/status_update`、
 `prompt_suggestions_update`、`cursor_update`、`mcp/message`、プロキシの `proxy/initialize` / `proxy/successor` などがある。
 SDK は既定の入口（stable の v1）から import しているため、これらの型を持たない。stable の `SessionUpdate` に無いバリアントの
 `session/update` は SDK のスキーマ検証で弾かれ（`console.error` に出る）、`translate.ts` には届かない。
