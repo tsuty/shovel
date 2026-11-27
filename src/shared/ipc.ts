@@ -137,7 +137,8 @@ export const IpcChannel = {
   BrowserInsertToChat: 'browser:insertToChat',
   BrowserAttachToChat: 'browser:attachToChat',
   BrowserAnnotateScreenshot: 'browser:annotateScreenshot',
-  BrowserScreenshotSaved: 'browser:screenshotSaved'
+  BrowserScreenshotSaved: 'browser:screenshotSaved',
+  BrowserPermissionDenied: 'browser:permissionDenied'
 } as const
 
 export interface CreateNewDirRequest {
@@ -422,6 +423,8 @@ export interface RendererApi {
     onAnnotateScreenshot(cb: (targetId: string, relPath: string) => void): () => void
     /** サンドボックス無しのプロジェクトでスクリーンショットを保存した。`annotate` なら注釈を付ける画面を開く。 */
     onScreenshotSaved(cb: (relPath: string, annotate: boolean) => void): () => void
+    /** ブラウザのタブのページが権限（`permission` は Electron の名前）を求め、断った。`origin` は求めたページ（読めなければ空文字）。 */
+    onPermissionDenied(cb: (webContentsId: number, permission: string, origin: string) => void): () => void
   }
   bookmarks: {
     list(projectId: string): Promise<Bookmark[]>

@@ -30,7 +30,8 @@ const labels = {
     saveScreenshot: 'Save screenshot',
     annotateScreenshot: 'Annotate screenshot and save',
     visibleChat: (title: string) => `${title} (visible)`,
-    noChats: 'No open chats'
+    noChats: 'No open chats',
+    devTools: 'Open developer tools'
   },
   ja: {
     back: '戻る',
@@ -48,7 +49,8 @@ const labels = {
     saveScreenshot: 'スクリーンショットを保存',
     annotateScreenshot: 'スクリーンショットに注釈を付けて保存',
     visibleChat: (title: string) => `${title}（表示中）`,
-    noChats: '開いているチャットはありません'
+    noChats: '開いているチャットはありません',
+    devTools: '開発者ツールを開く'
   }
 } as const
 
@@ -73,11 +75,21 @@ export function setChatTargets(host: WebContents, targets: unknown): void {
 
 /**
  * ブラウザのタブ（`<webview>`）の中身の設定を強制する。renderer が何を指定しても、preload なし・Node なし・
- * sandbox・専用の保存領域にし、`http:` / `https:` 以外のページは開かない。権限の要求はすべて断る。
+ * sandbox・専用の保存領域にし、`http:` / `https:` 以外のページは開かない。権限の要求はすべて断り、
+ * 断った権限の名前と求めたページの origin をホストのウィンドウへ知らせる。
  */
 export function installBrowserGuestPolicy(): void {
   const browserSession = session.fromPartition(BROWSER_PARTITION)
-  browserSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false))
+  browserSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    callback(false)
+    if (webContents.getType() !== 'webview') return
+    webContents.hostWebContents?.send(
+      IpcChannel.BrowserPermissionDenied,
+      webContents.id,
+      permission,
+      originOf(details.requestingUrl)
+    )
+  })
   browserSession.setPermissionCheckHandler(() => false)
 
   app.on('web-contents-created', (_event, contents) => {
@@ -94,6 +106,20 @@ export function installBrowserGuestPolicy(): void {
     })
     if (contents.getType() === 'webview') setupGuest(contents)
   })
+}
+
+/** URL の origin。読めなければ空文字。 */
+function originOf(url: string | undefined): string {
+  try {
+    return url ? new URL(url).origin : ''
+  } catch {
+    return ''
+  }
+}
+
+/** 右クリックメニューの「開発者ツールを開く」。ページのタブとは別のウィンドウに開く。 */
+function devToolsMenuItems(contents: WebContents, t: (typeof labels)[keyof typeof labels]): MenuItemConstructorOptions[] {
+  return [{ type: 'separator' }, { label: t.devTools, click: () => contents.openDevTools({ mode: 'detach' }) }]
 }
 
 function setupGuest(contents: WebContents): void {
@@ -136,11 +162,11 @@ function setupGuest(contents: WebContents): void {
   contents.on('context-menu', (_event, params) => {
     const host = contents.hostWebContents
     const window = host ? BrowserWindow.fromWebContents(host) ?? undefined : undefined
+    const t = labels[resolveLocale()]
     if (params.isEditable) {
-      Menu.buildFromTemplate(editMenuTemplate(contents, params)).popup({ window })
+      Menu.buildFromTemplate([...editMenuTemplate(contents, params), ...devToolsMenuItems(contents, t)]).popup({ window })
       return
     }
-    const t = labels[resolveLocale()]
     const history = contents.navigationHistory
     const template: MenuItemConstructorOptions[] = [
       { label: t.back, enabled: history.canGoBack(), click: () => history.goBack() },
@@ -159,7 +185,7 @@ function setupGuest(contents: WebContents): void {
     if (params.selectionText) {
       template.push({ type: 'separator' }, { label: t.copy, click: () => contents.copy() })
     }
-    template.push({ type: 'separator' }, ...chatMenuItems(contents, params, window, t))
+    template.push({ type: 'separator' }, ...chatMenuItems(contents, params, window, t), ...devToolsMenuItems(contents, t))
     Menu.buildFromTemplate(template).popup({ window })
   })
 }

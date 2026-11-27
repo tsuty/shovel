@@ -110,8 +110,10 @@ so moving a tab across panes never moves its DOM (no iframe/webview reload); Cmd
 open-externally and an in-tab find bar (`findInPage`); not counted toward the tab limit, restored by URL. Main
 (`src/main/windows/browserGuest.ts`) forces every guest to no preload / no Node / sandbox / the app-wide
 `persist:shovel-browser` partition (cookies shared by all projects, kept across restarts), allows only http(s), denies all
-permission requests, turns popups into new browser tabs, and forwards the guest's Cmd/Ctrl+F, focus and mouse-down to the
+permission requests (each denied request is reported to the tab via `browser:permissionDenied`, shown as a
+dismissable bar with "open externally"; permission *checks* are not reported), turns popups into new browser tabs, and forwards the guest's Cmd/Ctrl+F, focus and mouse-down to the
 host (`browser:findRequested` / `browser:focused`) since guest input never reaches the host window. The page's right-click
+(and its edit menu) ends with "open developer tools" for the guest (`openDevTools({ mode: 'detach' })`). The page's right-click
 also hands things to a chat (quote the selection / paste the link or page URL into the composer — never sent
 automatically — or save a visible-area `capturePage()` PNG to `.shovel/screenshots/` and attach it — directly, or after annotating it in `ImageAnnotator` ("保存して添付" attaches the `-annotated.png`; the raw capture stays saved)); each item has a
 submenu listing every connected chat (left pane first, "（表示中）" on visible ones, a disabled "no open chats" row when

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, ExternalLink, RotateCw, Star, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, ExternalLink, RotateCw, ShieldAlert, Star, X } from 'lucide-react'
 import { addressToUrl, BLANK_PAGE, isWebUrl } from '@shared/browserUrl'
 import { cn } from '../../shared/lib/utils'
 import { registerEditorSearch } from '../editorSearch'
@@ -48,7 +48,7 @@ export function BrowserView({
   /** ページにフォーカスが移った（分割ビューで前面のペインにする）。 */
   onFocus: () => void
 }): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const hostRef = useRef<HTMLDivElement>(null)
   const webviewRef = useRef<WebviewElement | null>(null)
   const readyRef = useRef(false)
@@ -63,6 +63,8 @@ export function BrowserView({
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState<{ active: number; total: number } | null>(null)
   const findInputRef = useRef<HTMLInputElement>(null)
+  /** 今のページで断った権限（Electron の名前）と、それを求めたページの origin。ページを移ったら空にする。 */
+  const [deniedPermissions, setDeniedPermissions] = useState<{ permission: string; origins: string[] }[]>([])
 
   const callbacksRef = useRef({ onNavigate, onTitleChange, onFocus })
   callbacksRef.current = { onNavigate, onTitleChange, onFocus }
@@ -85,6 +87,7 @@ export function BrowserView({
     const onNavigated = (event: Event): void => {
       const { url: next, isMainFrame } = event as Event & { url: string; isMainFrame?: boolean }
       if (isMainFrame === false) return
+      if (event.type === 'did-navigate') setDeniedPermissions([])
       const shown = isWebUrl(next) ? next : ''
       setUrl(shown)
       if (!editingRef.current) setAddress(shown)
@@ -170,6 +173,21 @@ export function BrowserView({
       window.shovel.browser.onFocused((webContentsId) => {
         const webview = webviewRef.current
         if (webview && readyRef.current && webview.getWebContentsId() === webContentsId) callbacksRef.current.onFocus()
+      }),
+    []
+  )
+
+  useEffect(
+    () =>
+      window.shovel.browser.onPermissionDenied((webContentsId, permission, origin) => {
+        const webview = webviewRef.current
+        if (!webview || !readyRef.current || webview.getWebContentsId() !== webContentsId) return
+        setDeniedPermissions((prev) => {
+          const found = prev.find((p) => p.permission === permission)
+          if (!found) return [...prev, { permission, origins: origin ? [origin] : [] }]
+          if (!origin || found.origins.includes(origin)) return prev
+          return prev.map((p) => (p === found ? { ...p, origins: [...p.origins, origin] } : p))
+        })
       }),
     []
   )
@@ -271,6 +289,41 @@ export function BrowserView({
           <ExternalLink size={14} />
         </button>
       </div>
+      {deniedPermissions.length > 0 && (
+        <div className="flex items-center gap-2 border-b border-border bg-amber-500/10 px-2 py-1 text-xs">
+          <ShieldAlert size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
+          <span
+            className="min-w-0 flex-1 truncate"
+            title={deniedPermissions
+              .map((p) => `${t(`browser.permissions.${p.permission}`, { defaultValue: p.permission })} (${p.permission})${p.origins.length ? `: ${p.origins.join(', ')}` : ''}`)
+              .join('\n')}
+          >
+            {t('browser.permissionDenied', {
+              names: new Intl.ListFormat(i18n.language, { style: 'narrow', type: 'conjunction' }).format([
+                ...new Set(deniedPermissions.map((p) => t(`browser.permissions.${p.permission}`, { defaultValue: p.permission })))
+              ])
+            })}
+            <span className="ml-2 text-muted-foreground">{t('browser.permissionDeniedHint')}</span>
+          </span>
+          <button
+            type="button"
+            disabled={!url}
+            onClick={() => void window.shovel.browser.openExternal(url)}
+            className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent disabled:opacity-40"
+          >
+            <ExternalLink size={12} />
+            {t('browser.openExternal')}
+          </button>
+          <button
+            type="button"
+            title={t('browser.dismiss')}
+            onClick={() => setDeniedPermissions([])}
+            className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
       {findOpen && (
         <div className="flex items-center gap-1 border-b border-border px-2 py-1">
           <input

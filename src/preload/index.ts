@@ -214,6 +214,12 @@ const api: RendererApi = {
       const listener = (_event: unknown, relPath: string, annotate: boolean): void => cb(relPath, annotate)
       ipcRenderer.on(IpcChannel.BrowserScreenshotSaved, listener)
       return () => ipcRenderer.removeListener(IpcChannel.BrowserScreenshotSaved, listener)
+    },
+    onPermissionDenied: (cb) => {
+      const listener = (_event: unknown, webContentsId: number, permission: string, origin: string): void =>
+        cb(webContentsId, permission, origin)
+      ipcRenderer.on(IpcChannel.BrowserPermissionDenied, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserPermissionDenied, listener)
     }
   },
   bookmarks: {
