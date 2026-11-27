@@ -17,8 +17,8 @@
 | 項目 | 値 |
 |---|---|
 | プロトコルバージョン | `1`（`initialize` で送る） |
-| 照合した仕様 | ACP リリース `v1.20.0`（2026-11-20）の `schema/v1/schema.json` と `meta.json` |
-| 使っている SDK | `@agentclientprotocol/sdk` 2.9.1（既定の入口 = stable の ACP v1。`/unstable`・`/experimental/v2` は使わない） |
+| 照合した仕様 | ACP リリース `v1.22.0`（2026-11-23）の `schema/v1/schema.json` と `meta.json` |
+| 使っている SDK | `@agentclientprotocol/sdk` 2.12.0（既定の入口 = stable の ACP v1。`/unstable`・`/experimental/v2` は使わない） |
 | shovel のバージョン | 1.6.0 |
 | unstable の機能（`schema.unstable.json`） | 方針（§7。stable になってから検討する） |
 | ACP v2（`schema-v2.0.0-alpha.*`） | 方針（decisions.md A-1b。v1 のみ） |
@@ -167,7 +167,7 @@
 
 ## 7. unstable の機能
 
-`schema.unstable.json` の機能は何も実装していない。v1.20.0 の時点では、`session/fork`、`session/options`、
+`schema.unstable.json` の機能は何も実装していない。v1.22.0 の時点では、`session/fork`、`session/options`、
 `session/archive` / `session/unarchive`、`session/status`、`session/set_title`、`providers/*`、`auth/status` / `auth/status_update`、
 `prompt_suggestions_update`、`cursor_update`、`mcp/message`、プロキシの `proxy/initialize` / `proxy/successor` などがある。
 SDK は既定の入口（stable の v1）から import しているため、これらの型を持たない。stable の `SessionUpdate` に無いバリアントの
