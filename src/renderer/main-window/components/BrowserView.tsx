@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, ExternalLink, RotateCw, ShieldAlert, Star, X } from 'lucide-react'
-import { addressToUrl, BLANK_PAGE, isWebUrl } from '@shared/browserUrl'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, ExternalLink, Globe, GlobeLock, RefreshCw, RotateCw, ShieldAlert, Star, X } from 'lucide-react'
+import { addressToUrl, BLANK_PAGE, isBrowsableUrl, isWebUrl, parseLocalPageUrl } from '@shared/browserUrl'
 import { cn } from '../../shared/lib/utils'
 import { registerEditorSearch } from '../editorSearch'
 import { TAB_TOOLBAR_CLASS } from '../tabToolbar'
@@ -37,7 +37,8 @@ export function BrowserView({
   onNavigate,
   onTitleChange,
   onToggleBookmark,
-  onFocus
+  onFocus,
+  onAutoRefreshChange
 }: {
   initialUrl: string
   /** 今のページがブックマークにあるか。 */
@@ -47,13 +48,15 @@ export function BrowserView({
   onToggleBookmark: (url: string, title: string) => void
   /** ページにフォーカスが移った（分割ビューで前面のペインにする）。 */
   onFocus: () => void
+  /** 自動再読み込みの間隔（秒、0 は止めている）が変わった。 */
+  onAutoRefreshChange: (seconds: number) => void
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const hostRef = useRef<HTMLDivElement>(null)
   const webviewRef = useRef<WebviewElement | null>(null)
   const readyRef = useRef(false)
   const addressRef = useRef<HTMLInputElement>(null)
-  const [url, setUrl] = useState(isWebUrl(initialUrl) ? initialUrl : '')
+  const [url, setUrl] = useState(isBrowsableUrl(initialUrl) ? initialUrl : '')
   const [address, setAddress] = useState(url)
   const [editingAddress, setEditingAddress] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -64,10 +67,18 @@ export function BrowserView({
   const [matches, setMatches] = useState<{ active: number; total: number } | null>(null)
   const findInputRef = useRef<HTMLInputElement>(null)
   /** 今のページで断った権限（Electron の名前）と、それを求めたページの origin。ページを移ったら空にする。 */
+  /** 自動再読み込みの間隔（秒）。0 は止めている。 */
+  const [autoRefresh, setAutoRefresh] = useState(0)
+  /** 表示中のプロジェクト内のファイルのページから、外部への接続を許しているか。 */
+  const [networkAllowed, setNetworkAllowed] = useState(false)
+  const localPage = parseLocalPageUrl(url)
+  const localProjectId = localPage?.projectId ?? null
+  /** 外部のブラウザで開けるか。プロジェクト内のファイルは HTML（とフォルダの `index.html`）だけ。 */
+  const canOpenExternal = localPage ? localPage.relPath === '' || /(\.html?|\/)$/i.test(localPage.relPath) : isWebUrl(url)
   const [deniedPermissions, setDeniedPermissions] = useState<{ permission: string; origins: string[] }[]>([])
 
-  const callbacksRef = useRef({ onNavigate, onTitleChange, onFocus })
-  callbacksRef.current = { onNavigate, onTitleChange, onFocus }
+  const callbacksRef = useRef({ onNavigate, onTitleChange, onFocus, onAutoRefreshChange })
+  callbacksRef.current = { onNavigate, onTitleChange, onFocus, onAutoRefreshChange }
 
   useEffect(() => {
     const host = hostRef.current
@@ -76,7 +87,7 @@ export function BrowserView({
     webview.setAttribute('partition', BROWSER_PARTITION)
     webview.setAttribute('allowpopups', '')
     webview.className = 'h-full w-full'
-    webview.src = isWebUrl(initialUrl) ? initialUrl : BLANK_PAGE
+    webview.src = isBrowsableUrl(initialUrl) ? initialUrl : BLANK_PAGE
     webviewRef.current = webview
 
     const syncHistory = (): void => {
@@ -88,7 +99,7 @@ export function BrowserView({
       const { url: next, isMainFrame } = event as Event & { url: string; isMainFrame?: boolean }
       if (isMainFrame === false) return
       if (event.type === 'did-navigate') setDeniedPermissions([])
-      const shown = isWebUrl(next) ? next : ''
+      const shown = isBrowsableUrl(next) ? next : ''
       setUrl(shown)
       if (!editingRef.current) setAddress(shown)
       if (shown) callbacksRef.current.onNavigate(shown)
@@ -135,7 +146,7 @@ export function BrowserView({
 
   // 空のページで開いたときは、すぐ入力できるようにアドレスバーへフォーカスする。
   useEffect(() => {
-    if (!isWebUrl(initialUrl)) addressRef.current?.focus()
+    if (!isBrowsableUrl(initialUrl)) addressRef.current?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -191,6 +202,51 @@ export function BrowserView({
       }),
     []
   )
+
+  /** 自動再読み込みの間隔を変える。右クリックで選ばれたときは main がもう知っているので伝えない。 */
+  function changeAutoRefresh(seconds: number, tellMain: boolean): void {
+    setAutoRefresh(seconds)
+    callbacksRef.current.onAutoRefreshChange(seconds)
+    const webview = webviewRef.current
+    if (tellMain && webview && readyRef.current) void window.shovel.browser.setAutoRefresh(webview.getWebContentsId(), seconds)
+  }
+
+  useEffect(
+    () =>
+      window.shovel.browser.onAutoRefresh((webContentsId, seconds) => {
+        const webview = webviewRef.current
+        if (webview && readyRef.current && webview.getWebContentsId() === webContentsId) changeAutoRefresh(seconds, false)
+      }),
+    []
+  )
+
+  // 読み込み中でなければ、間隔ごとに読み直す。
+  useEffect(() => {
+    if (autoRefresh <= 0) return
+    const timer = window.setInterval(() => {
+      const webview = webviewRef.current
+      if (webview && readyRef.current && !webview.isLoading()) webview.reload()
+    }, autoRefresh * 1000)
+    return () => window.clearInterval(timer)
+  }, [autoRefresh])
+
+  useEffect(() => {
+    if (!localProjectId) return
+    let cancelled = false
+    void window.shovel.browser.getLocalPageNetwork(localProjectId).then((allowed) => {
+      if (!cancelled) setNetworkAllowed(allowed)
+    })
+    const off = window.shovel.browser.onLocalPageNetworkChanged((projectId, allowed) => {
+      if (projectId !== localProjectId) return
+      setNetworkAllowed(allowed)
+      // 新しい設定（CSP）はページを読み直したときに効く。
+      if (readyRef.current) webviewRef.current?.reload()
+    })
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [localProjectId])
 
   function find(forward: boolean, findNext: boolean): void {
     const webview = webviewRef.current
@@ -272,10 +328,29 @@ export function BrowserView({
           }}
           className="h-7 min-w-0 flex-1 rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
+        {autoRefresh > 0 && (
+          <button
+            className="flex h-7 shrink-0 items-center gap-1 rounded px-1.5 text-xs text-primary hover:bg-accent"
+            title={t('browser.autoRefreshStop', { seconds: autoRefresh })}
+            onClick={() => changeAutoRefresh(0, true)}
+          >
+            <RefreshCw size={13} />
+            {t('browser.autoRefreshSeconds', { seconds: autoRefresh })}
+          </button>
+        )}
+        {localProjectId && (
+          <button
+            className={cn(iconButton, networkAllowed && 'text-amber-600 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-400')}
+            title={networkAllowed ? t('browser.localNetworkAllowed') : t('browser.localNetworkBlocked')}
+            onClick={() => void window.shovel.browser.setLocalPageNetwork(localProjectId, !networkAllowed)}
+          >
+            {networkAllowed ? <Globe size={14} /> : <GlobeLock size={14} />}
+          </button>
+        )}
         <button
           className={iconButton}
           title={bookmarked ? t('browser.removeBookmark') : t('browser.addBookmark')}
-          disabled={!url}
+          disabled={!isWebUrl(url)}
           onClick={() => onToggleBookmark(url, webview()?.getTitle() || url)}
         >
           <Star size={14} className={cn(bookmarked && 'fill-current text-amber-500')} />
@@ -283,7 +358,7 @@ export function BrowserView({
         <button
           className={iconButton}
           title={t('browser.openExternal')}
-          disabled={!url}
+          disabled={!canOpenExternal}
           onClick={() => void window.shovel.browser.openExternal(url)}
         >
           <ExternalLink size={14} />
@@ -307,7 +382,7 @@ export function BrowserView({
           </span>
           <button
             type="button"
-            disabled={!url}
+            disabled={!canOpenExternal}
             onClick={() => void window.shovel.browser.openExternal(url)}
             className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent disabled:opacity-40"
           >

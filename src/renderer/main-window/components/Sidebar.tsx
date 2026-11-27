@@ -32,6 +32,7 @@ export function Sidebar({
   activeSessionId,
   onSelectTab,
   onOpenFile,
+  onOpenInBrowser,
   onOpenHistory,
   onOpenLocalRecord,
   onRenameTab,
@@ -57,6 +58,8 @@ export function Sidebar({
   activeSessionId: string | null
   onSelectTab: (sessionId: string) => void
   onOpenFile: (relPath: string, at?: Omit<FileReveal, 'nonce'>) => void
+  /** HTML ファイルをブラウザのタブで開く。 */
+  onOpenInBrowser: (relPath: string) => void
   onOpenHistory: (entry: HistoryEntry) => void
   onOpenLocalRecord: (record: LocalRecordSummary) => void
   onRenameTab: (sessionId: string, title: string) => void
@@ -139,6 +142,7 @@ export function Sidebar({
             <Filer
               projectId={projectId}
               onOpenFile={onOpenFile}
+              onOpenInBrowser={onOpenInBrowser}
               chatTargets={local ? undefined : chatTargets}
               onAddToContext={onAddToContext}
             />

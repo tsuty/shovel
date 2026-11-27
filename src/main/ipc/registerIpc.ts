@@ -86,8 +86,9 @@ import { searchLocalRecords } from '../domain/localSearch'
 import { restoreOpenTabs, saveOpenTabs } from '../domain/openTabsService'
 import { listBookmarks, saveBookmarks } from '../domain/bookmarkService'
 import { openExternalIfSafe } from '../windows/createSecureWindow'
-import { setChatTargets } from '../windows/browserGuest'
-import { isWebUrl } from '@shared/browserUrl'
+import { setAutoRefresh, setChatTargets } from '../windows/browserGuest'
+import { isLocalPageNetworkAllowed, openLocalPageExternally, setLocalPageNetworkAllowed } from '../windows/localPageProtocol'
+import { isLocalPageUrl, isWebUrl } from '@shared/browserUrl'
 import { sanitizeFontFamily } from '@shared/fontFamily'
 import type { Bookmark } from '@shared/types/browser'
 import { getAcpUpdateOffer, resolveAcpUpdate, rollbackAcpVersion } from '../domain/acpVersionService'
@@ -117,10 +118,21 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IpcChannel.TabsRestore, (_event, projectId: string) => restoreOpenTabs(projectId))
   ipcMain.handle(IpcChannel.TabsSave, (_event, projectId: string, tabs: SavedTab[]) => saveOpenTabs(projectId, tabs))
-  ipcMain.handle(IpcChannel.BrowserOpenExternal, (_event, url: string) => {
-    if (typeof url === 'string' && isWebUrl(url)) openExternalIfSafe(url)
+  ipcMain.handle(IpcChannel.BrowserOpenExternal, async (event, url: string) => {
+    if (typeof url !== 'string') return
+    if (isWebUrl(url)) openExternalIfSafe(url)
+    else if (isLocalPageUrl(url)) await openLocalPageExternally(event.sender, url)
   })
   ipcMain.handle(IpcChannel.BrowserSetChatTargets, (event, targets: unknown) => setChatTargets(event.sender, targets))
+  ipcMain.handle(IpcChannel.BrowserSetAutoRefresh, (_event, webContentsId: unknown, seconds: unknown) =>
+    setAutoRefresh(webContentsId, seconds)
+  )
+  ipcMain.handle(IpcChannel.BrowserGetLocalPageNetwork, (_event, projectId: unknown) =>
+    typeof projectId === 'string' && isLocalPageNetworkAllowed(projectId)
+  )
+  ipcMain.handle(IpcChannel.BrowserSetLocalPageNetwork, (_event, projectId: unknown, allowed: unknown) =>
+    setLocalPageNetworkAllowed(projectId, allowed)
+  )
   ipcMain.handle(IpcChannel.BookmarksList, (_event, projectId: string) => listBookmarks(projectId))
   ipcMain.handle(IpcChannel.BookmarksSave, (_event, projectId: string, bookmarks: Bookmark[]) =>
     saveBookmarks(projectId, bookmarks)

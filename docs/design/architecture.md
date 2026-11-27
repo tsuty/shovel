@@ -91,7 +91,8 @@ OS のリソースとプロセスを扱うものはすべてここに置く。
 - `will-navigate` と `setWindowOpenHandler` を塞ぐ。リンクは外部ブラウザへ渡す
 - ブラウザのタブ（`<webview>`、decisions.md G-1-20）はプロジェクトのウィンドウだけで有効にし、main の
   `will-attach-webview` で preload なし・`nodeIntegration: false`・`contextIsolation: true`・`sandbox: true`・
-  専用の保存領域（`persist:shovel-browser`）を強制する。開けるのは `http:` / `https:` だけ、権限の要求はすべて断る（断った権限はタブの帯で知らせる）。
+  専用の保存領域（`persist:shovel-browser`）を強制する。開けるのは `http:` / `https:` と、プロジェクト内のファイルを配信する
+  `shovel-file:`（そのプロジェクトのウィンドウ・ページからだけ、既定で外部への接続を CSP で遮断。decisions.md G-1-22）だけ、権限の要求はすべて断る（断った権限はタブの帯で知らせる）。
   ブラウザはホストで動き、サンドボックスの隔離（§6 ①）の外にある。エージェントからは操作できない
 - Markdown 中の生 HTML を通さない（`rehype-raw` を使わない）
   - 例外: Markdown ファイルの表示（エディタのプレビュー・印刷用表示）に限り、`<details>` / `<summary>` だけを

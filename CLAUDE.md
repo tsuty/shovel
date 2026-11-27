@@ -109,11 +109,24 @@ so moving a tab across panes never moves its DOM (no iframe/webview reload); Cmd
 (`addressToUrl` in `src/shared/browserUrl.ts`: scheme added for domain-like input, else Google search), ☆ bookmark toggle,
 open-externally and an in-tab find bar (`findInPage`); not counted toward the tab limit, restored by URL. Main
 (`src/main/windows/browserGuest.ts`) forces every guest to no preload / no Node / sandbox / the app-wide
-`persist:shovel-browser` partition (cookies shared by all projects, kept across restarts), allows only http(s), denies all
+`persist:shovel-browser` partition (cookies shared by all projects, kept across restarts), allows only http(s) plus
+`shovel-file://<projectId>/<relPath>` (project-folder HTML served by `localPageProtocol.ts`, below), denies all
 permission requests (each denied request is reported to the tab via `browser:permissionDenied`, shown as a
 dismissable bar with "open externally"; permission *checks* are not reported), turns popups into new browser tabs, and forwards the guest's Cmd/Ctrl+F, focus and mouse-down to the
 host (`browser:findRequested` / `browser:focused`) since guest input never reaches the host window. The page's right-click
-(and its edit menu) ends with "open developer tools" for the guest (`openDevTools({ mode: 'detach' })`). The page's right-click
+(and its edit menu) ends with "open developer tools" for the guest (`openDevTools({ mode: 'detach' })`). The page's
+right-click also has "auto refresh ▸" (off / 1·3·5·10·30·60 s; any page; the renderer runs the timer, main only keeps the
+value for the menu's check mark; shown as a "⟳ Ns" toolbar pill that stops it and a coloured `refresh-cw` tab icon; not saved).
+**Project HTML in the browser** (decisions.md G-1-22): the Filer's right-click on `.html`/`.htm` and the HTML editor's toolbar
+"open in browser" open `shovel-file://<projectId>/<relPath>` (typing it in the address bar works too; no bookmarks).
+`src/main/windows/localPageProtocol.ts` serves only files inside that project's folder (symlinks resolved, directory →
+`index.html`, `no-store`), and a `webRequest.onBeforeRequest` guard only lets through requests from that project's window
+that are either main-frame loads or come from a frame of the same `shovel-file` origin — web pages can't embed/fetch
+project files (Electron 45 sends no `Sec-Fetch-Site` for custom schemes, so don't rely on it). A CSP blocks external
+connections by default; a toolbar toggle (`globe-lock`/amber `globe`) allows them **per project, in memory only** (same
+origin across tabs makes per-tab meaningless). It's a guardrail, not a boundary (navigation and WebRTC aren't covered). "Open externally" on such a page
+(`.html`/`.htm` only, checked in main too) shows a native warning dialog, then hands the `file:` URL to `shell.openExternal`.
+The scheme's privileges are registered together with `app://` in `registerRendererScheme` (one call only). The page's right-click
 also hands things to a chat (quote the selection / paste the link or page URL into the composer — never sent
 automatically — or save a visible-area `capturePage()` PNG to `.shovel/screenshots/` and attach it — directly, or after annotating it in `ImageAnnotator` ("保存して添付" attaches the `-annotated.png`; the raw capture stays saved)); each item has a
 submenu listing every connected chat (left pane first, "（表示中）" on visible ones, a disabled "no open chats" row when

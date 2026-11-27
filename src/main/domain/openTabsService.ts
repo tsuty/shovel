@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { RestoredTab, SavedPane, SavedTab } from '@shared/types/session'
-import { isWebUrl } from '@shared/browserUrl'
+import { isWebUrl, parseLocalPageUrl } from '@shared/browserUrl'
 import { openTabsStore, projectsStore } from '../persistence/store'
 import { parseRecordName, readLocalRecord } from '../persistence/snapshot'
 
@@ -36,8 +36,11 @@ export async function restoreOpenTabs(projectId: string): Promise<RestoredTab[]>
     switch (saved.kind) {
       case 'file':
         return (await isExistingFile(saved.relPath)) ? { kind: 'file', relPath: saved.relPath, pane } : null
-      case 'browser':
-        return isWebUrl(saved.url) ? { kind: 'browser', url: saved.url, title: String(saved.title), pane } : null
+      case 'browser': {
+        const local = parseLocalPageUrl(saved.url)
+        const ok = local ? local.projectId === projectId && (await isExistingFile(local.relPath)) : isWebUrl(saved.url)
+        return ok ? { kind: 'browser', url: saved.url, title: String(saved.title), pane } : null
+      }
       case 'record': {
         const parsed = parseRecordName(saved.fileName)
         if (!parsed) return null

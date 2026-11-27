@@ -1,6 +1,6 @@
 import { app, BrowserWindow, clipboard, Menu, session, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import { IpcChannel } from '@shared/ipc'
-import { BLANK_PAGE, isWebUrl } from '@shared/browserUrl'
+import { BLANK_PAGE, isBrowsableUrl, isLocalPageUrl, isWebUrl } from '@shared/browserUrl'
 import { quoteSelection, type ChatTarget, type DraftInsertion } from '@shared/chatDraft'
 import { resolveLocale } from '../locale'
 import { saveScreenshot } from '../domain/filerService'
@@ -9,6 +9,7 @@ import { openExternalIfSafe } from './createSecureWindow'
 import { projectIdOfWindow } from './registry'
 import { projectsStore } from '../persistence/store'
 import { isSandboxProject } from '@shared/types/project'
+import { installLocalPageProtocol, isSameLocalPage } from './localPageProtocol'
 
 /** ブラウザのタブの保存領域（Cookie・ログイン状態）。全プロジェクトで共通にし、再起動しても残す。 */
 export const BROWSER_PARTITION = 'persist:shovel-browser'
@@ -31,7 +32,10 @@ const labels = {
     annotateScreenshot: 'Annotate screenshot and save',
     visibleChat: (title: string) => `${title} (visible)`,
     noChats: 'No open chats',
-    devTools: 'Open developer tools'
+    devTools: 'Open developer tools',
+    autoRefresh: 'Auto refresh',
+    autoRefreshOff: 'Off',
+    seconds: (n: number) => `Every ${n}s`
   },
   ja: {
     back: '戻る',
@@ -50,7 +54,10 @@ const labels = {
     annotateScreenshot: 'スクリーンショットに注釈を付けて保存',
     visibleChat: (title: string) => `${title}（表示中）`,
     noChats: '開いているチャットはありません',
-    devTools: '開発者ツールを開く'
+    devTools: '開発者ツールを開く',
+    autoRefresh: '自動再読み込み',
+    autoRefreshOff: 'オフ',
+    seconds: (n: number) => `${n}秒ごと`
   }
 } as const
 
@@ -91,6 +98,7 @@ export function installBrowserGuestPolicy(): void {
     )
   })
   browserSession.setPermissionCheckHandler(() => false)
+  installLocalPageProtocol(browserSession)
 
   app.on('web-contents-created', (_event, contents) => {
     contents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -102,7 +110,7 @@ export function installBrowserGuestPolicy(): void {
       webPreferences.webSecurity = true
       webPreferences.allowRunningInsecureContent = false
       webPreferences.partition = BROWSER_PARTITION
-      if (params.src && params.src !== BLANK_PAGE && !isWebUrl(params.src)) event.preventDefault()
+      if (params.src && params.src !== BLANK_PAGE && !isBrowsableUrl(params.src)) event.preventDefault()
     })
     if (contents.getType() === 'webview') setupGuest(contents)
   })
@@ -117,16 +125,58 @@ function originOf(url: string | undefined): string {
   }
 }
 
+/** 自動再読み込みの間隔の選択肢（秒）。 */
+const AUTO_REFRESH_SECONDS = [1, 3, 5, 10, 30, 60]
+
+/** ブラウザのタブ（ページの `webContents.id`）ごとの自動再読み込みの間隔（秒）。右クリックメニューの選択表示に使う。 */
+const autoRefreshByGuest = new Map<number, number>()
+
+/** ページの自動再読み込みの間隔を記録する（0 で止める）。renderer の `setAutoRefresh` からも呼ばれる。 */
+export function setAutoRefresh(guestId: unknown, seconds: unknown): void {
+  if (typeof guestId !== 'number' || typeof seconds !== 'number') return
+  if (seconds > 0) autoRefreshByGuest.set(guestId, seconds)
+  else autoRefreshByGuest.delete(guestId)
+}
+
+/** 右クリックメニューの「自動再読み込み ▸」。選んだ間隔をホストのウィンドウへ知らせる。 */
+function autoRefreshMenuItem(contents: WebContents, t: (typeof labels)[keyof typeof labels]): MenuItemConstructorOptions {
+  const current = autoRefreshByGuest.get(contents.id) ?? 0
+  const choose = (seconds: number): void => {
+    setAutoRefresh(contents.id, seconds)
+    contents.hostWebContents?.send(IpcChannel.BrowserAutoRefresh, contents.id, seconds)
+  }
+  return {
+    label: t.autoRefresh,
+    submenu: [
+      { label: t.autoRefreshOff, type: 'radio', checked: current === 0, click: () => choose(0) },
+      { type: 'separator' },
+      ...AUTO_REFRESH_SECONDS.map(
+        (seconds): MenuItemConstructorOptions => ({
+          label: t.seconds(seconds),
+          type: 'radio',
+          checked: current === seconds,
+          click: () => choose(seconds)
+        })
+      )
+    ]
+  }
+}
+
 /** 右クリックメニューの「開発者ツールを開く」。ページのタブとは別のウィンドウに開く。 */
 function devToolsMenuItems(contents: WebContents, t: (typeof labels)[keyof typeof labels]): MenuItemConstructorOptions[] {
   return [{ type: 'separator' }, { label: t.devTools, click: () => contents.openDevTools({ mode: 'detach' }) }]
 }
 
 function setupGuest(contents: WebContents): void {
+  contents.once('destroyed', () => autoRefreshByGuest.delete(contents.id))
+
+  /** プロジェクト内のファイルのページへ移れるのは、同じプロジェクトのページからだけ。 */
+  const canOpen = (url: string): boolean => isWebUrl(url) || isSameLocalPage(contents.getURL(), url)
+
   /** ページから新しいタブで開く URL を、そのタブのあるウィンドウへ渡す。`mailto:` などは OS へ。 */
   const openInNewTab = (url: string): void => {
-    if (isWebUrl(url)) contents.hostWebContents?.send(IpcChannel.BrowserOpenUrl, url)
-    else openExternalIfSafe(url)
+    if (canOpen(url)) contents.hostWebContents?.send(IpcChannel.BrowserOpenUrl, url)
+    else if (!isLocalPageUrl(url)) openExternalIfSafe(url)
   }
 
   contents.setWindowOpenHandler(({ url }) => {
@@ -134,9 +184,9 @@ function setupGuest(contents: WebContents): void {
     return { action: 'deny' }
   })
   contents.on('will-navigate', (event, url) => {
-    if (isWebUrl(url)) return
+    if (canOpen(url)) return
     event.preventDefault()
-    openExternalIfSafe(url)
+    if (!isLocalPageUrl(url)) openExternalIfSafe(url)
   })
   contents.on('will-redirect', (event, url) => {
     if (!isWebUrl(url)) event.preventDefault()
@@ -171,15 +221,16 @@ function setupGuest(contents: WebContents): void {
     const template: MenuItemConstructorOptions[] = [
       { label: t.back, enabled: history.canGoBack(), click: () => history.goBack() },
       { label: t.forward, enabled: history.canGoForward(), click: () => history.goForward() },
-      { label: t.reload, click: () => contents.reload() }
+      { label: t.reload, click: () => contents.reload() },
+      autoRefreshMenuItem(contents, t)
     ]
-    if (params.linkURL && isWebUrl(params.linkURL)) {
+    if (params.linkURL && canOpen(params.linkURL)) {
       const link = params.linkURL
       template.push(
         { type: 'separator' },
         { label: t.openInNewTab, click: () => openInNewTab(link) },
         { label: t.copyLink, click: () => void clipboard.writeText(link) },
-        { label: t.openExternal, click: () => openExternalIfSafe(link) }
+        ...(isWebUrl(link) ? [{ label: t.openExternal, click: () => openExternalIfSafe(link) }] : [])
       )
     }
     if (params.selectionText) {

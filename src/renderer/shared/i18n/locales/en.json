@@ -116,6 +116,10 @@
     "comingSoon": "Coming soon"
   },
   "browser": {
+    "localNetworkAllowed": "Pages from this project's files may connect to external sites. Click to block",
+    "localNetworkBlocked": "Pages from this project's files can't connect to external sites. Click to allow (reset to blocked when the app quits)",
+    "autoRefreshStop": "Reloading automatically every {{seconds}}s. Click to stop (also changeable from the page's right-click \"Auto refresh\")",
+    "autoRefreshSeconds": "{{seconds}}s",
     "newTab": "New browser tab",
     "newTabTitle": "New tab",
     "back": "Back",
@@ -177,6 +181,7 @@
     "splitRight": "Split and move right"
   },
   "filer": {
+    "openInBrowser": "Open in browser",
     "copyPath": "Copy path",
     "addToContext": "Add to context",
     "visibleChat": "{{title}} (visible)",
@@ -286,6 +291,7 @@
     "open": "Annotate"
   },
   "editor": {
+    "openInBrowser": "Open in browser",
     "mode": {
       "split": "Split",
       "source": "Source",

@@ -8,6 +8,7 @@ import {
   Columns2,
   ExternalLink,
   Eye,
+  Globe,
   Printer,
   SquareCode,
   SquarePen,
@@ -178,12 +179,15 @@ export function TextFileEditor({
   projectId,
   relPath,
   language = 'markdown',
-  reveal
+  reveal,
+  onOpenInBrowser
 }: {
   projectId: string
   relPath: string
   language?: EditorLanguage
   reveal?: FileReveal
+  /** このファイルをブラウザのタブで開く（HTML だけ）。 */
+  onOpenInBrowser?: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const modes = modesFor(language)
@@ -662,6 +666,22 @@ export function TextFileEditor({
           </>
         )}
         <div className="flex-1" />
+        {language === 'html' &&
+          onOpenInBrowser &&
+          (compactToolbar ? (
+            <button
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+              title={t('editor.openInBrowser')}
+              onClick={onOpenInBrowser}
+            >
+              <Globe size={14} />
+            </button>
+          ) : (
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={onOpenInBrowser}>
+              <Globe size={14} />
+              {t('editor.openInBrowser')}
+            </Button>
+          ))}
         {(language === 'markdown' || language === 'html') &&
           (compactToolbar ? (
             <button

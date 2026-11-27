@@ -8,6 +8,7 @@ import { openProjectManagerWindow } from './windows/projectManagerWindow'
 import { installRendererProtocol, registerRendererScheme } from './windows/rendererProtocol'
 import { anyProjectWindowOpen, getProjectManagerWindow, markQuitting } from './windows/registry'
 import { installBrowserGuestPolicy } from './windows/browserGuest'
+import { LOCAL_PAGE_SCHEME_PRIVILEGES } from './windows/localPageProtocol'
 import { installAppHealthMonitor } from './windows/rendererRecovery'
 import { applyPlanUsageSetting, notePlanUsageActivity } from './domain/planUsageService'
 import { CLI_OPEN_KEY, type CliOpenRequest, parseCliArgv, parseCliOpenData } from './domain/cliCommand'
@@ -20,7 +21,7 @@ const gotLock = app.requestSingleInstanceLock(cliOpen ? { [CLI_OPEN_KEY]: cliOpe
 if (!gotLock) {
   app.quit()
 } else {
-  registerRendererScheme()
+  registerRendererScheme([LOCAL_PAGE_SCHEME_PRIVILEGES])
 
   // PATH の取り込みと IPC 登録が済むまでは、Dock クリックなどの `activate` でウィンドウを開かない。
   let startupDone = false

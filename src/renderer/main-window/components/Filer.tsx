@@ -17,6 +17,7 @@ import {
   FolderOpen,
   FolderPlus,
   FolderSearch,
+  Globe,
   Link,
   Link2,
   RefreshCw,
@@ -26,7 +27,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FsEntry } from '@shared/types/filer'
-import type { NewFileKind } from '@shared/fileKinds'
+import { editorLanguageFor, type NewFileKind } from '@shared/fileKinds'
 import type { ChatTarget } from '@shared/chatDraft'
 import { cn } from '../../shared/lib/utils'
 import { MERMAID_BRAND_COLOR, MermaidIcon } from '../../shared/components/icons/MermaidIcon'
@@ -112,12 +113,15 @@ function targetDirFor(node: FsNode | null): string {
 export function Filer({
   projectId,
   onOpenFile,
+  onOpenInBrowser,
   chatTargets,
   onAddToContext
 }: {
   projectId: string
   /** `at` があれば、開いた後にその位置（コンテンツ検索の一致箇所）へ移る。 */
   onOpenFile: (relPath: string, at?: Omit<FileReveal, 'nonce'>) => void
+  /** HTML ファイルをブラウザのタブで開く。 */
+  onOpenInBrowser: (relPath: string) => void
   /** 「コンテキストに追加 ▸」のサブメニューに出す、渡す先に選べるチャット。 */
   /** 「コンテキストに追加」の渡す先。チャットの無いプロジェクト（サンドボックス無し）では undefined で、項目を出さない。 */
   chatTargets?: ChatTarget[]
@@ -461,6 +465,17 @@ export function Filer({
           {menu.node && (
             <MenuItem icon={<Link size={14} />} onClick={() => void copyPath(menu.node!)}>
               {t('filer.copyPath')}
+            </MenuItem>
+          )}
+          {menu.node && !menu.node.isDir && editorLanguageFor(menu.node.relPath) === 'html' && (
+            <MenuItem
+              icon={<Globe size={14} />}
+              onClick={() => {
+                onOpenInBrowser(menu.node!.relPath)
+                setMenu(null)
+              }}
+            >
+              {t('filer.openInBrowser')}
             </MenuItem>
           )}
           {menu.node && !menu.node.isDir && chatTargets && (

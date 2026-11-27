@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Bot, Clock3, Columns2, CopyX, File, FileX, Globe, Loader2, Plus, X } from 'lucide-react'
+import { AlertTriangle, Bot, Clock3, Columns2, CopyX, File, FileCode, FileX, Globe, Loader2, Plus, RefreshCw, X } from 'lucide-react'
 import { cn } from '../../shared/lib/utils'
 import { tabIndicator, type TabStatus } from '../tabAttention'
 import { MenuItem } from './MenuItem'
@@ -22,6 +22,10 @@ export interface TabInfo {
   failed?: boolean
   /** 「右に分割して移動」を押せる。 */
   canSplitRight?: boolean
+  /** ブラウザのタブがプロジェクト内のファイルを表示している。 */
+  localPage?: boolean
+  /** ブラウザのタブの自動再読み込みの間隔（秒）。止めていれば undefined。 */
+  autoRefreshSeconds?: number
 }
 
 /** ドラッグで離したときに入る位置。`beforeId` のタブの左（`null` はそのペインの右端）。 */
@@ -273,7 +277,16 @@ export function TabBar({
                   />
                 )}
                 {tab.kind === 'history' && <Clock3 size={12} className="shrink-0" />}
-                {tab.kind === 'browser' && <Globe size={12} className="shrink-0" />}
+                {tab.kind === 'browser' &&
+                  (tab.autoRefreshSeconds ? (
+                    <span className="flex shrink-0 text-primary" title={t('browser.autoRefreshSeconds', { seconds: tab.autoRefreshSeconds })}>
+                      <RefreshCw size={12} />
+                    </span>
+                  ) : tab.localPage ? (
+                    <FileCode size={12} className="shrink-0" />
+                  ) : (
+                    <Globe size={12} className="shrink-0" />
+                  ))}
                 {tab.kind === 'connecting' &&
                   (tab.failed ? (
                     <AlertTriangle size={12} className="shrink-0 text-destructive" />

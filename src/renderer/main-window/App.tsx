@@ -36,6 +36,7 @@ import { ConnectingView, type ConnectingStepRecord } from './components/Connecti
 import { FindBar } from './components/FindBar'
 import type { FileReveal } from './revealMatch'
 import type { Bookmark } from '@shared/types/browser'
+import { isLocalPageUrl, localPageUrl } from '@shared/browserUrl'
 import type { ChatTarget } from '@shared/chatDraft'
 import { BrowserView } from './components/BrowserView'
 import { BookmarkDialog } from './components/BookmarkDialog'
@@ -102,6 +103,8 @@ type Tab =
       initialUrl: string
       /** 今表示しているページ（保存とブックマークの判定に使う）。まだ開いていなければ空。 */
       url: string
+      /** 自動再読み込みの間隔（秒）。止めていれば undefined。 */
+      autoRefresh?: number
     }
   | {
       kind: 'history'
@@ -494,12 +497,21 @@ export function App(): React.JSX.Element {
   openBrowserTabRef.current = openBrowserTab
   useEffect(() => window.shovel.browser.onOpenUrl((url) => openBrowserTabRef.current(url)), [])
 
-  function updateBrowserTab(id: string, patch: { url?: string; title?: string }): void {
+  /** プロジェクト内の HTML ファイルをブラウザのタブで開く。同じページのタブがあれば前面に出す。 */
+  function openLocalPage(relPath: string): void {
+    if (!projectId) return
+    const url = localPageUrl(projectId, relPath)
+    const existing = tabs.find((tab) => tab.kind === 'browser' && tab.url === url)
+    if (existing) activate(existing.sessionId)
+    else openBrowserTab(url)
+  }
+
+  function updateBrowserTab(id: string, patch: { url?: string; title?: string; autoRefresh?: number }): void {
     setTabs((prev) =>
       prev.map((tab) => {
         if (tab.sessionId !== id || tab.kind !== 'browser') return tab
         const next = { ...tab, ...patch }
-        return next.url === tab.url && next.title === tab.title ? tab : next
+        return next.url === tab.url && next.title === tab.title && next.autoRefresh === tab.autoRefresh ? tab : next
       })
     )
   }
@@ -860,7 +872,9 @@ export function App(): React.JSX.Element {
     snapshotId: tab.kind === 'session' ? tab.snapshotId : undefined,
     failed: tab.kind === 'connecting' ? tab.error !== undefined : undefined,
     status: tab.kind === 'session' ? tabStatuses[tab.sessionId] : undefined,
-    canSplitRight: canSplitRight(layout, tab.sessionId)
+    canSplitRight: canSplitRight(layout, tab.sessionId),
+    localPage: tab.kind === 'browser' ? isLocalPageUrl(tab.url) : undefined,
+    autoRefreshSeconds: tab.kind === 'browser' ? tab.autoRefresh : undefined
   })
   /** サイドバーのタブ一覧用。ペインの左から順に並べる。 */
   const tabInfos: TabInfo[] = panes.flatMap((pane) => pane.tabIds.flatMap((id) => {
@@ -897,6 +911,7 @@ export function App(): React.JSX.Element {
           activeSessionId={activeSessionId}
           onSelectTab={(id) => activate(id)}
           onOpenFile={openFile}
+          onOpenInBrowser={openLocalPage}
           onOpenHistory={(entry) => void openHistoryEntry(entry)}
           onOpenLocalRecord={(record) => void openLocalRecord(record)}
           onRenameTab={renameTab}
@@ -1016,6 +1031,7 @@ export function App(): React.JSX.Element {
                       onTitleChange={(title) => updateBrowserTab(tab.sessionId, { title })}
                       onToggleBookmark={toggleBookmark}
                       onFocus={() => activate(tab.sessionId)}
+                      onAutoRefreshChange={(seconds) => updateBrowserTab(tab.sessionId, { autoRefresh: seconds || undefined })}
                     />
                   ) : tab.editor ? (
                     <TextFileEditor
@@ -1023,6 +1039,7 @@ export function App(): React.JSX.Element {
                       relPath={tab.relPath}
                       language={tab.editor}
                       reveal={revealFor(tab.relPath)}
+                      onOpenInBrowser={tab.editor === 'html' ? () => openLocalPage(tab.relPath) : undefined}
                     />
                   ) : (
                     <FileViewer

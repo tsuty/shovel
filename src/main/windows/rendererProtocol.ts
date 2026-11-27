@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { protocol } from 'electron'
+import { protocol, type CustomScheme } from 'electron'
 
 /**
  * ビルド済みの renderer を `app://renderer/...` で配信する。メインプロセスが `out/renderer` 配下を
@@ -22,10 +22,11 @@ const MIME_BY_EXT: Record<string, string> = {
   '.woff2': 'font/woff2'
 }
 
-/** `app.whenReady()` より前に呼ぶ。 */
-export function registerRendererScheme(): void {
+/** `app.whenReady()` より前に1回だけ呼ぶ。`others` は一緒に登録する他のスキーム。 */
+export function registerRendererScheme(others: CustomScheme[] = []): void {
   protocol.registerSchemesAsPrivileged([
-    { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }
+    { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
+    ...others
   ])
 }
 

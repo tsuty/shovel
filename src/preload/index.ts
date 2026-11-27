@@ -220,6 +220,20 @@ const api: RendererApi = {
         cb(webContentsId, permission, origin)
       ipcRenderer.on(IpcChannel.BrowserPermissionDenied, listener)
       return () => ipcRenderer.removeListener(IpcChannel.BrowserPermissionDenied, listener)
+    },
+    setAutoRefresh: (webContentsId, seconds) => ipcRenderer.invoke(IpcChannel.BrowserSetAutoRefresh, webContentsId, seconds),
+    onAutoRefresh: (cb) => {
+      const listener = (_event: unknown, webContentsId: number, seconds: number): void => cb(webContentsId, seconds)
+      ipcRenderer.on(IpcChannel.BrowserAutoRefresh, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserAutoRefresh, listener)
+    },
+    getLocalPageNetwork: (projectId) => ipcRenderer.invoke(IpcChannel.BrowserGetLocalPageNetwork, projectId),
+    setLocalPageNetwork: (projectId, allowed) =>
+      ipcRenderer.invoke(IpcChannel.BrowserSetLocalPageNetwork, projectId, allowed),
+    onLocalPageNetworkChanged: (cb) => {
+      const listener = (_event: unknown, projectId: string, allowed: boolean): void => cb(projectId, allowed)
+      ipcRenderer.on(IpcChannel.BrowserLocalPageNetworkChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.BrowserLocalPageNetworkChanged, listener)
     }
   },
   bookmarks: {

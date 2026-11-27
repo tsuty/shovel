@@ -115,6 +115,10 @@
     "comingSoon": "近日対応"
   },
   "browser": {
+    "localNetworkAllowed": "このプロジェクトのファイルのページから外部への接続を許可しています。押すと遮断します",
+    "localNetworkBlocked": "このプロジェクトのファイルのページから外部への接続を遮断しています。押すと許可します（アプリを終えると遮断に戻ります）",
+    "autoRefreshStop": "{{seconds}}秒ごとに自動で再読み込みしています。押すと止めます（ページの右クリックの「自動再読み込み」でも変えられます）",
+    "autoRefreshSeconds": "{{seconds}}秒",
     "newTab": "新しいブラウザタブ",
     "newTabTitle": "新しいタブ",
     "back": "戻る",
@@ -176,6 +180,7 @@
     "splitRight": "右に分割して移動"
   },
   "filer": {
+    "openInBrowser": "ブラウザで開く",
     "copyPath": "パスをコピー",
     "addToContext": "コンテキストに追加",
     "visibleChat": "{{title}}（表示中）",
@@ -284,6 +289,7 @@
     "open": "注釈を付ける"
   },
   "editor": {
+    "openInBrowser": "ブラウザで開く",
     "mode": {
       "split": "分割",
       "source": "ソース",

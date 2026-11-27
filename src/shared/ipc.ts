@@ -119,6 +119,9 @@ export const IpcChannel = {
 
   BrowserOpenExternal: 'browser:openExternal',
   BrowserSetChatTargets: 'browser:setChatTargets',
+  BrowserSetAutoRefresh: 'browser:setAutoRefresh',
+  BrowserGetLocalPageNetwork: 'browser:getLocalPageNetwork',
+  BrowserSetLocalPageNetwork: 'browser:setLocalPageNetwork',
   BookmarksList: 'bookmarks:list',
   BookmarksSave: 'bookmarks:save',
 
@@ -138,7 +141,9 @@ export const IpcChannel = {
   BrowserAttachToChat: 'browser:attachToChat',
   BrowserAnnotateScreenshot: 'browser:annotateScreenshot',
   BrowserScreenshotSaved: 'browser:screenshotSaved',
-  BrowserPermissionDenied: 'browser:permissionDenied'
+  BrowserPermissionDenied: 'browser:permissionDenied',
+  BrowserAutoRefresh: 'browser:autoRefresh',
+  BrowserLocalPageNetworkChanged: 'browser:localPageNetworkChanged'
 } as const
 
 export interface CreateNewDirRequest {
@@ -405,7 +410,7 @@ export interface RendererApi {
     runHtml(html: string): Promise<void>
   }
   browser: {
-    /** `http:` / `https:` の URL を外部のブラウザで開く。それ以外は何もしない。 */
+    /** `http:` / `https:` の URL を外部のブラウザで開く。プロジェクト内のファイルのページ（`shovel-file:`）は確認してから開く。それ以外は何もしない。 */
     openExternal(url: string): Promise<void>
     /** ブラウザのタブのページが新しいウィンドウを開こうとした（`target="_blank"`・`window.open`・右クリック）。 */
     onOpenUrl(cb: (url: string) => void): () => void
@@ -425,6 +430,16 @@ export interface RendererApi {
     onScreenshotSaved(cb: (relPath: string, annotate: boolean) => void): () => void
     /** ブラウザのタブのページが権限（`permission` は Electron の名前）を求め、断った。`origin` は求めたページ（読めなければ空文字）。 */
     onPermissionDenied(cb: (webContentsId: number, permission: string, origin: string) => void): () => void
+    /** ページの自動再読み込みの間隔（秒、0 で止める）を main に伝える（右クリックメニューの選択表示に使う）。 */
+    setAutoRefresh(webContentsId: number, seconds: number): Promise<void>
+    /** ページの右クリックで自動再読み込みの間隔（秒、0 で止める）が選ばれた。 */
+    onAutoRefresh(cb: (webContentsId: number, seconds: number) => void): () => void
+    /** プロジェクト内のファイルのページ（`shovel-file:`）から外部への接続を許しているか。 */
+    getLocalPageNetwork(projectId: string): Promise<boolean>
+    /** プロジェクト内のファイルのページから外部への接続を許すかを切り替える。アプリを終えると遮断に戻る。 */
+    setLocalPageNetwork(projectId: string, allowed: boolean): Promise<void>
+    /** プロジェクト内のファイルのページから外部への接続を許すかが変わった（どのウィンドウで変えても届く）。 */
+    onLocalPageNetworkChanged(cb: (projectId: string, allowed: boolean) => void): () => void
   }
   bookmarks: {
     list(projectId: string): Promise<Bookmark[]>
