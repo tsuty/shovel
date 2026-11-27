@@ -27,7 +27,7 @@
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "2.8.0",
+    "@agentclientprotocol/sdk": "2.9.1",
     "iconv-lite": "0.7.3",
     "ignore": "7.0.16",
     "zod": "4.6.7"
